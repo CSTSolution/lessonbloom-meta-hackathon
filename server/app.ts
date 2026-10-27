@@ -1,5 +1,6 @@
 // The HTTP API. Every error carries a Vietnamese and an English message; the browser shows the
 // one matching the teacher's language.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { Accounts, cleanEmail, EMAIL, publicTeacher, type Teacher } from './auth/accounts.ts';
@@ -7,33 +8,20 @@ import type { AI } from './ai/types.ts';
 import { config } from './config.ts';
 import type { Sql } from './db/sql.ts';
 import { Budget, clientIp, Limiter } from './guard/guard.ts';
+import { fail } from './http.ts';
+import { lessonRoutes } from './lesson/routes.ts';
 import type { Mailer } from './mail.ts';
 
 export type Env = { Variables: { teacher: Teacher; token: string } };
 const COOKIE = 'lbm_s';
-
-export const MSG = {
-  signIn: { vi: 'Cô đăng nhập hoặc bấm "Dùng thử" nhé.', en: 'Please sign in or start the demo.' },
-  email: { vi: 'Địa chỉ email chưa đúng.', en: 'That email address does not look right.' },
-  tooSoon: { vi: 'Cô đợi một phút rồi xin mã mới nhé.', en: 'Please wait a minute before asking for a new code.' },
-  tooMany: { vi: 'Hôm nay đã xin quá nhiều mã. Cô thử lại vào ngày mai nhé.', en: 'Too many codes today. Please try again tomorrow.' },
-  mailFailed: { vi: 'Chưa gửi được email. Cô thử lại sau ít phút nhé.', en: 'The email could not be sent. Please try again in a few minutes.' },
-  codeWrong: { vi: 'Mã chưa đúng. Cô kiểm tra lại email nhé.', en: 'That code is not right. Please check the email.' },
-  codeExpired: { vi: 'Mã đã hết hạn. Cô xin mã mới nhé.', en: 'That code has expired. Please ask for a new one.' },
-  demoLimit: { vi: 'Hôm nay mạng này đã tạo nhiều bản dùng thử. Cô đăng nhập bằng email nhé.', en: 'Too many demos from this network today. Please sign in with your email.' },
-  bad: { vi: 'Yêu cầu chưa hợp lệ.', en: 'Invalid request.' },
-  server: { vi: 'Có lỗi ở máy chủ. Cô thử lại sau nhé.', en: 'Something went wrong on the server. Please try again.' },
-} as const;
-export type MsgKey = keyof typeof MSG;
-export const fail = (c: Context, key: MsgKey, status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503 = 400) =>
-  c.json({ code: key, error: MSG[key].vi, errorEn: MSG[key].en }, status);
-
 export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer }) {
   const { sql, ai, mail } = deps;
   const accounts = new Accounts(sql), budget = new Budget(sql);
   const demoPerIp = new Limiter(3, config.guard.demoPerIpDay), codePerIp = new Limiter(5, config.guard.codesPerIpDay), codePerEmail = new Limiter(2, config.guard.codesPerEmailDay);
   const verifyPerIp = new Limiter(10, 100);
-  ai.onUsage = (u) => { void budget.record(u, null).catch((e) => console.error(`[usage] ${(e as Error).message}`)); };
+  // every model call is logged against the teacher whose request (or background job) made it
+  const who = new AsyncLocalStorage<string>();
+  ai.onUsage = (u) => { void budget.record(u, who.getStore() ?? null).catch((e) => console.error(`[usage] ${(e as Error).message}`)); };
 
   const app = new Hono<Env>();
   app.onError((e, c) => { console.error(`[error] ${c.req.method} ${c.req.path}: ${(e as Error).stack || e}`); return fail(c, 'server', 500); });
@@ -102,5 +90,6 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer }) {
     return c.json({ ok: true });
   });
 
+  lessonRoutes(app, { sql, ai, budget, as: (teacherId, fn) => who.run(teacherId, fn) });
   return app;
 }

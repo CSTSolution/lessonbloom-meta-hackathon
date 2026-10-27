@@ -33,6 +33,7 @@ export const config = {
     teacherDayUsd: num('LB_TEACHER_DAY_USD', 2),  // one teacher, per day
     demoPerIpDay: num('LB_DEMO_PER_IP_DAY', 6),
     codesPerEmailDay: 5, codesPerIpDay: 20, codeGapSeconds: 60,
+    lessonsDemoDay: num('LB_LESSONS_DEMO_DAY', 3), lessonsDay: num('LB_LESSONS_DAY', 10),
   },
   session: { days: 30, demoDays: 7 },
 };

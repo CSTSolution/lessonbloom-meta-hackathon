@@ -1,0 +1,177 @@
+// Practice items: built and checked by code (Chi's spec "Kiểm tra câu hỏi bằng code", 27 Oct).
+// The principle: the AI supplies data, code writes the question and works out the answer. A maths
+// item arrives as numbers (a, op, b, distractors, a story) and code writes what pupils see, so an
+// item can never miss its calculation (S) or carry a wrong answer.
+// Every rule returns issues tagged with the error class of the test reports:
+//   S calculation missing   K listening word on screen   Q wrong skill   U wrong unit / number not in the story
+// plus range, dup, offlesson, punct, lang, empty, long. An item with any issue never reaches anyone.
+import type { EnglishItem, Item, Lang, Level, MathItem, Op, Setup, Skill, Subject } from './types.ts';
+
+export type Code = 'S' | 'K' | 'Q' | 'U' | 'range' | 'dup' | 'offlesson' | 'punct' | 'lang' | 'empty' | 'long' | 'shape';
+export interface Issue { code: Code; msg: string }
+export interface CheckContext { subject: Subject; grade: number; lang: Lang; skills: Skill[]; source: string }
+
+// Numbers a grade works with (Chi: grade 1 to 20, grade 2 to 100, grade 3 to 1000); grades 4-5: never negative only.
+export const GRADE_MAX: Record<number, number> = { 1: 20, 2: 100, 3: 1000 };
+
+const INSTRUCTION = {
+  vi: { mcq: 'Chọn kết quả đúng', fill: 'Điền số thích hợp vào ô trống', truefalse: 'Đúng hay sai?' },
+  en: { mcq: 'Choose the right answer', fill: 'Write the missing number', truefalse: 'True or false?' },
+};
+const SIGN: Record<Op, string> = { '+': '+', '-': '−', '×': '×', ':': ':' };
+
+export function compute(a: number, op: Op, b: number): number {
+  return op === '+' ? a + b : op === '-' ? a - b : op === '×' ? a * b : b === 0 ? NaN : a / b;
+}
+
+// Deterministic shuffle (the same item always shows its options in the same order).
+function shuffle<T>(xs: T[], seed: string): T[] {
+  let h = [...seed].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const out = [...xs];
+  for (let i = out.length - 1; i > 0; i--) { h = (h * 1103515245 + 12345) >>> 0; const j = h % (i + 1); [out[i], out[j]] = [out[j], out[i]]; }
+  return out;
+}
+
+// --- maths: from data to the item pupils see ---
+
+export interface RawMath { template: MathItem['template']; skill: string; level: Level; a: number; op: Op; b: number; blank?: MathItem['blank']; shown?: number; distractors?: number[]; story?: string; unit?: string; explain?: string }
+
+export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
+  const a = Math.trunc(Number(r.a)), b = Math.trunc(Number(r.b)), op = (['+', '-', '×', ':'] as Op[]).includes(r.op) ? r.op : '+';
+  const result = compute(a, op, b), calc = `${a} ${SIGN[op]} ${b}`;
+  const base = { id, subject: 'math' as const, template: r.template, skill: String(r.skill || ''), level: r.level, a, op, b, explain: String(r.explain || '').trim() };
+  switch (r.template) {
+    case 'mcq': {
+      const distractors = (r.distractors || []).map((d) => Math.trunc(Number(d))).filter(Number.isFinite).slice(0, 3);
+      return { ...base, distractors, prompt: `${INSTRUCTION[lang].mcq}: ${calc} = ?`, options: shuffle([result, ...distractors].map(String), id + calc), answer: String(result) };
+    }
+    case 'fill': {
+      const blank = r.blank === 'a' || r.blank === 'b' ? r.blank : 'result';
+      const eq = blank === 'a' ? `? ${SIGN[op]} ${b} = ${result}` : blank === 'b' ? `${a} ${SIGN[op]} ? = ${result}` : `${calc} = ?`;
+      return { ...base, blank, prompt: `${INSTRUCTION[lang].fill}: ${eq}`, answer: String(blank === 'a' ? a : blank === 'b' ? b : result) };
+    }
+    case 'truefalse': {
+      const shown = Number.isFinite(Number(r.shown)) ? Math.trunc(Number(r.shown)) : result;
+      return { ...base, shown, prompt: `${INSTRUCTION[lang].truefalse} ${calc} = ${shown}`, answer: shown === result ? 'true' : 'false' };
+    }
+    case 'word':
+    default:
+      return { ...base, template: 'word', story: String(r.story || '').trim(), unit: String(r.unit || '').trim(), prompt: String(r.story || '').trim(), answer: String(result) };
+  }
+}
+
+// --- English: kept as written, checked by code ---
+
+export interface RawEnglish { template: EnglishItem['template']; skill: string; level: Level; prompt: string; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; options?: string[]; answer?: string; explain?: string }
+
+export function buildEnglish(r: RawEnglish, id: string): EnglishItem {
+  const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const it: EnglishItem = { id, subject: 'english', template: r.template, skill: clean(r.skill), level: r.level, prompt: clean(r.prompt), explain: clean(r.explain), answer: clean(r.answer) };
+  if (r.template === 'match') { it.pairs = (r.pairs || []).map((p) => ({ word: clean(p.word), emoji: clean(p.emoji) })).slice(0, 5); it.answer = it.pairs.map((p) => `${p.word}=${p.emoji}`).join(','); }
+  if (r.template === 'fill') { it.sentence = clean(r.sentence); it.options = (r.options || []).map(clean).slice(0, 4); }
+  if (r.template === 'listen') { it.say = clean(r.say); it.options = (r.options || []).map(clean).slice(0, 4); }
+  if (r.template === 'order') it.words = (r.words || []).map(clean).filter(Boolean).slice(0, 12);
+  return it;
+}
+
+// --- the rules ---
+
+const words = (s: unknown) => String(s ?? '').toLowerCase().normalize('NFC').match(/[\p{L}\p{N}]+/gu) || [];
+const nums = (s: unknown) => (String(s ?? '').match(/\d+/g) || []).map(Number);
+const has = (text: string, n: number) => new RegExp(`(^|\\D)${n}(\\D|$)`).test(text);
+const VI = /[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/i;
+const TAIL = new Set(['có', 'còn', 'lại', 'được', 'tất', 'cả', 'là', 'đã', 'thì', 'nữa', 'vậy', 'em', 'bạn', 'của']);
+
+// "Hỏi đàn có bao nhiêu con gà mái?" -> ["con", "gà", "mái"]; "How many apples are there?" -> ["apples"]
+export function askedThing(story: string): string[] | null {
+  const vi = /bao nhiêu\s+([^?.,!]+?)\s*\?/iu.exec(story);
+  if (vi) { const w = words(vi[1]); while (w.length && TAIL.has(w[w.length - 1])) w.pop(); return w.length ? w.slice(0, 3) : null; }
+  const en = /how many\s+(\p{L}+)/iu.exec(story);
+  return en ? [en[1].toLowerCase()] : null;
+}
+
+function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
+  const max = GRADE_MAX[ctx.grade] ?? Infinity, result = compute(e.a, e.op, e.b);
+  const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind;
+  if (!Number.isFinite(result) || !Number.isInteger(result)) out.push({ code: 'range', msg: 'the result is not a whole number' });
+  if ([e.a, e.b, result].some((n) => n < 0 || n > max)) out.push({ code: 'range', msg: `numbers outside grade ${ctx.grade} (0–${max}) or negative` });
+  if (e.template === 'mcq') {
+    if ((e.distractors || []).length < 2) out.push({ code: 'shape', msg: 'needs at least 2 wrong options' });
+    if (new Set(e.options).size !== (e.options || []).length) out.push({ code: 'dup', msg: 'repeated options' });
+    if ((e.distractors || []).some((d) => d < 0)) out.push({ code: 'range', msg: 'a negative option' });
+  }
+  if (e.template === 'truefalse' && e.shown !== undefined && (e.shown < 0 || e.shown > max * 2)) out.push({ code: 'range', msg: 'the claimed result is out of range' });
+  // Q: the skill fits the calculation
+  const units = (x: number) => x % 10;
+  const carries = e.op === '+' ? units(e.a) + units(e.b) >= 10 : e.op === '-' ? units(e.a) < units(e.b) : false;
+  if ((kind === 'add_carry' || kind === 'add_no_carry') && e.op !== '+') out.push({ code: 'Q', msg: `an addition skill on ${e.op}` });
+  if ((kind === 'sub_borrow' || kind === 'sub_no_borrow') && e.op !== '-') out.push({ code: 'Q', msg: `a subtraction skill on ${e.op}` });
+  if ((kind === 'add_carry' || kind === 'sub_borrow') && !carries) out.push({ code: 'Q', msg: `${e.a} ${SIGN[e.op]} ${e.b} has no ${e.op === '+' ? 'carrying' : 'borrowing'}, but the skill is "${e.skill}"` });
+  if ((kind === 'add_no_carry' || kind === 'sub_no_borrow') && carries) out.push({ code: 'Q', msg: `${e.a} ${SIGN[e.op]} ${e.b} needs ${e.op === '+' ? 'carrying' : 'borrowing'}, but the skill is "${e.skill}"` });
+  if (kind === 'column' && e.template === 'fill' && e.blank !== 'result') out.push({ code: 'Q', msg: 'finding a missing number is not column calculation' });
+  if (kind === 'find_missing' && !(e.template === 'fill' && e.blank !== 'result')) out.push({ code: 'Q', msg: 'a find-the-missing-number skill needs the blank on a number' });
+  if (kind === 'multiply' && e.op !== '×') out.push({ code: 'Q', msg: 'a multiplication skill without ×' });
+  if (kind === 'divide' && e.op !== ':') out.push({ code: 'Q', msg: 'a division skill without :' });
+  // S / U for word problems
+  if (e.template === 'word') {
+    if (!e.story) out.push({ code: 'S', msg: 'the word problem has no story' });
+    else {
+      if (![e.a, e.b].every((n) => has(e.story!, n))) out.push({ code: 'U', msg: 'the calculation uses a number that is not in the story' });
+      const asked = askedThing(e.story);
+      if (!asked) out.push({ code: 'S', msg: 'the story does not end with a question' });
+      else if (!asked.every((w) => words(e.unit).some((u) => u === w || u.replace(/s$/, '') === w.replace(/s$/, '')))) out.push({ code: 'U', msg: `the question asks for "${asked.join(' ')}" but the unit is "${e.unit || ''}"` });
+    }
+  }
+}
+
+function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
+  const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind, lesson = new Set(words(ctx.source));
+  const inOptions = (o: string[] | undefined) => (o || []).filter((x) => x.toLowerCase() === e.answer.toLowerCase()).length === 1;
+  const shown = ` ${words(e.prompt).join(' ')} `;
+  if (e.template === 'listen') {
+    if (!e.say) out.push({ code: 'empty', msg: 'nothing to read aloud' });
+    else if (shown.includes(` ${words(e.say).join(' ')} `)) out.push({ code: 'K', msg: 'the question shows the words that are read aloud' });
+    if (!inOptions(e.options)) out.push({ code: 'shape', msg: 'the answer must be exactly one of the options' });
+  }
+  if (e.template === 'fill') {
+    if ((String(e.sentence).match(/_{2,}/g) || []).length !== 1) out.push({ code: 'S', msg: 'the sentence needs exactly one ___ gap' });
+    if (!inOptions(e.options)) out.push({ code: 'shape', msg: 'the answer must be exactly one of the options' });
+    if (words(e.answer).some((w) => !lesson.has(w))) out.push({ code: 'offlesson', msg: `"${e.answer}" is not a word from the lesson` });
+  }
+  if (e.template === 'order') {
+    const want = e.answer.replace(/[.!?]$/, '').split(/\s+/).map((x) => x.toLowerCase()).sort().join(' ');
+    const got = (e.words || []).map((x) => x.toLowerCase().replace(/[.!?]$/, '')).sort().join(' ');
+    if (want !== got) out.push({ code: 'Q', msg: 'the word cards do not make the answer sentence exactly (punctuation included)' });
+    if ((e.words || []).join(' ').toLowerCase().replace(/[.!?]$/, '') === e.answer.toLowerCase().replace(/[.!?]$/, '')) out.push({ code: 'shape', msg: 'the word cards are not shuffled' });
+  }
+  if (e.template === 'match') {
+    const p = e.pairs || [];
+    if (p.length < 3 || new Set(p.map((x) => x.word.toLowerCase())).size !== p.length || new Set(p.map((x) => x.emoji)).size !== p.length) out.push({ code: 'shape', msg: 'needs 3-5 different word-picture pairs' });
+    if (p.some((x) => e.prompt.includes(x.emoji)) || p.filter((x) => shown.includes(` ${x.word.toLowerCase()} `)).length >= 2) out.push({ code: 'K', msg: 'the question gives the pairs away' });
+    for (const x of p) if (words(x.word).some((w) => !lesson.has(w))) out.push({ code: 'offlesson', msg: `"${x.word}" is not a word from the lesson` });
+  }
+  for (const o of e.options || []) if (!o) out.push({ code: 'empty', msg: 'an empty option' });
+  if (new Set((e.options || []).map((o) => o.toLowerCase())).size !== (e.options || []).length) out.push({ code: 'dup', msg: 'repeated options' });
+  if (kind === 'comma_clause') {
+    const s = e.template === 'order' ? e.answer : e.template === 'fill' ? e.sentence : e.say;
+    if (s && !s.includes(',')) out.push({ code: 'Q', msg: `"${s}" has no comma, but the skill is "${e.skill}"` });
+  }
+}
+
+export function checkItem(e: Item, ctx: CheckContext): Issue[] {
+  const out: Issue[] = [];
+  if (!ctx.skills.some((s) => s.tag === e.skill)) out.push({ code: 'Q', msg: `"${e.skill}" is not one of the lesson's skills` });
+  if (!e.prompt.trim()) out.push({ code: 'empty', msg: 'the question is empty' });
+  if (!e.explain.trim()) out.push({ code: 'empty', msg: 'the explanation is empty' });
+  if (e.prompt.length > 300 || e.explain.length > 320) out.push({ code: 'long', msg: 'the question or explanation is too long' });
+  for (const t of [e.prompt, e.explain, e.subject === 'english' ? e.sentence : e.story]) if (/([.:;,!?])(?!\1)[.:;,!?]/.test(String(t ?? ''))) { out.push({ code: 'punct', msg: 'two different punctuation marks in a row (".:")' }); break; }
+  const instr = e.subject === 'math' && e.template === 'word' ? e.story || '' : e.prompt;
+  if (words(instr).length >= 4) {
+    if (ctx.lang === 'vi' && !VI.test(instr) && (e.subject === 'math' || e.template !== 'order')) out.push({ code: 'lang', msg: 'the question should be in Vietnamese' });
+    if (ctx.lang === 'en' && VI.test(instr)) out.push({ code: 'lang', msg: 'the question should be in English' });
+  }
+  if (e.subject === 'math') mathRules(e, ctx, out); else englishRules(e, ctx, out);
+  return out.filter((x, i) => out.findIndex((y) => y.code === x.code && y.msg === x.msg) === i);
+}
+
+export const contextOf = (setup: Setup, skills: Skill[], source: string): CheckContext => ({ subject: setup.subject, grade: setup.grade, lang: setup.lang, skills, source });

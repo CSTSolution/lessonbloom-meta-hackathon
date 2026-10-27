@@ -1,6 +1,7 @@
 // The offline stand-in for the Meta models: deterministic, so the app runs and the tests pass with
 // no key. Each feature adds its fixtures here as it is built; an endpoint without one fails loudly.
 import { tone, wash } from '../media.ts';
+import { lessonAgentTurn, lessonAnswers } from './mock-lesson.ts';
 import type { AI, ChatMsg, ChatTurn, Endpoint, ImageRequest, JsonRequest, SegmentMatch, SpeechRequest, ToolSpec, Usage } from './types.ts';
 
 export class MockProvider implements AI {
@@ -9,6 +10,7 @@ export class MockProvider implements AI {
   calls: { endpoint: Endpoint; note?: string }[] = [];
   answers = new Map<Endpoint, (req: JsonRequest) => unknown>([
     ['precheck', () => ({ verdict: 'on_task', reason: 'mock' })],
+    ...(lessonAnswers as [Endpoint, (r: JsonRequest) => unknown][]),
   ]);
 
   async json<T>(req: JsonRequest): Promise<T> {
@@ -20,7 +22,7 @@ export class MockProvider implements AI {
   }
   async chat(req: { endpoint: Endpoint; messages: ChatMsg[]; tools: ToolSpec[] }): Promise<ChatTurn> {
     this.calls.push({ endpoint: req.endpoint });
-    return { model: 'mock', text: 'Done.', toolCalls: [] };
+    return req.endpoint === 'agent' ? lessonAgentTurn(req.messages) : { model: 'mock', text: 'Done.', toolCalls: [] };
   }
   async image(req: ImageRequest): Promise<Buffer> {
     this.calls.push({ endpoint: 'image', note: req.prompt.slice(0, 40) });

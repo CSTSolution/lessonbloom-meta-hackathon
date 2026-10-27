@@ -1,0 +1,9 @@
+Toán lớp 2 – Bài 24: Phép cộng có nhớ trong phạm vi 100.
+Mục tiêu: Học sinh biết đặt tính và cộng có nhớ hai số có hai chữ số. Học sinh giải được bài toán có lời văn một bước.
+Khởi động: cả lớp đếm thêm 10 từ 20 đến 90.
+Kiến thức: Khi cộng hàng đơn vị được 10 trở lên, ta viết chữ số hàng đơn vị và nhớ 1 sang hàng chục.
+Ví dụ: 36 + 27. Cộng hàng đơn vị: 6 cộng 7 bằng 13, viết 3 nhớ 1. Cộng hàng chục: 3 cộng 2 bằng 5, thêm 1 là 6. Vậy 36 + 27 = 63.
+Ví dụ 2: 48 + 25 = 73.
+Luyện tập: 19 + 36; 57 + 28; 44 + 39.
+Bài toán: Lan có 36 quả xoài, mẹ cho thêm 27 quả xoài. Hỏi Lan có tất cả bao nhiêu quả xoài?
+Lưu ý: nhắc học sinh không quên nhớ 1 sang hàng chục.
