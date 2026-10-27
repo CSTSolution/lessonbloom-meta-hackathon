@@ -64,7 +64,8 @@ test('Muse Spark picks the section; a citation counts only if its words are in t
 
 test('the scope of a section: its number range and its operations', () => {
   assert.deepEqual(scopeOf('Bài 21: Phép cộng có nhớ trong phạm vi 100. 36 + 27 = 63.'), { max: 100, ops: ['+'] });
-  assert.deepEqual(scopeOf('Bài 23: Phép trừ có nhớ trong phạm vi 100. 52 − 28 = 24.'), { max: 100, ops: ['-'] });
+  assert.deepEqual(scopeOf('Bài 23: Phép trừ có nhớ trong phạm vi 100\n52 − 28 = 24. Lấy 10 cộng vào hàng đơn vị rồi trừ.'), { max: 100, ops: ['-'] }, 'the title names the operation; "cộng" in the method does not allow addition');
+  assert.deepEqual(scopeOf('Bài 24: Bài toán có lời văn\n"tất cả" thường làm phép cộng; "còn lại" làm phép trừ. 35 − 20 = 15.'), { ops: ['+', '-'] }, 'no operation in the title: the section\'s wording and examples');
 });
 
 test('API: books are private to their assigner; non-PDFs and scanned books are refused', async () => {

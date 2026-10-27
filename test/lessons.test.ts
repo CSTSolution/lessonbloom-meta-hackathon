@@ -77,8 +77,11 @@ test('API: request -> matched section -> setup -> lesson from the book only; the
   assert.ok(l.items.length >= LIMITS.minItems && l.steps.length > 5 && l.agent.note);
   assert.ok(l.items.every((i: any) => i.op === '+' && i.a + i.b <= 100), 'the scope of the section: addition within 100');
   assert.ok(l.slides.some((x: any) => x.page === 3), 'slides carry their page');
+  const sub = await lessonFrom(call, areaId, 'phep tru co nho 52 - 28');
+  assert.match(sub.match.title, /^Bài 23/);
+  assert.ok(sub.lesson.items.length >= LIMITS.minItems && sub.lesson.items.every((i: any) => i.op === '-'), 'a subtraction section gets subtraction only');
   assert.equal(l.teacher_id, undefined);
-  assert.equal((await call('GET', '/api/t/lessons')).json.lessons[0].id, id);
+  assert.ok((await call('GET', '/api/t/lessons')).json.lessons.some((x: any) => x.id === id));
   const other = s.client('198.51.100.20');
   await other('POST', '/api/auth/demo');
   assert.equal((await other('GET', `/api/t/lessons/${id}`)).status, 404, 'another assigner cannot open it');

@@ -10,15 +10,25 @@ const COLOURS: Record<string, string> = { red: '🔴', blue: '🔵', green: '�
 export function isEnglish(notes: string) { return /\b(english|colou?r|grade \d|unit \d)\b/i.test(notes.slice(0, 200)) && !/[ăâđêôơư]/i.test(notes.slice(0, 120)); }
 
 function plan(setup: F, count: number) {
+  const sub = /trừ/i.test(String(setup.title)), plain = /không nhớ/i.test(String(setup.title));
   const skills = setup.subject === 'english'
     ? [{ tag: 'colour_words', name: 'Colour words', kind: 'vocabulary' }, { tag: 'what_colour', name: "Asking 'What colour is it?'", kind: 'sentence_pattern' }]
-    : [{ tag: 'cong_co_nho', name: 'Cộng có nhớ trong phạm vi 100', kind: 'add_carry' }, { tag: 'toan_loi_van', name: 'Bài toán có lời văn', kind: 'word_problem' }];
+    : sub ? [{ tag: plain ? 'tru_khong_nho' : 'tru_co_nho', name: plain ? 'Trừ không nhớ' : 'Trừ có nhớ trong phạm vi 100', kind: plain ? 'sub_no_borrow' : 'sub_borrow' }, { tag: 'dat_tinh', name: 'Đặt tính rồi tính', kind: 'column' }]
+      : [{ tag: 'cong_co_nho', name: 'Cộng có nhớ trong phạm vi 100', kind: 'add_carry' }, { tag: 'toan_loi_van', name: 'Bài toán có lời văn', kind: 'word_problem' }];
   const kinds = ['title', 'warmup', ...Array(Math.max(0, count - 4)).fill(0).map((_, i) => (i % 2 ? 'example' : 'teach')), 'practice', 'summary'];
   return { skills, outline: kinds.map((kind, i) => ({ kind, heading: `${kind === 'title' ? setup.title : `Phần ${i}`}`, objective: setup.objectives?.[i % Math.max(1, setup.objectives?.length || 1)] || '' })) };
 }
 
 function mathItems(f: F) {
   const { skill, template, level, count, round } = f, k = skill.kind as string, out: F[] = [];
+  if (/^sub_|column/.test(k) && /trừ/i.test(String(f.setup.title))) {        // subtraction sections: 52 − 28 and friends
+    return { items: Array.from({ length: count }, (_, i) => {
+      const a = 52 + i * 10 + (level === 'advanced' ? 20 : 0) - (k === 'sub_no_borrow' ? -6 : 0), b = k === 'sub_no_borrow' ? 23 : 28, r = a - b;
+      return template === 'fill' ? { a, op: '-', b, blank: 'result', explain: `${a} − ${b} = ${r}.` }
+        : template === 'truefalse' ? { a, op: '-', b, shown: i % 2 ? r : r + 10, explain: `${a} − ${b} = ${r}.` }
+        : { a, op: '-', b, distractors: [r + 10, r - 1], explain: `Mượn 1 chục: ${a} − ${b} = ${r}.` };
+    }) };
+  }
   for (let i = 0; i < count; i++) {
     const a = 36 + i + (level === 'advanced' ? 10 : 0), b = 27, r = a + b;
     if (k === 'add_carry' && template === 'mcq' && level === 'basic' && round === 0 && i === 0) { out.push({ a: 31, op: '+', b: 22, distractors: [43, 63], explain: '1 + 2 = 3; 3 + 2 = 5.' }); continue; }   // no carrying: rejected (Q)
