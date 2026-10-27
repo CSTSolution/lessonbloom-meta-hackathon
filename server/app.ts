@@ -11,6 +11,7 @@ import type { Sql } from './db/sql.ts';
 import { Budget, clientIp, Limiter } from './guard/guard.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
+import { knowledgeRoutes } from './knowledge/routes.ts';
 import { lessonRoutes } from './lesson/routes.ts';
 import type { Mailer } from './mail.ts';
 
@@ -97,6 +98,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     const f = await files.get(c.req.param('lesson'), c.req.param('name'));
     return f ? c.body(new Uint8Array(f.data), 200, { 'content-type': f.type, 'cache-control': 'public, max-age=31536000, immutable' }) : c.notFound();
   });
+  knowledgeRoutes(app, { sql, ai, budget, as: (teacherId, fn) => who.run(teacherId, fn) });
   lessonRoutes(app, { sql, ai, budget, files, as: (teacherId, fn) => who.run(teacherId, fn) });
   return app;
 }

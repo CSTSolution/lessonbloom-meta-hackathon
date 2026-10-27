@@ -3,12 +3,16 @@ export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; e
 export type Level = 'basic' | 'good' | 'advanced';
 export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string }
 export interface Skill { tag: string; name: string; kind: string }
-export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string }
+export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number }
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
-export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[] }[]; created_at: string }
+export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[] }[]; created_at: string }
 export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number }
+export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number }
+export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
+export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number }
+export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
 export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }
 
 async function call<T>(method: string, path: string, body?: unknown, raw?: Blob): Promise<T> {
@@ -27,8 +31,14 @@ export const api = {
   logout: () => call<{ ok: boolean }>('POST', '/t/logout'),
   photos: (images: { data: string; type: string }[]) => call<{ text: string }>('POST', '/t/notes/photos', { images }),
   voice: (audio: Blob) => call<{ text: string }>('POST', '/t/notes/voice', undefined, audio),
-  intake: (notes: string) => call<{ setup: Setup }>('POST', '/t/intake', { notes }),
-  create: (notes: string, setup: Setup) => call<{ id: string }>('POST', '/t/lessons', { notes, setup }),
+  areas: () => call<{ areas: AreaRow[] }>('GET', '/t/areas'),
+  createArea: (a: { name: string; subject: string; grade: number }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
+  sampleArea: (book: 'toan2' | 'english3') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
+  area: (id: string) => call<{ area: AreaRow; books: BookRow[]; sections: SectionRow[] }>('GET', `/t/areas/${id}`),
+  uploadBook: (areaId: string, file: File, title: string) => call<{ book: BookRow }>('POST', `/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, undefined, file),
+  match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),
+  intake: (areaId: string, sectionId: string) => call<{ setup: Setup; citation: string }>('POST', '/t/intake', { areaId, sectionId }),
+  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup }) => call<{ id: string }>('POST', '/t/lessons', b),
   lessons: () => call<{ lessons: LessonRow[] }>('GET', '/t/lessons'),
   newPicture: (id: string, sid: string) => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/picture`),
   cutout: (id: string, sid: string, photo: string, name: string) => call<{ slide: Slide; matches: number }>('POST', `/t/lessons/${id}/slides/${sid}/cutout`, { photo, name }),

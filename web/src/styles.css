@@ -111,3 +111,7 @@ textarea:focus, select:focus { outline: 3px solid var(--leaf-2); border-color: v
 .slide .pic.pending { display: grid; place-items: center; color: var(--ink-2); border: 2px dashed var(--line); }
 .slide { aspect-ratio: auto; }
 .slide input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.cite { display: inline-block; padding: 8px 12px; border-radius: var(--r); background: var(--sun-2); font-weight: 600; font-size: 14px; color: var(--ink); text-decoration: none; align-self: start; }
+blockquote { margin: 0; padding: 8px 12px; border-left: 4px solid var(--leaf); background: var(--leaf-2); border-radius: 0 var(--r) var(--r) 0; }
+.toc { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
+.book { padding: 8px 0; border-bottom: 1px solid var(--line); }

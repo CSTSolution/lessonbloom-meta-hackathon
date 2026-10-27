@@ -7,9 +7,22 @@
 // plus range, dup, offlesson, punct, lang, empty, long. An item with any issue never reaches anyone.
 import type { EnglishItem, Item, Lang, Level, MathItem, Op, Setup, Skill, Subject } from './types.ts';
 
-export type Code = 'S' | 'K' | 'Q' | 'U' | 'range' | 'dup' | 'offlesson' | 'punct' | 'lang' | 'empty' | 'long' | 'shape';
+export type Code = 'S' | 'K' | 'Q' | 'U' | 'scope' | 'range' | 'dup' | 'offlesson' | 'punct' | 'lang' | 'empty' | 'long' | 'shape';
 export interface Issue { code: Code; msg: string }
-export interface CheckContext { subject: Subject; grade: number; lang: Lang; skills: Skill[]; source: string }
+export interface Scope { max?: number; ops?: Op[] }
+export interface CheckContext { subject: Subject; grade: number; lang: Lang; skills: Skill[]; source: string; scope?: Scope }
+
+// Chi's scope rule: the lesson stays inside its section of the book. "phạm vi 100" caps every number;
+// only the operations the section teaches are allowed (a section on addition gets no subtraction).
+export function scopeOf(source: string): Scope {
+  const t = source.toLowerCase(), caps = [...t.matchAll(/phạm vi\s+(\d{1,5})/g)].map((m) => Number(m[1]));
+  const ops: Op[] = [];
+  if (/\d\s*\+\s*\d|\bcộng\b|\badd/.test(t)) ops.push('+');
+  if (/\d\s*[−–-]\s*\d|\btrừ\b|\bsubtract/.test(t)) ops.push('-');
+  if (/\d\s*[×x*]\s*\d|\bnhân\b|\bmultipl/.test(t)) ops.push('×');
+  if (/\d\s*[:÷]\s*\d|\bchia\b|\bdivi/.test(t)) ops.push(':');
+  return { ...(caps.length ? { max: Math.max(...caps) } : {}), ...(ops.length ? { ops } : {}) };
+}
 
 // Numbers a grade works with (Chi: grade 1 to 20, grade 2 to 100, grade 3 to 1000); grades 4-5: never negative only.
 export const GRADE_MAX: Record<number, number> = { 1: 20, 2: 100, 3: 1000 };
@@ -94,6 +107,8 @@ function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
   const max = GRADE_MAX[ctx.grade] ?? Infinity, result = compute(e.a, e.op, e.b);
   const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind;
   if (!Number.isFinite(result) || !Number.isInteger(result)) out.push({ code: 'range', msg: 'the result is not a whole number' });
+  if (ctx.scope?.max !== undefined && [e.a, e.b, result].some((n) => n > ctx.scope!.max!)) out.push({ code: 'scope', msg: `numbers above ${ctx.scope.max}, outside this section of the book` });
+  if (ctx.scope?.ops && !ctx.scope.ops.includes(e.op)) out.push({ code: 'scope', msg: `"${SIGN[e.op]}" is not taught in this section of the book` });
   if ([e.a, e.b, result].some((n) => n < 0 || n > max)) out.push({ code: 'range', msg: `numbers outside grade ${ctx.grade} (0–${max}) or negative` });
   if (e.template === 'mcq') {
     if ((e.distractors || []).length < 2) out.push({ code: 'shape', msg: 'needs at least 2 wrong options' });
@@ -174,4 +189,4 @@ export function checkItem(e: Item, ctx: CheckContext): Issue[] {
   return out.filter((x, i) => out.findIndex((y) => y.code === x.code && y.msg === x.msg) === i);
 }
 
-export const contextOf = (setup: Setup, skills: Skill[], source: string): CheckContext => ({ subject: setup.subject, grade: setup.grade, lang: setup.lang, skills, source });
+export const contextOf = (setup: Setup, skills: Skill[], source: string): CheckContext => ({ subject: setup.subject, grade: setup.grade, lang: setup.lang, skills, source, scope: setup.subject === 'math' ? scopeOf(source) : undefined });

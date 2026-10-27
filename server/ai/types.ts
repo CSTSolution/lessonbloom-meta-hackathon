@@ -2,7 +2,7 @@
 // API; MockProvider (mock.ts) answers offline. Every caller goes through the guard (guard/), which
 // fixes the system prompt, wraps user material and checks what comes back.
 
-export type Endpoint = 'precheck' | 'intake' | 'plan' | 'slides' | 'items' | 'cards' | 'write' | 'check' | 'image' | 'critic' | 'ocr' | 'segment' | 'transcribe' | 'errortag' | 'comments' | 'agent' | 'tts';
+export type Endpoint = 'precheck' | 'toc' | 'rerank' | 'intake' | 'plan' | 'slides' | 'items' | 'cards' | 'write' | 'check' | 'image' | 'critic' | 'ocr' | 'segment' | 'transcribe' | 'errortag' | 'comments' | 'agent' | 'tts';
 
 export interface JsonRequest {
   endpoint: Endpoint;

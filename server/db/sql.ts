@@ -37,7 +37,9 @@ export function pgSql(url: string): Sql {
 // PGlite: in memory (tests) or in a folder (local development without a database server).
 export async function pgliteSql(dir?: string): Promise<Sql> {
   const { PGlite } = await import('@electric-sql/pglite');
-  const db = dir ? new PGlite(dir) : new PGlite();
+  const { pg_trgm } = await import('@electric-sql/pglite/contrib/pg_trgm');
+  const { unaccent } = await import('@electric-sql/pglite/contrib/unaccent');
+  const db = new PGlite({ ...(dir ? { dataDir: dir } : {}), extensions: { pg_trgm, unaccent } });   // the same extensions as the server's Postgres
   const over = (c: { query: (t: string, p?: unknown[]) => Promise<{ rows: unknown[] }> }): Sql => ({
     async query<T>(text: string, params: unknown[] = []) { return (await c.query(text, params)).rows as T[]; },
     async one<T>(text: string, params: unknown[] = []) { return (await c.query(text, params)).rows[0] as T | undefined; },

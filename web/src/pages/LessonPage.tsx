@@ -37,7 +37,7 @@ function SlideCard({ s, i, total, lessonId, pending, t, onSlide }: { s: Slide; i
       {s.bullets.length > 0 && <ul>{s.bullets.map((b, j) => <li key={j}>{b}</li>)}</ul>}
       {s.example && <div className="ex">{s.example}</div>}
       <p className="small"><b>{t.teacherSays}:</b> {s.notes}</p>
-      {s.source && <p className="small muted">“{s.source}” · {t.source}</p>}
+      {s.source && <p className="small muted">“{s.source}”{s.page ? ` · tr. ${s.page}` : ''}</p>}
       <div className="row small">
         <button className="btn ghost small" disabled={busy} onClick={() => run(async () => onSlide((await api.newPicture(lessonId, s.id)).slide))}>{busy && !cut ? t.busy : t.newPic}</button>
         <button className="btn ghost small" disabled={busy} onClick={() => setCut(cut ? null : { file: null, name: '' })}>{t.cut}</button>
@@ -91,6 +91,7 @@ export function LessonPage({ id }: { id: string }) {
     <div className="stack" style={{ gap: 20 }}>
       <button className="btn ghost" style={{ alignSelf: 'start' }} onClick={() => go('/')}>{t.back}</button>
       <h1>{l.setup.title}</h1>
+      {l.refs?.[0] && <a className="cite" href={`/api/t/books/${l.refs[0].bookId}/file#page=${l.refs[0].pageFrom}`} target="_blank" rel="noreferrer">📘 {lang === 'en' ? l.refs[0].en : l.refs[0].vi} ↗</a>}
       {l.status !== 'ready' && (
         <div className="card stack">
           <h2>{l.status === 'working' ? t.working : t.failed}</h2>

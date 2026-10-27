@@ -1,6 +1,5 @@
 // Slide pictures (Muse Image + the vision check) and photo cut-outs (SAM 3.1), offline.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { inflateSync } from 'node:zlib';
 import jpeg from 'jpeg-js';
@@ -8,9 +7,8 @@ import { MockProvider } from '../server/ai/mock.ts';
 import type { ImageRequest, SegmentMatch } from '../server/ai/types.ts';
 import { cleanName, compose, CUTOUT, CutoutError, decodePhoto } from '../server/lesson/cutout.ts';
 import { CAST, illustrate, STYLE } from '../server/lesson/pictures.ts';
-import { testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
-const MATH = await readFile(new URL('../samples/toan-lop2-cong-co-nho.txt', import.meta.url), 'utf8');
 function photo(w = 40, h = 30): Buffer {      // left half red, right half blue
   const d = Buffer.alloc(w * h * 4);
   for (let k = 0; k < w * h; k++) d.set(k % w < w / 2 ? [220, 20, 20, 255] : [20, 20, 220, 255], k * 4);
@@ -40,10 +38,8 @@ test('every picture carries the one house style and cast; a picture with text in
 test('after the lesson is ready, pictures arrive on the slides and are served from /media', async () => {
   const s = await testServer(), call = s.client();
   await call('POST', '/api/auth/demo');
-  const { setup } = (await call('POST', '/api/t/intake', { notes: MATH })).json;
-  const { id } = (await call('POST', '/api/t/lessons', { notes: MATH, setup })).json;
-  let l: any;
-  for (let i = 0; i < 300; i++) { l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson; if (l.status !== 'working' && !l.pictures_pending) break; await new Promise((r) => setTimeout(r, 20)); }
+  const { areaId } = await areaWithBook(call, 'toan2');
+  const { id, lesson: l } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ', { pictures: true });
   const withPic = l.slides.filter((x: any) => x.image);
   assert.equal(withPic.length, 6, 'six pictures, the teaching slides first');
   assert.ok(l.steps.some((x: any) => /Drew 6 pictures/.test(x.en)));
@@ -80,9 +76,8 @@ test('cut-out: masked pixels keep their colour, the rest is transparent, cropped
 test('API: a cut-out becomes the slide picture; refused names never reach the model', async () => {
   const s = await testServer(), call = s.client();
   await call('POST', '/api/auth/demo');
-  const { setup } = (await call('POST', '/api/t/intake', { notes: MATH })).json;
-  const { id } = (await call('POST', '/api/t/lessons', { notes: MATH, setup })).json;
-  for (let i = 0; i < 300; i++) { const l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson; if (l.status !== 'working' && !l.pictures_pending) break; await new Promise((r) => setTimeout(r, 20)); }
+  const { areaId } = await areaWithBook(call, 'toan2');
+  const { id } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ', { pictures: true });
   const pic = photo(200, 150).toString('base64'), url = `/api/t/lessons/${id}/slides/sl03/cutout`;
   const before = s.ai.calls.filter((c) => c.endpoint === 'segment').length;
   assert.equal((await call('POST', url, { photo: pic, name: 'học sinh' })).json.code, 'cutoutPeople');

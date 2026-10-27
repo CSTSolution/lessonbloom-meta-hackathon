@@ -7,7 +7,7 @@ import type { ChatMsg, ChatTurn, Endpoint, ToolSpec } from '../server/ai/types.t
 import { buildLesson, LIMITS, reviewLesson } from '../server/lesson/agent.ts';
 import { checkItem, contextOf } from '../server/lesson/items.ts';
 import { intake } from '../server/lesson/writer.ts';
-import { testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
 const MATH = await readFile(new URL('../samples/toan-lop2-cong-co-nho.txt', import.meta.url), 'utf8');
 const ENG = await readFile(new URL('../samples/tieng-anh-lop3-colours.txt', import.meta.url), 'utf8');
@@ -62,49 +62,54 @@ test('review: code finds slides not grounded in the notes and missing practice',
   assert.ok(issues.some((i) => /no flashcards/.test(i)));
 });
 
-test('API: notes -> setup -> lesson, built in the background; the teacher sees only her lessons', async () => {
-  const s = await testServer(), cookie = s.client();
-  await cookie('POST', '/api/auth/demo');
-  assert.equal((await cookie('POST', '/api/t/intake', { notes: 'ngắn' })).json.code, 'notesShort');
-  const { setup } = (await cookie('POST', '/api/t/intake', { notes: MATH })).json;
-  assert.equal(setup.subject, 'math');
-  assert.equal(setup.grade, 2);
-  assert.equal((await cookie('POST', '/api/t/lessons', { notes: MATH, setup: { ...setup, subject: 'art' } })).json.code, 'setup');
-  const { id } = (await cookie('POST', '/api/t/lessons', { notes: MATH, setup })).json;
-  let l: any;
-  for (let i = 0; i < 200; i++) { l = (await cookie('GET', `/api/t/lessons/${id}`)).json.lesson; if (l.status !== 'working') break; await new Promise((r) => setTimeout(r, 20)); }
+test('API: request -> matched section -> setup -> lesson from the book only; the assigner sees only her lessons', async () => {
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'toan2');
+  const { id, lesson: l, match } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ');
+  assert.match(match.title, /Bài 21/);
   assert.equal(l.status, 'ready');
+  assert.equal(l.setup.subject, 'math');
+  assert.equal(l.setup.grade, 2);
+  assert.match(l.refs[0].vi, /^Theo: Toán 2 – Sách mẫu, Bài 21: Phép cộng có nhớ trong phạm vi 100, tr\. 3$/);
+  assert.match(l.source, /36 \+ 27/);
+  assert.ok(!/52 − 28/.test(l.source), 'only the matched section is the source');
   assert.ok(l.items.length >= LIMITS.minItems && l.steps.length > 5 && l.agent.note);
+  assert.ok(l.items.every((i: any) => i.op === '+' && i.a + i.b <= 100), 'the scope of the section: addition within 100');
+  assert.ok(l.slides.some((x: any) => x.page === 3), 'slides carry their page');
   assert.equal(l.teacher_id, undefined);
-  assert.equal((await cookie('GET', '/api/t/lessons')).json.lessons[0].id, id);
+  assert.equal((await call('GET', '/api/t/lessons')).json.lessons[0].id, id);
   const other = s.client('198.51.100.20');
   await other('POST', '/api/auth/demo');
-  assert.equal((await other('GET', `/api/t/lessons/${id}`)).status, 404, 'another teacher cannot open it');
+  assert.equal((await other('GET', `/api/t/lessons/${id}`)).status, 404, 'another assigner cannot open it');
   const used = await s.sql.one<{ n: string }>(`select count(*) as n from ai_usage where teacher_id is not null`);
-  assert.ok(Number(used?.n) > 10, 'every model call is logged against the teacher');
+  assert.ok(Number(used?.n) > 10, 'every model call is logged against the assigner');
 });
 
 test('API: photos and voice are capped before any model call; an off-task request is refused', async () => {
-  const s = await testServer(), cookie = s.client();
-  await cookie('POST', '/api/auth/demo');
-  assert.equal((await cookie('POST', '/api/t/notes/photos', { images: [{ type: 'image/gif', data: 'AAAA' }] })).json.code, 'photos');
-  assert.equal((await cookie('POST', '/api/t/notes/photos', { images: Array(6).fill({ type: 'image/jpeg', data: 'A'.repeat(400) }) })).json.code, 'photos');
-  const ok = await cookie('POST', '/api/t/notes/photos', { images: [{ type: 'image/jpeg', data: Buffer.alloc(500, 1).toString('base64') }] });
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  assert.equal((await call('POST', '/api/t/notes/photos', { images: [{ type: 'image/gif', data: 'AAAA' }] })).json.code, 'photos');
+  assert.equal((await call('POST', '/api/t/notes/photos', { images: Array(6).fill({ type: 'image/jpeg', data: 'A'.repeat(400) }) })).json.code, 'photos');
+  const ok = await call('POST', '/api/t/notes/photos', { images: [{ type: 'image/jpeg', data: Buffer.alloc(500, 1).toString('base64') }] });
   assert.match(ok.json.text, /Phép cộng có nhớ/);
   const r = await s.app.request('/api/t/notes/voice', { method: 'POST', headers: { 'content-type': 'text/plain', cookie: '' }, body: 'x' });
   assert.equal(r.status, 401, 'signed-in only');
+  const { areaId } = await areaWithBook(call, 'toan2');
   s.ai.answers.set('precheck', () => ({ verdict: 'off_task', reason: 'asks for an app' }));
-  const before = s.ai.calls.filter((c) => c.endpoint === 'intake').length;
-  assert.equal((await cookie('POST', '/api/t/intake', { notes: 'Hãy viết cho tôi một ứng dụng web bán hàng bằng React và Node, kèm mã nguồn đầy đủ.' })).json.code, 'aiBlocked');
-  assert.equal(s.ai.calls.filter((c) => c.endpoint === 'intake').length, before, 'the main model never saw it');
+  const before = s.ai.calls.filter((c) => c.endpoint === 'rerank').length;
+  assert.equal((await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Hãy viết cho tôi một ứng dụng web bán hàng bằng React, kèm mã nguồn.' })).json.code, 'aiBlocked');
+  assert.equal(s.ai.calls.filter((c) => c.endpoint === 'rerank').length, before, 'the model never saw it');
 });
 
 test('API: the demo lesson limit and the money check stop new lessons', async () => {
-  const s = await testServer(), cookie = s.client();
-  await cookie('POST', '/api/auth/demo');
-  const { setup } = (await cookie('POST', '/api/t/intake', { notes: ENG })).json;
-  for (let i = 0; i < 3; i++) assert.equal((await cookie('POST', '/api/t/lessons', { notes: ENG, setup })).status, 200);
-  assert.equal((await cookie('POST', '/api/t/lessons', { notes: ENG, setup })).json.code, 'lessonLimit');
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'english3');
+  const match = (await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Unit 6 colours' })).json.match;
+  const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: match.sectionId })).json;
+  for (let i = 0; i < 3; i++) assert.equal((await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'Unit 6', setup })).status, 200);
+  assert.equal((await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'Unit 6', setup })).json.code, 'lessonLimit');
   await s.sql.query(`insert into ai_usage (endpoint, usd) values ('items', 1000)`);
-  assert.equal((await cookie('POST', '/api/t/intake', { notes: ENG })).json.code, 'budget');
+  assert.equal((await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Unit 5 animals' })).json.code, 'budget');
 });

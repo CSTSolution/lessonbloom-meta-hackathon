@@ -15,6 +15,7 @@ ENV NODE_ENV=production CHROMIUM_PATH=/usr/bin/chromium
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY server ./server
+COPY samples/books/*.pdf ./samples/books/
 COPY --from=web /app/web/dist ./web/dist
 USER node
 CMD ["./node_modules/.bin/tsx", "server/main.ts"]

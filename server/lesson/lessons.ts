@@ -13,10 +13,10 @@ const J = (v: unknown) => JSON.stringify(v);
 export class Lessons {
   constructor(private sql: Sql) {}
 
-  async create(teacherId: string, setup: Setup, source: string): Promise<string> {
+  async create(teacherId: string, setup: Setup, source: string, k: { areaId: string; request: string; refs: unknown[] }): Promise<string> {
     const id = newId(10);
-    await this.sql.query(`insert into lessons (id, teacher_id, status, setup, source, steps) values ($1, $2, 'working', $3::jsonb, $4, $5::jsonb)`,
-      [id, teacherId, J(setup), source, J([{ at: new Date().toISOString(), vi: 'Trợ lý bắt đầu đọc ghi chú của cô…', en: 'The agent is reading your notes…' }])]);
+    await this.sql.query(`insert into lessons (id, teacher_id, status, setup, source, steps, area_id, request, refs) values ($1, $2, 'working', $3::jsonb, $4, $5::jsonb, $6, $7, $8::jsonb)`,
+      [id, teacherId, J(setup), source, J([{ at: new Date().toISOString(), vi: 'Trợ lý bắt đầu đọc phần bài trong sách…', en: 'The agent is reading the section of your book…' }]), k.areaId, k.request, J(k.refs)]);
     return id;
   }
   get(teacherId: string, id: string) { return this.sql.one<Lesson>('select * from lessons where id = $1 and teacher_id = $2', [id, teacherId]); }
@@ -48,9 +48,20 @@ export class Lessons {
 }
 
 // Builds the lesson in the background; the teacher's page polls and shows the agent's steps live.
-export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string }) {
+// The page each slide comes from: the passage that contains (most of) its source quote.
+const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').match(/[a-z0-9]+/g) || [];
+export function pageOf(quote: string, passages: { page: number; text: string }[]): number | undefined {
+  const q = fold(quote);
+  if (!q.length) return undefined;
+  let best: [number | undefined, number] = [undefined, 0];
+  for (const p of passages) { const w = new Set(fold(p.text)), hit = q.filter((x) => w.has(x)).length / q.length; if (hit > best[1]) best = [p.page, hit]; }
+  return best[1] >= 0.8 ? best[0] : undefined;
+}
+
+export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; passages?: { page: number; text: string }[] }) {
   try {
     const b = await buildLesson(ai, setup, source, (vi, en) => lessons.step(id, vi, en));
+    if (pics?.passages) for (const s of b.slides) { const p = pageOf(s.source, pics.passages); if (p) s.page = p; }
     await lessons.step(id, 'Xong! Cô xem bài giảng và ghi chú của trợ lý nhé. Hình minh họa đang được vẽ thêm.', 'Done! Have a look at the lesson and the agent\'s note. Pictures are on their way.');
     await lessons.finish(id, b);
     if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides);

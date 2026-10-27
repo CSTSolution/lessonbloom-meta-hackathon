@@ -18,15 +18,15 @@ export const LIMITS = { maxTurns: 18, maxItemCalls: 14, maxItems: 30, minItems: 
 export type Say = (vi: string, en: string) => void | Promise<void>;
 export interface Built { skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; rejected: Rejected[]; agent: AgentNote }
 
-const AGENT_SYSTEM = `You are LessonBloom's lesson agent. You turn a Vietnamese primary-school teacher's own notes into a complete lesson by calling tools, then leave her a short note. Grade {{grade}}, {{subject}}, language {{lang}}.
+const AGENT_SYSTEM = `You are LessonBloom's lesson agent. You turn ONE section of the assigner's own book (she is a teacher or a parent) into a complete lesson by calling tools, then leave her a short note. Grade {{grade}}, {{subject}}, language {{lang}}.
 Work in this order:
-1. save_plan: 2-4 skills the notes really teach (each with the closest kind) and an outline of {{count}} slides (title, warmup, teach/example, practice, summary), each slide serving one of the teacher's objectives.
+1. save_plan: 2-4 skills the notes really teach (each with the closest kind) and an outline of {{count}} slides (title, warmup, teach/example, practice, summary), each slide serving one of her objectives.
 2. write_slides.
 3. write_items for every skill: basic and good levels for each skill, advanced for at least one; 2-4 items per call. Templates — maths: mcq, fill, truefalse, word; English: match, fill, listen, order. Code builds and checks every item; read what it rejected and ask again differently if a skill is still short.
 4. write_cards.
 5. review, then fix only real problems: simplify_slide for text too hard for the grade, drop_item for an item that should not be there.
 6. finish: a note to the teacher in {{lang}} (2-3 sentences: what you made, what you checked and changed, anything she should look at herself), and one line per change.
-Never add content that is not in her notes. Practice is "bài luyện tập", never a test; no scores. You have at most {{turns}} turns.`;
+Never add content that is not in the book section; harder items extend only within it. Practice is "bài luyện tập", never a test; no scores. You have at most {{turns}} turns.`;
 
 const MATHT = ['mcq', 'fill', 'truefalse', 'word'], ENGT = ['match', 'fill', 'listen', 'order'];
 const TOOLS = (subject: Setup['subject']): ToolSpec[] => [
@@ -56,7 +56,7 @@ export function reviewLesson(setup: Setup, source: string, b: { skills: Skill[];
   const issues: string[] = [];
   if (!b.slides.length) issues.push('no slides yet');
   for (const s of b.slides) {
-    if (s.kind !== 'title' && !grounded(s.source, source)) issues.push(`${s.id}: its source quote is not in the teacher's notes`);
+    if (s.kind !== 'title' && !grounded(s.source, source)) issues.push(`${s.id}: its source quote is not in the book section`);
     for (const t of [s.heading, ...s.bullets]) if (Math.max(0, ...t.split(/[.!?;\n]+/).map((x) => words(x).length)) > maxWords(setup.grade)) { issues.push(`${s.id}: a sentence longer than ${maxWords(setup.grade)} words`); break; }
   }
   for (const k of b.skills) for (const lv of ['basic', 'good'] as Level[]) if (!b.items.some((i) => i.skill === k.tag && i.level === lv)) issues.push(`skill ${k.tag}: no ${lv} items`);
@@ -152,7 +152,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   try {
     const messages: ChatMsg[] = [
       { role: 'system', content: scopedSystem(fill(AGENT_SYSTEM, { grade: setup.grade, subject: setup.subject === 'math' ? 'Maths' : 'English', lang: langName(setup.lang), count: slideCount(setup.minutes), turns: LIMITS.maxTurns }), canary) },
-      { role: 'user', content: wrapUser(JSON.stringify({ SETUP: setup, NOTES: source })) },
+      { role: 'user', content: wrapUser(JSON.stringify({ SETUP: setup, BOOK_SECTION: source })) },
     ];
     const tools = TOOLS(setup.subject);
     let nudged = false;
@@ -196,8 +196,8 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   items = items.filter((i) => !checkItem(i, ctx()).length).slice(0, LIMITS.maxItems);
 
   if (!note) note = setup.lang === 'en'
-    ? `I made ${slides.length} slides, ${items.length} practice items and ${cards.length} flashcards from your notes. Every item passed the code checks.`
-    : `Trợ lý đã soạn ${slides.length} slide, ${items.length} câu luyện tập và ${cards.length} thẻ nhớ từ ghi chú của cô. Mọi câu đều đã qua bộ kiểm tra.`;
+    ? `I made ${slides.length} slides, ${items.length} practice items and ${cards.length} flashcards from the section of your book. Every item passed the code checks.`
+    : `Trợ lý đã soạn ${slides.length} slide, ${items.length} câu luyện tập và ${cards.length} thẻ nhớ từ phần bài trong sách của cô. Mọi câu đều đã qua bộ kiểm tra.`;
   const [ok] = checkOutput(note + changes.join('\n'), canary, { maxChars: 4000 });
   if (!ok) { note = ''; changes.length = 0; }
   return { skills, slides, items, cards, rejected, agent: { model, turns, finished, note, changes: changes.slice(0, 12) } };

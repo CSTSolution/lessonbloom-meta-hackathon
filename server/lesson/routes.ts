@@ -12,6 +12,9 @@ import type { Files } from '../files.ts';
 import { CutoutError, cutOut, cleanName, decodePhoto } from './cutout.ts';
 import { Lessons, runLesson } from './lessons.ts';
 import { illustrate } from './pictures.ts';
+import { areaOf, sectionOf } from '../knowledge/routes.ts';
+import { citation, sourceOf } from '../knowledge/search.ts';
+import type { Setup } from './types.ts';
 import { cleanSetup, intake, NotLesson, readPhotos } from './writer.ts';
 
 const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
@@ -58,29 +61,35 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     try { return c.json({ text: (await d.as(c.get('teacher').id, () => d.ai.transcribe({ audio, mime: type.split(';')[0], lang: c.get('teacher').lang }))).slice(0, MAX_NOTES) }); } catch (e) { return aiError(c, e); }
   });
 
+  // The setup, pre-filled from the matched section of her book (subject and grade come from the area).
   app.post('/api/t/intake', async (c) => {
-    const b = await c.req.json<{ notes?: string }>().catch(() => ({} as { notes?: string }));
-    const notes = String(b.notes ?? '').trim();
-    if (notes.length < 30) return fail(c, 'notesShort');
-    if (notes.length > MAX_NOTES) return fail(c, 'notesLong');
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string }>().catch(() => ({} as { areaId?: string; sectionId?: string }));
+    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
+    if (!a || !m) return fail(c, 'notFound', 404);
     const g = await gate(c); if (g) return g;
+    const source = sourceOf(m);
     try {
-      return c.json({ setup: await d.as(c.get('teacher').id, async () => { await requireOnTask(d.ai, notes); return intake(d.ai, notes, c.get('teacher').lang); }) });
+      const setup = await d.as(t.id, async () => { await requireOnTask(d.ai, source); return intake(d.ai, source, t.lang); });
+      return c.json({ setup: { ...setup, subject: a.subject, grade: a.grade }, citation: citation(m, t.lang) });
     } catch (e) { return aiError(c, e); }
   });
 
+  // A lesson always comes from one section of one knowledge area: that section is its only source.
   app.post('/api/t/lessons', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ notes?: string; setup?: unknown }>().catch(() => ({} as { notes?: string; setup?: unknown }));
-    const notes = String(b.notes ?? '').trim(), setup = cleanSetup(b.setup);
-    if (notes.length < 30) return fail(c, 'notesShort');
-    if (notes.length > MAX_NOTES) return fail(c, 'notesLong');
-    if (!setup) return fail(c, 'setup');
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; request?: string; setup?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; request?: string; setup?: unknown }));
+    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
+    if (!a || !m) return fail(c, 'notFound', 404);
+    const setup0 = cleanSetup(b.setup), request = String(b.request ?? '').trim().slice(0, 2000);
+    if (!setup0) return fail(c, 'setup');
+    const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'] };
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
-    // everything she wrote that reaches a prompt is classified: notes, title, objectives, wishes
-    try { await d.as(t.id, () => requireOnTask(d.ai, [notes, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
-    const id = await lessons.create(t.id, setup, notes);
-    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, notes, { files: d.files, budget: d.budget, teacherId: t.id }));
+    const source = sourceOf(m);
+    // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
+    try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
+    const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
+    const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
+    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages }));
     return c.json({ id });
   });
 

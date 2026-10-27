@@ -32,6 +32,7 @@ export interface Slide {
   narration: string;              // the video's voice for this slide
   imagePrompt: string;
   image?: string;
+  page?: number;                  // the page of the book it comes from
 }
 
 export type Op = '+' | '-' | '×' | ':';
@@ -87,6 +88,9 @@ export interface Lesson {
   agent: AgentNote | null;
   rejected: Rejected[];
   error: string | null;
+  area_id: string | null;
+  request: string;
+  refs: { book: string; title: string; pageFrom: number; pageTo: number; vi: string; en: string }[];
   created_at: string;
   updated_at: string;
 }

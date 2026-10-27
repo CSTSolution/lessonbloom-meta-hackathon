@@ -26,7 +26,7 @@ export function cleanSetup(x: unknown): Setup | null {
   return { subject: s.subject, grade: Math.min(5, Math.max(1, Math.round(Number(s.grade)) || 2)) as Setup['grade'], title, objectives, minutes, lang: s.lang === 'en' ? 'en' : 'vi', ...(note ? { note } : {}) };
 }
 
-const material = (setup: Setup, source: string) => wrapUser(`SETUP: ${JSON.stringify(setup)}\n\nTEACHER'S NOTES:\n${source}`);
+const material = (setup: Setup, source: string) => wrapUser(`SETUP: ${JSON.stringify(setup)}\n\nBOOK SECTION (the only source):\n${source}`);
 
 export async function intake(ai: AI, notes: string, uiLang: 'vi' | 'en'): Promise<Setup> {
   const r = await guardedJson<Setup & { usable: boolean }>(ai, { endpoint: 'intake', system: fill(INTAKE_SYSTEM, { lang: langName(uiLang) }), prompt: wrapUser(notes), schema: INTAKE_SCHEMA, fixture: { notes } });
