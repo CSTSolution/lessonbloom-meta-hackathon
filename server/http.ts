@@ -22,6 +22,10 @@ export const MSG = {
   budget: { vi: 'Hôm nay LessonBloom đã dùng hết hạn mức AI. Cô thử lại vào ngày mai nhé.', en: 'LessonBloom has used today\'s AI allowance. Please try again tomorrow.' },
   aiBlocked: { vi: 'LessonBloom chỉ soạn bài giảng và bài luyện tập từ ghi chú bài học. Cô kiểm tra lại nội dung nhé.', en: 'LessonBloom only makes lessons and practice from lesson notes. Please check the text.' },
   aiBusy: { vi: 'AI đang bận, cô thử lại sau ít phút nhé.', en: 'The AI is busy. Please try again in a few minutes.' },
+  cutoutName: { vi: 'Cô gõ tên đồ vật cần cắt, ngắn gọn (ví dụ: quả táo, đồng xu, chậu cây).', en: 'Type the name of the thing to cut out, briefly (for example: apples, coins, plant pot).' },
+  cutoutPeople: { vi: 'Không cắt người hoặc khuôn mặt: ảnh của các con không đưa vào bài. Cô chọn đồ vật nhé.', en: 'People and faces are not cut out: children\'s photos never go into lessons. Please choose an object.' },
+  cutoutNone: { vi: 'AI chưa tìm thấy đồ vật này trong ảnh. Cô thử tên khác hoặc ảnh rõ hơn nhé.', en: 'The AI could not find that in the photo. Try another name or a clearer photo.' },
+  pictureFailed: { vi: 'Chưa vẽ được hình phù hợp. Cô thử lại nhé.', en: 'No suitable picture this time. Please try again.' },
   server: { vi: 'Có lỗi ở máy chủ. Cô thử lại sau nhé.', en: 'Something went wrong on the server. Please try again.' },
 } as const;
 export type MsgKey = keyof typeof MSG;

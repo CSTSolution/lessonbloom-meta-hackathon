@@ -8,14 +8,17 @@ import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { Blocked, type Budget, Limiter, requireOnTask } from '../guard/guard.ts';
 import { fail } from '../http.ts';
+import type { Files } from '../files.ts';
+import { CutoutError, cutOut, cleanName, decodePhoto } from './cutout.ts';
 import { Lessons, runLesson } from './lessons.ts';
+import { illustrate } from './pictures.ts';
 import { cleanSetup, intake, NotLesson, readPhotos } from './writer.ts';
 
 const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
 const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
 const lessonsPerDay = (kind: string) => (kind === 'demo' ? config.guard.lessonsDemoDay : config.guard.lessonsDay);
 
-export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T) => T }) {
+export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T) => T }) {
   const lessons = new Lessons(d.sql);
   const perTeacher = new Limiter(10, 200);           // AI requests per teacher (per minute, per day)
 
@@ -77,8 +80,39 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     // everything she wrote that reaches a prompt is classified: notes, title, objectives, wishes
     try { await d.as(t.id, () => requireOnTask(d.ai, [notes, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
     const id = await lessons.create(t.id, setup, notes);
-    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, notes));
+    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, notes, { files: d.files, budget: d.budget, teacherId: t.id }));
     return c.json({ id });
+  });
+
+  // One slide's picture: drawn again with Muse Image, or cut out of the assigner's own photo with SAM 3.1.
+  const slideOf = async (c: Context<Env>) => {
+    const l = await lessons.get(c.get('teacher').id, c.req.param('id') ?? '');
+    const s = l?.status === 'ready' ? l.slides.find((x) => x.id === c.req.param('sid')) : undefined;
+    return l && s ? { l, s } : null;
+  };
+  app.post('/api/t/lessons/:id/slides/:sid/picture', async (c) => {
+    const f = await slideOf(c); if (!f) return fail(c, 'notFound', 404);
+    const g = await gate(c); if (g) return g;
+    try {
+      const img = await d.as(c.get('teacher').id, () => illustrate(d.ai, f.s, '(a different composition)'));
+      if (!img) return fail(c, 'pictureFailed', 503);
+      const url = await d.files.put(f.l.id, img[0] === 0x89 ? 'png' : 'jpg', img);
+      await lessons.setSlideImage(f.l.id, f.s.id, url);
+      return c.json({ slide: { ...f.s, image: url } });
+    } catch (e) { return aiError(c, e); }
+  });
+  app.post('/api/t/lessons/:id/slides/:sid/cutout', async (c) => {
+    const f = await slideOf(c); if (!f) return fail(c, 'notFound', 404);
+    const b = await c.req.json<{ photo?: string; name?: string }>().catch(() => ({} as { photo?: string; name?: string }));
+    const photo = Buffer.from(String(b.photo || '').slice(0, 6e6), 'base64');
+    try { cleanName(b.name); decodePhoto(photo); } catch (e) { if (e instanceof CutoutError) return fail(c, e.code); throw e; }
+    const g = await gate(c); if (g) return g;
+    try {
+      const cut = await d.as(c.get('teacher').id, () => cutOut(d.ai, photo, String(b.name)));
+      const url = await d.files.put(f.l.id, 'png', cut.png);
+      await lessons.setSlideImage(f.l.id, f.s.id, url);
+      return c.json({ slide: { ...f.s, image: url }, matches: cut.matches });
+    } catch (e) { if (e instanceof CutoutError) return fail(c, e.code); return aiError(c, e); }
   });
 
   app.get('/api/t/lessons', async (c) => c.json({ lessons: await lessons.list(c.get('teacher').id) }));

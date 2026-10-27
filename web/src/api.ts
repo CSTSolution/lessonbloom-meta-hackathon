@@ -7,7 +7,7 @@ export interface Slide { id: string; kind: string; heading: string; bullets: str
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
-export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[] }[]; created_at: string }
+export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[] }[]; created_at: string }
 export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number }
 export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }
 
@@ -30,5 +30,7 @@ export const api = {
   intake: (notes: string) => call<{ setup: Setup }>('POST', '/t/intake', { notes }),
   create: (notes: string, setup: Setup) => call<{ id: string }>('POST', '/t/lessons', { notes, setup }),
   lessons: () => call<{ lessons: LessonRow[] }>('GET', '/t/lessons'),
+  newPicture: (id: string, sid: string) => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/picture`),
+  cutout: (id: string, sid: string, photo: string, name: string) => call<{ slide: Slide; matches: number }>('POST', `/t/lessons/${id}/slides/${sid}/cutout`, { photo, name }),
   lesson: (id: string) => call<{ lesson: Lesson }>('GET', `/t/lessons/${encodeURIComponent(id)}`),
 };

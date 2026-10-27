@@ -60,6 +60,10 @@ export const lessonAnswers: [string, (r: JsonRequest) => unknown][] = [
     return { slides: f.outline.map((o: F, i: number) => ({ kind: o.kind, heading: o.kind === 'title' ? f.setup.title : (s[i % s.length] || '').split(/[,:]/)[0].slice(0, 50), bullets: [(s[(i + 1) % s.length] || '').slice(0, 70)],
       example: o.kind === 'example' && f.setup.subject === 'math' ? '36 + 27 = 63' : undefined, notes: 'Cô hỏi cả lớp trước rồi mới giải thích.', source: s[i % s.length] || '', narration: s[i % s.length] || '', imagePrompt: 'children counting mangoes in a school yard, no text' })) };
   }],
+  // the picture check: the first picture of slide 2 has "text" in it, so the redraw path runs
+  ['critic', (r) => ((r.fixture as F).slide === 'sl02' && (r.fixture as F).attempt === 1
+    ? { hasText: true, unsafe: false, offTopic: false, broken: false, score: 3, revisedPrompt: 'the same scene with no writing anywhere' }
+    : { hasText: false, unsafe: false, offTopic: false, broken: false, score: 8 })],
   ['items', (r) => ((r.fixture as F).setup.subject === 'math' ? mathItems(r.fixture as F) : englishItems(r.fixture as F))],
   ['cards', (r) => ((r.fixture as F).setup.subject === 'math'
     ? { cards: [['36 + 27', '63'], ['48 + 25', '73'], ['19 + 36', '55'], ['57 + 28', '85']].map(([front, back]) => ({ front, back })) }

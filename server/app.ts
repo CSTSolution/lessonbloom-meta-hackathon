@@ -1,6 +1,7 @@
 // The HTTP API. Every error carries a Vietnamese and an English message; the browser shows the
 // one matching the teacher's language.
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { Accounts, cleanEmail, EMAIL, publicTeacher, type Teacher } from './auth/accounts.ts';
@@ -8,14 +9,15 @@ import type { AI } from './ai/types.ts';
 import { config } from './config.ts';
 import type { Sql } from './db/sql.ts';
 import { Budget, clientIp, Limiter } from './guard/guard.ts';
+import { Files } from './files.ts';
 import { fail } from './http.ts';
 import { lessonRoutes } from './lesson/routes.ts';
 import type { Mailer } from './mail.ts';
 
 export type Env = { Variables: { teacher: Teacher; token: string } };
 const COOKIE = 'lbm_s';
-export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer }) {
-  const { sql, ai, mail } = deps;
+export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files }) {
+  const { sql, ai, mail } = deps, files = deps.files ?? new Files(join(config.dataDir, 'files'));
   const accounts = new Accounts(sql), budget = new Budget(sql);
   const demoPerIp = new Limiter(3, config.guard.demoPerIpDay), codePerIp = new Limiter(5, config.guard.codesPerIpDay), codePerEmail = new Limiter(2, config.guard.codesPerEmailDay);
   const verifyPerIp = new Limiter(10, 100);
@@ -90,6 +92,11 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer }) {
     return c.json({ ok: true });
   });
 
-  lessonRoutes(app, { sql, ai, budget, as: (teacherId, fn) => who.run(teacherId, fn) });
+  // pictures, cut-outs and videos: random names, so a file is reachable only through its lesson
+  app.get('/media/:lesson/:name', async (c) => {
+    const f = await files.get(c.req.param('lesson'), c.req.param('name'));
+    return f ? c.body(new Uint8Array(f.data), 200, { 'content-type': f.type, 'cache-control': 'public, max-age=31536000, immutable' }) : c.notFound();
+  });
+  lessonRoutes(app, { sql, ai, budget, files, as: (teacherId, fn) => who.run(teacherId, fn) });
   return app;
 }

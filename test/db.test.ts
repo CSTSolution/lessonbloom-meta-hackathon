@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
+import { readdir } from 'node:fs/promises';
 import { test } from 'node:test';
 import { migrate } from '../server/db/migrate.ts';
 import { pgliteSql } from '../server/db/sql.ts';
 
 test('migrations apply once, in order, and an edited one stops the server', async () => {
   const sql = await pgliteSql();
-  assert.deepEqual(await migrate(sql), ['001_accounts.sql', '002_lessons.sql']);
+  const all = (await readdir(new URL('../server/db/migrations/', import.meta.url))).filter((f) => f.endsWith('.sql')).sort();
+  assert.deepEqual(await migrate(sql), all);
   assert.deepEqual(await migrate(sql), [], 'nothing to do the second time');
   const tables = (await sql.query<{ t: string }>(`select table_name as t from information_schema.tables where table_schema = 'public' order by 1`)).map((r) => r.t);
   for (const t of ['ai_usage', 'lessons', 'login_codes', 'schema_migrations', 'sessions', 'teachers']) assert.ok(tables.includes(t), t);

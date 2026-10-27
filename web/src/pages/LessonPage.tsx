@@ -1,7 +1,8 @@
 // One lesson. While the agent works: its steps, live. Then: its note, the slides, the practice
 // (each item with its answer, as the teacher reviews it) and the flashcards.
 import { useEffect, useState } from 'react';
-import { api, type Item, type Lesson } from '../api.ts';
+import { api, ApiError, type Item, type Lesson, type Slide } from '../api.ts';
+import { shrink } from '../photo.ts';
 import { useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
@@ -11,14 +12,48 @@ const T = {
     tabs: { slides: 'Slide', practice: 'Bài luyện tập', cards: 'Thẻ nhớ' }, teacherSays: 'Lời giảng', source: 'Từ ghi chú của cô',
     levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, answer: 'Đáp án', checked: (n: number, r: number) => `${n} câu, tất cả đã qua bộ kiểm tra bằng code${r ? ` (đã loại ${r} câu chưa đạt)` : ''}.`,
     tf: { true: 'Đúng', false: 'Sai' }, unit: 'Đơn vị',
+    drawing: 'Đang vẽ hình…', newPic: 'Vẽ hình khác', cut: '✂️ Cắt từ ảnh của cô', cutName: 'Đồ vật trong ảnh (vd. quả táo)', cutGo: 'Cắt', busy: 'Đang làm…',
+    cutHint: 'Chụp đồ vật thật; AI cắt nền và đặt vào slide. Không dùng ảnh có người. Ảnh gốc không được lưu.', cutDone: (n: number) => `Đã cắt ${n} đồ vật.`,
   },
   en: {
     back: '← Lessons', working: 'The agent is making your lesson…', failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes',
     tabs: { slides: 'Slides', practice: 'Practice', cards: 'Flashcards' }, teacherSays: 'You say', source: 'From your notes',
     levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, answer: 'Answer', checked: (n: number, r: number) => `${n} items, every one passed the code checks${r ? ` (${r} rejected items left out)` : ''}.`,
     tf: { true: 'True', false: 'False' }, unit: 'Unit',
+    drawing: 'Drawing…', newPic: 'New picture', cut: '✂️ Cut from my photo', cutName: 'Object in the photo (e.g. apples)', cutGo: 'Cut out', busy: 'Working…',
+    cutHint: 'Photograph a real object; the AI removes the background and puts it on the slide. No photos of people. The photo is not kept.', cutDone: (n: number) => `Cut out ${n} object(s).`,
   },
 };
+
+function SlideCard({ s, i, total, lessonId, pending, t, onSlide }: { s: Slide; i: number; total: number; lessonId: string; pending: boolean; t: (typeof T)['vi']; onSlide: (s: Slide) => void }) {
+  const lang = useLang();
+  const [busy, setBusy] = useState(false), [cut, setCut] = useState<{ file: File | null; name: string } | null>(null), [msg, setMsg] = useState('');
+  const run = async (fn: () => Promise<void>) => { setBusy(true); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); } };
+  return (
+    <article className={`slide k-${s.kind}`}>
+      <span className="small muted">{i + 1} / {total}</span>
+      {s.image ? <img className="pic" src={s.image} alt="" /> : pending && <div className="pic pending small">{t.drawing}</div>}
+      <h3>{s.heading}</h3>
+      {s.bullets.length > 0 && <ul>{s.bullets.map((b, j) => <li key={j}>{b}</li>)}</ul>}
+      {s.example && <div className="ex">{s.example}</div>}
+      <p className="small"><b>{t.teacherSays}:</b> {s.notes}</p>
+      {s.source && <p className="small muted">“{s.source}” · {t.source}</p>}
+      <div className="row small">
+        <button className="btn ghost small" disabled={busy} onClick={() => run(async () => onSlide((await api.newPicture(lessonId, s.id)).slide))}>{busy && !cut ? t.busy : t.newPic}</button>
+        <button className="btn ghost small" disabled={busy} onClick={() => setCut(cut ? null : { file: null, name: '' })}>{t.cut}</button>
+      </div>
+      {cut && <div className="stack small" style={{ gap: 6 }}>
+        <p className="muted">{t.cutHint}</p>
+        <input type="file" accept="image/*" onChange={(e) => setCut({ ...cut, file: e.target.files?.[0] || null })} />
+        <input placeholder={t.cutName} maxLength={40} value={cut.name} onChange={(e) => setCut({ ...cut, name: e.target.value })} />
+        <button className="btn primary small" disabled={busy || !cut.file || !cut.name.trim()} onClick={() => run(async () => {
+          const r = await api.cutout(lessonId, s.id, (await shrink(cut.file!, 1280)).data, cut.name.trim()); onSlide(r.slide); setCut(null); setMsg(t.cutDone(r.matches));
+        })}>{busy ? t.busy : t.cutGo}</button>
+      </div>}
+      {msg && <p className="small note">{msg}</p>}
+    </article>
+  );
+}
 
 function ItemView({ it, t }: { it: Item; t: (typeof T)['vi'] }) {
   const right = (o: string) => o.toLowerCase() === it.answer.toLowerCase();
@@ -44,7 +79,7 @@ export function LessonPage({ id }: { id: string }) {
   useEffect(() => {
     let alive = true, timer: ReturnType<typeof setTimeout>;
     const load = async () => {
-      try { const { lesson } = await api.lesson(id); if (!alive) return; setL(lesson); if (lesson.status === 'working') timer = setTimeout(load, 1500); }
+      try { const { lesson } = await api.lesson(id); if (!alive) return; setL(lesson); if (lesson.status === 'working' || lesson.pictures_pending) timer = setTimeout(load, 1500); }
       catch { if (alive) timer = setTimeout(load, 4000); }
     };
     void load();
@@ -66,14 +101,7 @@ export function LessonPage({ id }: { id: string }) {
         {l.agent?.note && <div className="card agent"><strong>◆ {t.note}</strong><p>{l.agent.note}</p>{!!l.agent.changes.length && <p className="small muted">{t.changes}: {l.agent.changes.join(' · ')}</p>}</div>}
         <div className="seg" role="tablist">{(['slides', 'practice', 'cards'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t.tabs[k]} <span className="muted">{k === 'slides' ? l.slides.length : k === 'practice' ? l.items.length : l.cards.length}</span></button>)}</div>
         {tab === 'slides' && <div className="slides">{l.slides.map((s, i) => (
-          <article key={s.id} className={`slide k-${s.kind}`}>
-            <span className="small muted">{i + 1} / {l.slides.length}</span>
-            <h3>{s.heading}</h3>
-            {s.bullets.length > 0 && <ul>{s.bullets.map((b, j) => <li key={j}>{b}</li>)}</ul>}
-            {s.example && <div className="ex">{s.example}</div>}
-            <p className="small"><b>{t.teacherSays}:</b> {s.notes}</p>
-            {s.source && <p className="small muted">“{s.source}” · {t.source}</p>}
-          </article>
+          <SlideCard key={s.id} s={s} i={i} total={l.slides.length} lessonId={l.id} pending={l.pictures_pending} t={t} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} />
         ))}</div>}
         {tab === 'practice' && <div className="stack">
           <p className="small muted">{t.checked(l.items.length, l.rejected.length)}</p>

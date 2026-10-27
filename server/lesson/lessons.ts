@@ -2,7 +2,10 @@
 import { newId } from '../auth/accounts.ts';
 import type { AI } from '../ai/types.ts';
 import type { Sql } from '../db/sql.ts';
+import type { Files } from '../files.ts';
+import type { Budget } from '../guard/guard.ts';
 import { buildLesson } from './agent.ts';
+import { drawPictures } from './pictures.ts';
 import type { Lesson, Setup } from './types.ts';
 
 const J = (v: unknown) => JSON.stringify(v);
@@ -31,17 +34,26 @@ export class Lessons {
     await this.sql.query(`update lessons set status = 'ready', skills = $2::jsonb, slides = $3::jsonb, items = $4::jsonb, cards = $5::jsonb, rejected = $6::jsonb, agent = $7::jsonb, updated_at = now() where id = $1`,
       [id, J(b.skills), J(b.slides), J(b.items), J(b.cards), J(b.rejected), J(b.agent)]);
   }
+  async picturesPending(id: string, on: boolean) {
+    await this.sql.query('update lessons set pictures_pending = $2, updated_at = now() where id = $1', [id, on]);
+  }
+  // One slide's picture, set inside the database so a concurrent change to another slide is never lost.
+  async setSlideImage(id: string, slideId: string, url: string) {
+    await this.sql.query(`update lessons set slides = (select coalesce(jsonb_agg(case when s->>'id' = $2 then s || jsonb_build_object('image', $3::text) else s end order by o), '[]'::jsonb)
+      from jsonb_array_elements(slides) with ordinality as t(s, o)), updated_at = now() where id = $1`, [id, slideId, url]);
+  }
   async fail(id: string) {
     await this.sql.query(`update lessons set status = 'error', error = 'failed', updated_at = now() where id = $1`, [id]);
   }
 }
 
 // Builds the lesson in the background; the teacher's page polls and shows the agent's steps live.
-export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string) {
+export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string }) {
   try {
     const b = await buildLesson(ai, setup, source, (vi, en) => lessons.step(id, vi, en));
-    await lessons.step(id, 'Xong! Cô xem bài giảng và ghi chú của trợ lý nhé.', 'Done! Have a look at the lesson and the agent\'s note.');
+    await lessons.step(id, 'Xong! Cô xem bài giảng và ghi chú của trợ lý nhé. Hình minh họa đang được vẽ thêm.', 'Done! Have a look at the lesson and the agent\'s note. Pictures are on their way.');
     await lessons.finish(id, b);
+    if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides);
   } catch (e) {
     // the teacher sees a plain message; details stay in the server log
     console.error(`[lesson] ${id} failed: ${String((e as Error)?.stack || e).slice(0, 1500)}`);
