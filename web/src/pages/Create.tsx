@@ -12,14 +12,14 @@ import { go } from '../router.ts';
 const T = {
   vi: {
     title: 'Soạn bài mới', step1: '1. Dạy phần nào?', step2: '2. Phần tìm thấy trong sách', step3: '3. Thông tin bài', area: 'Kho kiến thức', noArea: 'Cô cần một kho kiến thức có sách trước. Bài giảng chỉ lấy nội dung từ sách của cô.', toKnowledge: 'Mở Kho kiến thức',
-    tabs: { type: 'Gõ', photo: 'Chụp ảnh', voice: 'Đọc to' }, ask: 'Ví dụ: Bài 21, phép cộng có nhớ', photoHint: 'Chụp trang sách, giáo án hoặc bài con đã làm (tối đa 5 ảnh).', pick: 'Chọn ảnh', reading: 'AI đang đọc ảnh…',
+    tabs: { type: 'Gõ', photo: 'Chụp ảnh', voice: 'Đọc to' }, ask: 'Ví dụ: Bài 21, phép cộng có nhớ', photoHint: 'Chụp trang sách, giáo án hoặc bài con đã làm (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', pick: 'Chọn ảnh', reading: 'AI đang đọc ảnh…',
     rec: 'Ghi âm', stop: 'Dừng', hearing: 'AI đang nghe…', recording: 'Đang ghi âm…', find: 'Tìm trong sách', finding: 'Đang tìm trong sách…',
     used: 'Các đoạn AI đã dùng', openBook: 'Mở sách', use: 'Dùng phần này', again: 'Tìm lại', thinking: 'Đang đọc phần bài…',
     sample: 'Dùng sách mẫu', lessonTitle: 'Tên bài', objectives: 'Mục tiêu (tối đa 3)', minutes: 'Thời lượng', min: (n: number) => `${n} phút`, lang: 'Ngôn ngữ của bài', vi: 'Tiếng Việt', en: 'Tiếng Anh', note: 'Mong muốn của cô (không bắt buộc)', notePh: 'Ví dụ: dùng tình huống ở chợ', make: 'Soạn bài', page: 'tr.',
   },
   en: {
     title: 'New lesson', step1: '1. Which part to teach?', step2: '2. Found in your book', step3: '3. About the lesson', area: 'Knowledge area', noArea: 'You need a knowledge area with a book first. Lessons come only from your books.', toKnowledge: 'Open Knowledge',
-    tabs: { type: 'Type', photo: 'Photo', voice: 'Speak' }, ask: 'e.g. Unit 6, colours', photoHint: 'Photograph the book page, your plan or your child\'s finished exercise (up to 5 photos).', pick: 'Choose photos', reading: 'The AI is reading the photos…',
+    tabs: { type: 'Type', photo: 'Photo', voice: 'Speak' }, ask: 'e.g. Unit 6, colours', photoHint: 'Photograph the book page, your plan or your child\'s finished exercise (up to 5 photos). No faces, names or personal details.', pick: 'Choose photos', reading: 'The AI is reading the photos…',
     rec: 'Record', stop: 'Stop', hearing: 'The AI is listening…', recording: 'Recording…', find: 'Find in my books', finding: 'Searching your books…',
     used: 'Passages the AI used', openBook: 'Open the book', use: 'Use this part', again: 'Search again', thinking: 'Reading the section…',
     sample: 'Use a sample book', lessonTitle: 'Title', objectives: 'Objectives (up to 3)', minutes: 'Length', min: (n: number) => `${n} min`, lang: 'Lesson language', vi: 'Vietnamese', en: 'English', note: 'Your wishes (optional)', notePh: 'e.g. use market examples', make: 'Make the lesson', page: 'p.',

@@ -7,14 +7,14 @@ import { useLang, useT } from '../i18n.ts';
 const T = {
   vi: {
     title: 'Kho kiến thức', lead: 'Tải sách (PDF) lên theo môn và lớp. Bài giảng và bài luyện tập chỉ lấy nội dung từ sách trong kho, và ghi rõ trang.',
-    private: 'Sách trong kho là của riêng cô, không chia sẻ cho ai.', newArea: 'Tạo kho mới', name: 'Tên kho', namePh: 'Ví dụ: Toán 2', subject: 'Môn', math: 'Toán', english: 'Tiếng Anh', grade: 'Lớp',
+    private: 'Sách trong kho là của riêng cô, không chia sẻ cho ai. Trong bản demo, nên dùng sách mẫu hoặc tài liệu tự soạn, không dùng tài liệu bí mật.', newArea: 'Tạo kho mới', name: 'Tên kho', namePh: 'Ví dụ: Toán 2', subject: 'Môn', math: 'Toán', english: 'Tiếng Anh', grade: 'Lớp',
     create: 'Tạo', upload: 'Tải sách PDF lên', bookTitle: 'Tên sách', uploading: 'Đang tải lên…', none: 'Chưa có kho nào. Cô tạo kho đầu tiên rồi tải sách lên nhé.',
     status: { processing: 'Đang đọc sách…', ready: 'Sẵn sàng', error: 'Lỗi' }, errors: { scanned: 'Sách là ảnh chụp, chưa có chữ. Hiện LessonBloom đọc được PDF có chữ.', failed: 'Chưa đọc được tệp này.', blocked: 'Nội dung không dùng được.' },
     sections: (n: number) => `${n} bài`, contents: 'Mục lục', open: 'Mở', page: 'tr.', sample: 'Thử với sách mẫu', sampleNote: 'Sách mẫu do đội LessonBloom tự viết.', sampleMath: 'Toán 2', sampleEng: 'Tiếng Anh 3',
   },
   en: {
     title: 'Knowledge', lead: 'Upload your books (PDF) by subject and grade. Lessons and practice come only from the books here, with their pages.',
-    private: 'Your books are private to you; nobody else can open them.', newArea: 'New area', name: 'Name', namePh: 'e.g. Maths 2', subject: 'Subject', math: 'Maths', english: 'English', grade: 'Grade',
+    private: 'Your books are private to you; nobody else can open them. In this demo, use the sample books or your own material, nothing confidential.', newArea: 'New area', name: 'Name', namePh: 'e.g. Maths 2', subject: 'Subject', math: 'Maths', english: 'English', grade: 'Grade',
     create: 'Create', upload: 'Upload a PDF book', bookTitle: 'Book title', uploading: 'Uploading…', none: 'No knowledge areas yet. Create one, then upload a book.',
     status: { processing: 'Reading the book…', ready: 'Ready', error: 'Error' }, errors: { scanned: 'The book is scanned images without text. LessonBloom reads text PDFs for now.', failed: 'This file could not be read.', blocked: 'This content cannot be used.' },
     sections: (n: number) => `${n} lessons`, contents: 'Contents', open: 'Open', page: 'p.', sample: 'Try with a sample book', sampleNote: 'Sample books written by the LessonBloom team.', sampleMath: 'Maths 2', sampleEng: 'English 3',

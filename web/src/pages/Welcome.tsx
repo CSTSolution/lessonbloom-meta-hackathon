@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { api, ApiError, type Teacher } from '../api.ts';
 import { getLang, useLang, useT } from '../i18n.ts';
 import { LangToggle } from './LangToggle.tsx';
+import { Notice } from './Notice.tsx';
 
 const T = {
   vi: {
@@ -42,6 +43,7 @@ export function Welcome({ onSignedIn }: { onSignedIn: (t: Teacher) => void }) {
         <p className="muted" style={{ fontSize: 18 }}>{t.lead}</p>
         <div className="flow">{t.steps.map(([n, h, d]) => <div key={n}><b>{n}</b><strong>{h}</strong><p className="muted small">{d}</p></div>)}</div>
         <span className="meta-tag">◆ {t.built}</span>
+        <Notice compact />
       </section>
       <section className="door">
         <div className="card stack" style={{ gap: 16 }}>

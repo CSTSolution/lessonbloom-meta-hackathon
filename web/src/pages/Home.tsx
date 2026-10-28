@@ -8,6 +8,7 @@ import { Create } from './Create.tsx';
 import { Knowledge } from './Knowledge.tsx';
 import { LangToggle } from './LangToggle.tsx';
 import { LessonPage } from './LessonPage.tsx';
+import { Notice } from './Notice.tsx';
 
 const T = {
   vi: {
@@ -44,6 +45,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
         </div>
       </aside>
       <main className="main stack" style={{ gap: 24 }}>
+        <Notice compact />
         {path === '/new' ? <Create onKnowledge={() => { setTab('knowledge'); go('/'); }} /> : lessonId ? <LessonPage id={lessonId} /> : <>
           {tab !== 'knowledge' && <div className="row"><h1 className="grow">{t.hello(teacher.name)}</h1>{tab === 'lessons' && !!rows?.length && <button className="btn coral" onClick={() => go('/new')}>+ {t.make}</button>}</div>}
           {tab === 'lessons' && rows && (rows.length ? (

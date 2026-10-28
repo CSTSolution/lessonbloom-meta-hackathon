@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { MockProvider } from '../server/ai/mock.ts';
 import type { JsonRequest } from '../server/ai/types.ts';
 import { config } from '../server/config.ts';
-import { Blocked, Budget, checkOutput, guardedJson, precheckAll, REFUSAL, scopedSystem, wrapUser } from '../server/guard/guard.ts';
+import { Blocked, Budget, checkOutput, guardedJson, precheckAll, redact, REFUSAL, scopedSystem, wrapUser } from '../server/guard/guard.ts';
 import { testServer } from './helpers.ts';
 
 test('layer 2: user text cannot leave <user_input>; the fixed rules carry the canary', () => {
@@ -62,3 +62,13 @@ test('layer 1: spending is logged, and the teacher cap, app budget and kill swit
   config.guard.disabled = true;
   try { assert.equal(await b.check('t1'), 'disabled'); } finally { config.guard.disabled = false; }
 });
+
+test('personal data is removed before anything reaches a model; lesson numbers are kept', () => {
+  const t = redact('Liên hệ cô Hạnh: hanh.nguyen@example.edu, 0912 345 678 hoặc +84 912345678. Số tài khoản 0123456789012.');
+  assert.ok(!/@|0912|345 678|912345678|0123456789012/.test(t), t);
+  assert.match(t, /\[email\].*\[phone\].*\[phone\].*\[number\]/);
+  const lesson = 'Bài 21, tr. 45: 36 + 27 = 63; 1000 − 250 = 750; năm 2026.';
+  assert.equal(redact(lesson), lesson);
+  assert.match(wrapUser('email me at a@b.co'), /\[email\]/);
+});
+

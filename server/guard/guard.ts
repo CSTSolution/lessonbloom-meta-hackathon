@@ -24,7 +24,17 @@ export class Blocked extends Error {
 
 export const newCanary = () => `lbm-${randomBytes(6).toString('hex')}`;
 const TAG = /<\s*\/?\s*user_input\s*>/gi;
-export const wrapUser = (text: unknown) => `<user_input>\n${String(text ?? '').replace(TAG, '')}\n</user_input>`;
+// Personal data never goes to the models: while LessonBloom runs on Meta's free hackathon credits, Meta
+// may use what it is sent to improve its products. Emails, phone numbers and long ID or account numbers
+// are replaced before any user material is wrapped. (Pupils' names, when pupil features use a model,
+// go as neutral labels and are filled back in on our server.)
+const REDACT: [RegExp, string][] = [
+  [/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, '[email]'],
+  [/(?<![\d.])(\+?84|0)(?:[\s.-]?\d){8,10}(?!\d)/g, '[phone]'],
+  [/(?<!\d)\d(?:[\s.-]?\d){8,}(?!\d)/g, '[number]'],
+];
+export const redact = (text: string) => REDACT.reduce((t, [re, to]) => t.replace(re, to), text);
+export const wrapUser = (text: unknown) => `<user_input>\n${redact(String(text ?? '')).replace(TAG, '')}\n</user_input>`;
 
 export function scopedSystem(job: string, canary: string): string {
   return `${job.trim()}

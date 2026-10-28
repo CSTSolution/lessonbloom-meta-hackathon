@@ -115,3 +115,6 @@ textarea:focus, select:focus { outline: 3px solid var(--leaf-2); border-color: v
 blockquote { margin: 0; padding: 8px 12px; border-left: 4px solid var(--leaf); background: var(--leaf-2); border-radius: 0 var(--r) var(--r) 0; }
 .toc { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
 .book { padding: 8px 0; border-bottom: 1px solid var(--line); }
+
+.notice { margin: 0; padding: 10px 14px; border-radius: var(--r); background: var(--sun-2); border: 1px solid #EBD9A0; color: #5B4A12; font-size: 14px; }
+.notice.small { font-size: 13px; padding: 8px 12px; }
