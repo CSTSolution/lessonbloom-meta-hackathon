@@ -28,15 +28,22 @@ const T = {
 const day = (d: string | null, lang: string) => (d ? new Date(d).toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) : '');
 export const copyText = async (s: string) => { try { await navigator.clipboard.writeText(s); return true; } catch { return false; } };
 
-export function Classes() {
-  const t = useT(T);
+// a parent's "Con của tôi": one row per child, with the lessons given and the child's own link
+const P = {
+  vi: { title: 'Con của tôi', lead: 'Mỗi con một dòng: bài đã giao, dạng lỗi lặp lại và link riêng của con.', add: '+ Thêm con', namePh: 'Tên gọi của con', create: 'Thêm', empty: 'Cô thêm tên gọi của con để bắt đầu.', link: 'Link riêng của con', none: 'Chưa giao bài nào cho con.', del: 'Bỏ khỏi danh sách', delAsk: 'Bỏ con khỏi danh sách cùng bài đã giao và kết quả?', rename: 'Đổi tên gọi' },
+  en: { title: 'My children', lead: 'One row per child: lessons given, repeated mistakes and the child\'s own link.', add: '+ Add a child', namePh: "Child's first name", create: 'Add', empty: "Add your child's first name to start.", link: "Your child's link", none: 'Nothing assigned yet.', del: 'Remove', delAsk: 'Remove this child with the lessons given and the results?', rename: 'Rename' },
+};
+
+export function Classes({ parent = false }: { parent?: boolean }) {
+  const t0 = useT(T), lang0 = useLang(), t = parent ? { ...t0, ...P[lang0] } : t0;
   const [rows, setRows] = useState<ClassRow[] | null>(null), [open, setOpen] = useState<string | null>(null), [adding, setAdding] = useState(false), [name, setName] = useState(''), [err, setErr] = useState('');
-  const lang = useLang();
+  const lang = lang0;
+  const [grade, setGrade] = useState(1);
   const load = () => api.classes().then((r) => { setRows(r.classes); if (!open && r.classes[0]) setOpen(r.classes[0].id); }).catch(() => setRows([]));
   useEffect(() => { void load(); }, []);
   const create = async () => {
     setErr('');
-    try { const r = await api.createClass(name); setName(''); setAdding(false); setOpen(r.class.id); await load(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); }
+    try { const r = await (parent ? api.createChild(name, grade) : api.createClass(name)); setName(''); setAdding(false); setOpen(r.class.id); await load(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); }
   };
   if (!rows) return null;
   return (
@@ -44,6 +51,7 @@ export function Classes() {
       <div className="row"><div className="grow"><h1>{t.title}</h1><p className="muted small">{t.lead}</p></div><button className="btn" onClick={() => setAdding(true)}>{t.add}</button></div>
       {adding && <form className="card row" onSubmit={(e) => { e.preventDefault(); void create(); }}>
         <input className="grow" autoFocus maxLength={40} placeholder={t.namePh} value={name} onChange={(e) => setName(e.target.value)} />
+        {parent && <select value={grade} onChange={(e) => setGrade(Number(e.target.value))}>{[1, 2, 3, 4, 5].map((g) => <option key={g} value={g}>{lang === 'en' ? 'Grade' : 'Lớp'} {g}</option>)}</select>}
         <button className="btn primary" disabled={!name.trim()}>{t.create}</button><button type="button" className="btn ghost" onClick={() => setAdding(false)}>{t.cancel}</button>
       </form>}
       {err && <p className="note">{err}</p>}
@@ -52,17 +60,17 @@ export function Classes() {
         <div key={k.id} className={`group card ${open === k.id ? 'on' : ''}`}>
           <button className="group-head" onClick={() => setOpen(open === k.id ? null : k.id)} aria-expanded={open === k.id}>
             <span className="caret">{open === k.id ? '▾' : '▸'}</span>
-            <span className="grow"><b>{k.name}</b><span className="small muted"> · {t.pupils(k.pupils)} · {t.given(k.assignments)}</span></span>
-            {k.pupils > 0 && <span className={`chip ${k.joined < k.pupils ? 'warn' : 'ok'}`}>{k.joined < k.pupils ? t.notJoined(k.pupils - k.joined) : t.allIn}</span>}
+            <span className="grow"><b>{k.name}</b><span className="small muted"> · {parent ? `${lang === 'en' ? 'Grade' : 'Lớp'} ${k.grade ?? ''}` : t.pupils(k.pupils)} · {t.given(k.assignments)}</span></span>
+            {!parent && k.pupils > 0 && <span className={`chip ${k.joined < k.pupils ? 'warn' : 'ok'}`}>{k.joined < k.pupils ? t.notJoined(k.pupils - k.joined) : t.allIn}</span>}
           </button>
-          {open === k.id && <ClassBody id={k.id} t={t} onChange={load} />}
+          {open === k.id && <ClassBody id={k.id} t={t} onChange={load} parent={parent} />}
         </div>
       ))}
     </div>
   );
 }
 
-function ClassBody({ id, t, onChange }: { id: string; t: (typeof T)['vi']; onChange: () => void }) {
+function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'] & Partial<(typeof P)['vi']>; onChange: () => void; parent: boolean }) {
   const lang = useLang();
   const [v, setV] = useState<ClassView | null>(null), [names, setNames] = useState<string | null>(null), [copied, setCopied] = useState(''), [showAll, setShowAll] = useState(false);
   const load = () => api.classView(id).then(setV).catch(() => {});
@@ -70,16 +78,18 @@ function ClassBody({ id, t, onChange }: { id: string; t: (typeof T)['vi']; onCha
   if (!v) return null;
   const copy = async (s: string, k: string) => { if (await copyText(s)) { setCopied(k); setTimeout(() => setCopied(''), 1500); } };
   const kids = showAll ? v.pupils : v.pupils.slice(0, 12);
+  const me = v.pupils[0];
   return (
     <div className="stack" style={{ gap: 14, paddingTop: 8 }}>
-      <div className="join-box">
+      {parent && me && <div className="row small"><b>{t.link}:</b><span className="grow muted ellipsis">{me.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(me.url, 'me')}>{copied === 'me' ? t.copied : t.copy}</button><button className="link small" onClick={() => go(`/learner/${me.id}`)}>{lang === 'en' ? 'See details' : 'Xem chi tiết'}</button></div>}
+      {!parent && <div className="join-box">
         <img src={`/api/t/classes/${id}/qr.svg`} alt="QR" width={96} height={96} />
         <div className="stack" style={{ gap: 4 }}>
           <span className="small muted">{t.code}</span><b className="code">{v.class.code}</b>
           <span className="small muted">{t.link}: <a href={v.class.url} target="_blank" rel="noreferrer">{v.class.url.replace(/^https?:\/\//, '')}</a></span>
           <div className="row small"><button className="btn ghost small" onClick={() => copy(v.class.url, 'url')}>{copied === 'url' ? t.copied : t.copy}</button><button className="btn ghost small" onClick={() => printCode(v.class.name, v.class.code, v.class.url, id)}>{t.print}</button></div>
         </div>
-      </div>
+      </div>}
       <h3>{t.assigned}</h3>
       {v.assignments.length ? (
         <table className="tbl"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th /></tr></thead><tbody>
@@ -90,21 +100,21 @@ function ClassBody({ id, t, onChange }: { id: string; t: (typeof T)['vi']; onCha
           ))}
         </tbody></table>
       ) : <p className="small muted">{t.none}</p>}
-      <div className="row"><h3 className="grow">{t.kids}</h3><button className="btn ghost small" onClick={() => setNames(names === null ? '' : null)}>{t.addKids}</button></div>
+      {!parent && <><div className="row"><h3 className="grow">{t.kids}</h3><button className="btn ghost small" onClick={() => setNames(names === null ? '' : null)}>{t.addKids}</button></div>
       {names !== null && <form className="stack" onSubmit={async (e) => { e.preventDefault(); await api.addPupils(id, names); setNames(null); await load(); onChange(); }}>
         <textarea rows={4} placeholder={t.kidsPh} value={names} onChange={(e) => setNames(e.target.value)} />
         <div className="row"><button className="btn primary small" disabled={!names.trim()}>{t.save}</button><button type="button" className="btn ghost small" onClick={() => setNames(null)}>{t.cancel}</button></div>
       </form>}
       <div className="kids">{kids.map((p) => (
         <div key={p.id} className="kid">
-          <b>{p.name}</b><span className={`small ${p.joined_at ? 'ok-text' : 'muted'}`}>{p.joined_at ? t.joined : t.waiting}</span>
+          <button className="link" style={{ color: 'inherit', fontWeight: 700 }} onClick={() => go(`/learner/${p.id}`)}>{p.name}</button><span className={`small ${p.joined_at ? 'ok-text' : 'muted'}`}>{p.joined_at ? t.joined : t.waiting}</span>
           <div className="row small" style={{ gap: 6 }}>
             <button className="link small" title={t.parentLink} onClick={() => copy(p.url, p.id)}>{copied === p.id ? t.copied : t.parentLink}</button>
             <button className="link small muted" onClick={async () => { await api.removePupil(id, p.id); await load(); onChange(); }}>{t.remove}</button>
           </div>
         </div>
       ))}</div>
-      {v.pupils.length > 12 && !showAll && <button className="link small" onClick={() => setShowAll(true)}>{lang === 'en' ? `See all ${v.pupils.length}` : `Xem cả ${v.pupils.length} em`}</button>}
+      {v.pupils.length > 12 && !showAll && <button className="link small" onClick={() => setShowAll(true)}>{lang === 'en' ? `See all ${v.pupils.length}` : `Xem cả ${v.pupils.length} em`}</button>}</>}
       <div className="row small" style={{ justifyContent: 'flex-end' }}>
         <button className="link small" onClick={async () => { const n = prompt(t.rename, v.class.name); if (n?.trim()) { await api.renameClass(id, n); await load(); onChange(); } }}>{t.rename}</button>
         <button className="link small danger" onClick={async () => { if (confirm(t.delAsk)) { await api.deleteClass(id); onChange(); } }}>{t.del}</button>

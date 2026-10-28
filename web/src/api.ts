@@ -1,5 +1,5 @@
 // The browser talks only to our API (cookie session). Errors carry both languages.
-export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; email: string | null; lang: 'vi' | 'en' }
+export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; email: string | null; lang: 'vi' | 'en'; role: 'teacher' | 'parent' | null; subject: string }
 // 1 credit = US$0.01 of Meta's price: 100 when she joins, promo codes add more; subscribers also get a
 // daily allowance (Vietnam days), used first.
 export interface Credits { balance: number; subscriber: boolean; planUntil: string | null; daily: { perDay: number; used: number; left: number } | null; left: number }
@@ -11,16 +11,27 @@ export interface Item { id: string; subject: 'math' | 'english'; template: strin
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
 export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number }
-export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number }
+export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
-export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number }
+export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number }
 export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
-export interface ClassRow { id: string; name: string; code: string; pupils: number; joined: number; assignments: number }
+export interface ClassRow { id: string; name: string; code: string; kind?: 'class' | 'child'; grade?: number | null; pupils: number; joined: number; assignments: number }
 export interface PupilRow { id: string; name: string; link: string; url: string; joined_at: string | null; seen_at: string | null }
 export interface AssignedRow { id: string; lesson_id: string; title: string; due: string | null; created_at: string; items: number; done: number; started: number }
 export interface ClassView { class: { id: string; name: string; code: string; url: string }; pupils: PupilRow[]; assignments: AssignedRow[] }
 export interface LessonAssignment { id: string; class_id: string; class_name: string; due: string | null; created_at: string; done: number; pupils: number }
+export type Label = 'solid' | 'practising' | 'repeat';
+export interface PathStep { sectionId: string; title: string; pages: string; weeks: number; start: string; end: string; status: 'done' | 'current' | 'next' | 'later'; topic: string }
+export interface Reminder { date: string; who: 'pupils' | 'assigner'; kind: string; vi: string; en: string }
+export interface PathView { path: { id: string; start: string }; steps: PathStep[]; progress: { sectionId: string; done: number; pupils: number } | null; lessons: { id: string; title: string; section: string }[]; reminders: Reminder[] }
+export interface Criteria { recent: number; min: number; solid: number; repeat: number; same: number; sessions: number; classRepeat: number; classSolid: number }
+export interface SummaryClass { id: string; name: string; kind: string; skills: { skill: string; name: string; label: Label; counts: Record<Label, number> }[]; pupils: { id: string; name: string; skills: Record<string, Label> }[]; mistakes: { skill: string; what: string; pupils: number }[] }
+export interface Summary { criteria: Criteria; classes: SummaryClass[]; total: Record<Label, number>; learners: number }
+export interface Advice { kind: 'practice' | 'next' | 'time'; skill: string; text: string; why: string; applied: string | null; kept: boolean }
+export interface LearnerView { pupil: { id: string; name: string; classId: string; className: string; kind: string }; skills: { skill: string; name: string; label: Label; right: number; of: number; mistake: string | null }[]; sessions: { day: string; answers: number; minutes: number }[];
+  current: (PathStep & { week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean }) | null; advice: Advice[]; reminders: Reminder[]; mates: { id: string; name: string }[] }
+export interface ReminderSettings { pupilSession: boolean; pupilCards: boolean; time: string; assignerTwoDays: boolean; assignerEnd: boolean; assignerStart: boolean }
 export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }
 
 async function call<T>(method: string, path: string, body?: unknown, raw?: Blob): Promise<T> {
@@ -38,6 +49,7 @@ export const api = {
   update: (f: { name?: string; lang?: string }) => call<{ teacher: Teacher }>('PUT', '/t/me', f),
   classes: () => call<{ classes: ClassRow[] }>('GET', '/t/classes'),
   createClass: (name: string) => call<{ class: ClassRow }>('POST', '/t/classes', { name }),
+  createChild: (name: string, grade: number) => call<{ class: ClassRow }>('POST', '/t/classes', { name, grade }),
   renameClass: (id: string, name: string) => call<{ ok: boolean }>('PUT', `/t/classes/${id}`, { name }),
   deleteClass: (id: string) => call<{ ok: boolean }>('DELETE', `/t/classes/${id}`),
   classView: (id: string) => call<ClassView>('GET', `/t/classes/${id}`),
@@ -45,6 +57,24 @@ export const api = {
   removePupil: (id: string, pid: string) => call<{ ok: boolean }>('DELETE', `/t/classes/${id}/pupils/${pid}`),
   assign: (lessonId: string, a: { classId: string; confirmed: boolean; due?: string; retry: boolean; hints: boolean }) => call<{ assignment: { id: string; className: string } }>('POST', `/t/lessons/${lessonId}/assign`, a),
   lessonAssignments: (lessonId: string) => call<{ assignments: LessonAssignment[] }>('GET', `/t/lessons/${lessonId}/assignments`),
+  setRole: (r: { role: 'teacher' | 'parent'; name: string; subject?: string; children?: { name: string; grade: number }[] }) => call<{ teacher: Teacher }>('POST', '/t/role', r),
+  work: (images: { data: string; type: string }[]) => call<{ request: string; focus: string }>('POST', '/t/notes/work', { images }),
+  renameSection: (id: string, title: string) => call<{ ok: boolean }>('PUT', `/t/sections/${id}`, { title }),
+  splitSection: (id: string, page: number, title: string) => call<{ id: string }>('POST', `/t/sections/${id}/split`, { page, title }),
+  mergeSection: (id: string) => call<{ ok: boolean }>('POST', `/t/sections/${id}/merge`),
+  deleteItem: (lessonId: string, itemId: string) => call<{ ok: boolean }>('DELETE', `/t/lessons/${lessonId}/items/${itemId}`),
+  deleteArea: (id: string) => call<{ ok: boolean }>('DELETE', `/t/areas/${id}`),
+  deleteBook: (id: string) => call<{ ok: boolean }>('DELETE', `/t/books/${id}`),
+  path: (classId: string, areaId: string) => call<PathView>('GET', `/t/path?classId=${classId}&areaId=${areaId}`),
+  savePath: (id: string, p: { start?: string; steps: { sectionId: string; weeks: number }[] }) => call<{ ok: boolean }>('PUT', `/t/path/${id}`, p),
+  summary: (q: { classId?: string; lessonId?: string } = {}) => call<Summary>('GET', `/t/summary?${new URLSearchParams(q as Record<string, string>)}`),
+  comments: (classId: string) => call<{ comments: { pupilId: string; name: string; text: string }[] }>('POST', '/t/summary/comments', { classId }),
+  criteria: () => call<{ criteria: Criteria }>('GET', '/t/criteria'),
+  saveCriteria: (c: Criteria) => call<{ criteria: Criteria }>('PUT', '/t/criteria', c),
+  reminders: () => call<{ reminders: ReminderSettings }>('GET', '/t/reminders'),
+  saveReminders: (r: ReminderSettings) => call<{ reminders: ReminderSettings }>('PUT', '/t/reminders', r),
+  learner: (id: string) => call<LearnerView>('GET', `/t/pupils/${id}`),
+  advice: (id: string, a: { kind?: string; skill?: string; action: 'apply' | 'keep' | 'undo'; adviceId?: string }) => call<{ ok: boolean; adviceId?: string; added?: number }>('POST', `/t/pupils/${id}/advice`, a),
   promo: (code: string) => call<{ added: { credits: number; days: number }; credits: Credits }>('POST', '/t/promo', { code }),
   logout: () => call<{ ok: boolean }>('POST', '/t/logout'),
   photos: (images: { data: string; type: string }[]) => call<{ text: string }>('POST', '/t/notes/photos', { images }),

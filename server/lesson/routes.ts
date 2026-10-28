@@ -140,6 +140,24 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
   });
 
   app.get('/api/t/lessons', async (c) => c.json({ lessons: await lessons.list(c.get('teacher').id) }));
+  // Step 5: the assigner removes an item she does not want (assignments keep their own copy).
+  app.delete('/api/t/lessons/:id/items/:item', async (c) => {
+    const l = await lessons.get(c.get('teacher').id, c.req.param('id'));
+    if (!l) return fail(c, 'notFound', 404);
+    await d.sql.query(`update lessons set items = coalesce((select jsonb_agg(x) from jsonb_array_elements(items) x where x->>'id' <> $2), '[]'::jsonb), updated_at = now() where id = $1`, [l.id, c.req.param('item')]);
+    return c.json({ ok: true });
+  });
+  // Step 4: one slide's narration, read by the server's local voice (free, nothing goes to Meta).
+  const spoken = new Map<string, Buffer>();
+  app.get('/api/t/lessons/:id/say/:sid', async (c) => {
+    const l = await lessons.get(c.get('teacher').id, c.req.param('id')), s = l?.slides.find((x) => x.id === c.req.param('sid'));
+    const text = s ? (s.narration || s.notes || s.heading).slice(0, 1500) : '';
+    if (!l || !text) return fail(c, 'notFound', 404);
+    const key = `${l.setup.lang}:${text}`;
+    let wav = spoken.get(key);
+    if (!wav) { try { wav = await d.ai.speak({ text, lang: l.setup.lang }); } catch { return fail(c, 'aiBusy', 503); } if (spoken.size > 300) spoken.clear(); spoken.set(key, wav); }
+    return c.body(new Uint8Array(wav), 200, { 'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400' });
+  });
   app.get('/api/t/lessons/:id', async (c) => {
     const l = await lessons.get(c.get('teacher').id, c.req.param('id'));
     if (!l) return fail(c, 'notFound', 404);

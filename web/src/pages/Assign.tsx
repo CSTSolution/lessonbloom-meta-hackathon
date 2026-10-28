@@ -6,6 +6,12 @@ import { api, ApiError, type ClassRow, type ClassView, type LessonAssignment } f
 import { useLang, useT } from '../i18n.ts';
 import { copyText } from './Classes.tsx';
 
+// a parent assigns to one child: the child's own link instead of the class code and the pupils' list
+const P = {
+  vi: { pick: 'Chọn con để giao bài', forClass: (n: string) => `Giao bài cho ${n}`, noClass: 'Cô chưa thêm con nào.', newClass: 'Tên gọi của con', make: 'Thêm con', link: 'Link riêng của con', linkSub: (_c: string) => 'Mở trên điện thoại hoặc máy tính bảng của con, không cần đăng nhập', done: (n: string) => `Đã giao cho ${n}. Con thấy bài ngay ở “Hôm nay con học gì”.`, progress: (d: number, _n: number) => (d ? 'Con đã làm xong' : 'Con chưa làm xong') },
+  en: { pick: 'Choose a child', forClass: (n: string) => `Assign to ${n}`, noClass: 'No children added yet.', newClass: "Child's first name", make: 'Add child', link: "Your child's link", linkSub: (_c: string) => "Open it on your child's phone or tablet, no sign-in", done: (n: string) => `Assigned to ${n}. They see it straight away under “Today”.`, progress: (d: number, _n: number) => (d ? 'Finished' : 'Not finished yet') },
+};
+
 const T = {
   vi: {
     pick: 'Chọn lớp để giao bài', forClass: (n: string) => `Giao bài cho lớp ${n}`, noClass: 'Cô chưa có lớp. Tạo lớp trong mục Lớp học trước nhé.', newClass: 'Tên lớp mới, ví dụ 2A', make: 'Tạo lớp',
@@ -27,8 +33,8 @@ const T = {
   },
 };
 
-export function Assign({ lessonId }: { lessonId: string }) {
-  const t = useT(T), lang = useLang();
+export function Assign({ lessonId, parent = false }: { lessonId: string; parent?: boolean }) {
+  const t0 = useT(T), lang = useLang(), t = parent ? { ...t0, ...P[lang] } : t0;
   const [classes, setClasses] = useState<ClassRow[] | null>(null), [pick, setPick] = useState(''), [view, setView] = useState<ClassView | null>(null);
   const [due, setDue] = useState(''), [retry, setRetry] = useState(true), [hints, setHints] = useState(true), [ticked, setTicked] = useState(false);
   const [open, setOpen] = useState(''), [msg, setMsg] = useState(''), [busy, setBusy] = useState(false), [copied, setCopied] = useState(''), [name, setName] = useState('');
@@ -64,11 +70,13 @@ export function Assign({ lessonId }: { lessonId: string }) {
       <div className="row"><span className="small muted">{t.pick}</span>{classes.map((c) => <button key={c.id} className={`pill ${c.id === pick ? 'on' : ''}`} onClick={() => setPick(c.id)}>{c.name}</button>)}</div>
       {k && view && <>
         <h2>{t.forClass(k.name)}</h2>
-        <Group open={open} setOpen={setOpen} id="link" title={t.link} sub={t.linkSub(view.class.code)}>
+        {parent && view.pupils[0] ? <Group open={open} setOpen={setOpen} id="link" title={t.link} sub={t.linkSub('')}>
+          <div className="row small"><span className="grow muted ellipsis">{view.pupils[0].url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(view.pupils[0].url, 'url')}>{copied === 'url' ? t.copied : t.copy}</button></div>
+        </Group> : <Group open={open} setOpen={setOpen} id="link" title={t.link} sub={t.linkSub(view.class.code)}>
           <div className="join-box"><img src={`/api/t/classes/${k.id}/qr.svg`} alt="QR" width={110} height={110} />
             <div className="stack" style={{ gap: 6 }}><b className="code">{view.class.code}</b><a className="small" href={view.class.url} target="_blank" rel="noreferrer">{view.class.url.replace(/^https?:\/\//, '')}</a>
               <button className="btn ghost small" onClick={() => copy(view.class.url, 'url')}>{copied === 'url' ? t.copied : t.copy}</button></div></div>
-        </Group>
+        </Group>}
         <Group open={open} setOpen={setOpen} id="opts" title={t.opts} sub={t.optsSub(due, retry, hints)}>
           <div className="stack" style={{ gap: 8 }}>
             <label className="field">{t.due}<input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></label>
@@ -76,14 +84,14 @@ export function Assign({ lessonId }: { lessonId: string }) {
             <label className="check"><input type="checkbox" checked={hints} onChange={(e) => setHints(e.target.checked)} /> {t.hints}</label>
           </div>
         </Group>
-        <Group open={open} setOpen={setOpen} id="kids" title={t.kids(k.name)} sub={t.kidsSub(view.pupils.filter((p) => p.joined_at).length, view.pupils.length, view.class.code)}>
+        {!parent && <><Group open={open} setOpen={setOpen} id="kids" title={t.kids(k.name)} sub={t.kidsSub(view.pupils.filter((p) => p.joined_at).length, view.pupils.length, view.class.code)}>
           {view.pupils.length ? <div className="kids">{view.pupils.map((p) => <div key={p.id} className="kid"><b>{p.name}</b><span className={`small ${p.joined_at ? 'ok-text' : 'muted'}`}>{p.joined_at ? '✓' : '·'}</span></div>)}</div> : <p className="small muted">{t.none}</p>}
         </Group>
         <Group open={open} setOpen={setOpen} id="parents" title={t.parents} sub={t.parentsSub} badge={t.isNew}>
           {view.pupils.length ? <div className="stack" style={{ gap: 6 }}>{view.pupils.map((p) => (
             <div key={p.id} className="row small"><b style={{ minWidth: 90 }}>{p.name}</b><span className="grow muted ellipsis">{p.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(p.url, p.id)}>{copied === p.id ? t.copied : t.copy}</button></div>
           ))}</div> : <p className="small muted">{t.none}</p>}
-        </Group>
+        </Group></>}
         <label className={`card confirm ${ticked ? 'on' : ''}`}>
           <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
           <span><b>{t.confirm}</b><span className="small muted" style={{ display: 'block' }}>{t.confirmSub}</span></span>

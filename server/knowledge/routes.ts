@@ -146,6 +146,15 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     });
     return c.json({ ok: true });
   });
+  app.delete('/api/t/areas/:id', async (c) => {
+    const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
+    if (!a) return fail(c, 'notFound', 404);
+    const books = await sql.query<{ id: string }>('select id from books where area_id = $1', [a.id]);
+    await sql.query('delete from areas where id = $1', [a.id]);
+    const { unlink } = await import('node:fs/promises');
+    for (const b of books) await unlink(bookFile(b.id)).catch(() => {});
+    return c.json({ ok: true });
+  });
   app.delete('/api/t/books/:id', async (c) => {
     const ok = await sql.one('select 1 from books b join areas a on a.id = b.area_id where b.id = $1 and a.teacher_id = $2', [c.req.param('id'), c.get('teacher').id]);
     if (!ok) return fail(c, 'notFound', 404);

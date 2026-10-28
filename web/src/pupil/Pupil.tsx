@@ -35,9 +35,9 @@ interface PLesson { id: string; title: string; lang: L; retry: boolean; hints: b
 
 export function Pupil() {
   const path = usePath();
-  const [today, setToday] = useState<{ pupil: { name: string }; class: { name: string }; lessons: TodayRow[] } | null | undefined>(undefined);
+  const [today, setToday] = useState<{ pupil: { name: string }; class: { name: string }; lessons: TodayRow[]; reminder?: { vi: string; en: string } | null } | null | undefined>(undefined);
   const lang: L = (today?.lessons[0]?.lang as L) || (getLang() as L) || 'vi', t = S[lang];
-  const load = () => p<{ pupil: { name: string }; class: { name: string }; lessons: TodayRow[] }>('GET', '/today').then(setToday).catch(() => setToday(null));
+  const load = () => p<{ pupil: { name: string }; class: { name: string }; lessons: TodayRow[]; reminder?: { vi: string; en: string } | null }>('GET', '/today').then(setToday).catch(() => setToday(null));
   useEffect(() => {
     const link = /^\/p\/([\w-]+)$/.exec(path)?.[1];
     if (link) { p('POST', '/link', { link }).then(() => { go('/hoc'); void load(); }).catch(() => { go('/hoc'); setToday(null); }); return; }
@@ -52,6 +52,7 @@ export function Pupil() {
         <div className="p-stack">
           <div className="p-top"><b className="grow">{t.hello(today.pupil.name)}</b><button className="p-link" onClick={async () => { await p('POST', '/leave').catch(() => {}); setToday(null); go('/hoc'); }}>{t.leave}</button></div>
           <h1>{t.today}</h1>
+          {today.reminder && <div className="p-feedback" role="note">🔔 {lang === 'en' ? today.reminder.en : today.reminder.vi}</div>}
           {!today.lessons.length && <p className="p-soft">{t.nothing}</p>}
           {today.lessons.map((l) => { const s = S[l.lang] || t; return (
             <div key={l.id} className="p-lesson">

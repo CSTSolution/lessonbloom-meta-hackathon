@@ -1,86 +1,156 @@
-// Signed in: the sidebar (bottom bar on phones) and the teacher's lessons, a new lesson, or one lesson.
-// Classes and the learning summary arrive in the next steps of the rebuild.
+// Signed in: Chi's layout. One top bar: the five tabs on one line (Bài giảng · Kho kiến thức · Lộ trình
+// học · Lớp học, for a parent "Con của tôi" · Tóm tắt học tập), the language, credits and the profile.
+// No role switch in the header: the role is chosen once at sign-up (SignupRole).
 import { useEffect, useState } from 'react';
 import { api, ApiError, type Credits, type LessonRow, type Teacher } from '../api.ts';
 import { useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
 import { Classes } from './Classes.tsx';
 import { Create } from './Create.tsx';
+import { Criteria, Insights } from './Insights.tsx';
 import { Knowledge } from './Knowledge.tsx';
 import { LangToggle } from './LangToggle.tsx';
+import { Learner } from './Learner.tsx';
 import { LessonPage } from './LessonPage.tsx';
 import { Notice } from './Notice.tsx';
+import { Path } from './Path.tsx';
+import { Reminders } from './Reminders.tsx';
+import { SignupRole } from './SignupRole.tsx';
 
 const T = {
   vi: {
-    nav: { lessons: 'Bài giảng', knowledge: 'Kho kiến thức', classes: 'Lớp học', insight: 'Tóm tắt học tập' },
-    hello: (n: string) => (n ? `Chào cô ${n}!` : 'Chào cô!'), demo: 'Bản dùng thử', signOut: 'Đăng xuất',
-    emptyTitle: 'Bài giảng đầu tiên của cô', emptyText: 'Gõ, chụp ảnh hoặc đọc to ghi chú bài học. Trợ lý sẽ soạn slide, bài luyện tập và tự kiểm tra từng câu.',
-    credits: (c: Credits) => `Tín dụng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
-    creditsHint: 'Một bài dùng khoảng 50 tín dụng.', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} tín dụng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
-    make: 'Soạn bài mới', soon: 'Sắp có', status: { working: 'Đang soạn', ready: 'Xong', error: 'Lỗi' }, counts: (s: number, i: number) => `${s} slide · ${i} câu luyện tập`, gradeN: (g: number) => `Lớp ${g}`, classesText: 'Lớp học và mã lớp cho học sinh sẽ ở đây.', insightText: 'Lớp vướng ở dạng bài nào, em nào cần luyện thêm: sẽ ở đây.',
+    nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
+    helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
+    teaches: 'Cô dạy', kidsOf: 'Con học', make: '+ Tạo bài giảng mới', allClasses: 'Tất cả các lớp', all: 'Tất cả',
+    groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number) => [s && 'Slide', 'Video', i && `${i} bài tập`, c && 'Lật thẻ'].filter(Boolean).join(' · '),
+    status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
+    week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
+    demo: 'Bản dùng thử', credits: (c: Credits) => `Tín dụng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
+    creditsHint: 'Một bài dùng khoảng 50 tín dụng.', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} tín dụng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
+    reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
   },
   en: {
-    nav: { lessons: 'Lessons', knowledge: 'Knowledge', classes: 'Classes', insight: 'Learning summary' },
-    hello: (n: string) => (n ? `Hello, ${n}!` : 'Hello!'), demo: 'Demo', signOut: 'Sign out',
-    emptyTitle: 'Your first lesson', emptyText: 'Type, photograph or say your lesson notes. The agent writes slides and practice and checks every item.',
-    credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
-    creditsHint: 'A lesson uses about 50 credits.', promo: 'Enter a promo code', promoPh: 'Code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${c} credits` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
-    make: 'New lesson', soon: 'Coming next', status: { working: 'Making', ready: 'Ready', error: 'Failed' }, counts: (s: number, i: number) => `${s} slides · ${i} practice items`, gradeN: (g: number) => `Grade ${g}`, classesText: 'Your classes and their join codes will be here.', insightText: 'Which skills a class is stuck on and who needs more practice: here.',
+    nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
+    helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
+    teaches: 'You teach', kidsOf: 'Your children', make: '+ New lesson', allClasses: 'All classes', all: 'All',
+    groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${n} lessons`, parts: (s: number, i: number, c: number) => [s && 'Slides', 'Video', i && `${i} items`, c && 'Flip cards'].filter(Boolean).join(' · '),
+    status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
+    week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
+    demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
+    creditsHint: 'A lesson uses about 50 credits.', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${c} credits` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
+    reminders: 'Reminder settings', criteria: 'Summary criteria', signOut: 'Sign out', role: { teacher: 'Teacher', parent: 'Parent' },
   },
 };
-type Tab = 'lessons' | 'knowledge' | 'classes' | 'insight';
+type Dict = (typeof T)['vi'];
+type Tab = keyof Dict['nav'];
+const SUBJ: Record<string, { vi: string; en: string }> = { math: { vi: 'Toán', en: 'Maths' }, english: { vi: 'Tiếng Anh', en: 'English' }, both: { vi: 'Toán, Tiếng Anh', en: 'Maths, English' } };
 
 export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onChange: (t: Teacher) => void; onSignOut: () => void }) {
-  const t = useT(T);
-  const [tab, setTab] = useState<Tab>('lessons');
-  const path = usePath(), [rows, setRows] = useState<LessonRow[] | null>(null);
-  const [credits, setCredits] = useState<Credits | null>(null);
-  useEffect(() => { if (path === '/') api.lessons().then((r) => setRows(r.lessons)).catch(() => setRows([])); }, [path]);
-  useEffect(() => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }, [path]);
-  void onChange;
-  const lessonId = /^\/lesson\/([\w-]+)$/.exec(path)?.[1];
+  const t = useT(T), path = usePath();
+  if (!teacher.role) return <SignupRole teacher={teacher} onDone={onChange} />;
+  const parent = teacher.role === 'parent';
+  const tabs = Object.keys(t.nav) as Tab[];
+  const tab = tabs.find((k) => (k === '/' ? path === '/' || path.startsWith('/lesson') || path === '/new' : path.startsWith(k) || (k === '/insight' && path.startsWith('/learner')))) ?? '/';
+  const lessonId = /^\/lesson\/([\w-]+)$/.exec(path)?.[1], learnerId = /^\/learner\/([\w-]+)$/.exec(path)?.[1];
   return (
-    <div className="shell">
-      <aside className="side">
-        <div className="brand"><img src="/favicon.svg" alt="" />LessonBloom</div>
-        <nav>{(Object.keys(t.nav) as Tab[]).map((k) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => { setTab(k); go('/'); }}>{t.nav[k]}</button>)}</nav>
-        <div className="grow" />
-        <div className="who stack small" style={{ gap: 8 }}>
-          <span className="muted">{teacher.kind === 'demo' ? <span className="chip">{t.demo}</span> : teacher.email}</span>
-          {credits && <CreditBox credits={credits} account={teacher.kind === 'account'} onChange={setCredits} t={t} />}
-          <div className="row"><LangToggle /><button className="btn ghost small" onClick={async () => { await api.logout().catch(() => {}); onSignOut(); }}>{t.signOut}</button></div>
-        </div>
-      </aside>
-      <main className="main stack" style={{ gap: 24 }}>
+    <div>
+      <header className="top">
+        <button className="brand link" style={{ color: 'inherit' }} onClick={() => go('/')}><img src="/favicon.svg" alt="" />LessonBloom</button>
+        <nav className="tabs">{tabs.map((k) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => go(k)}>{k === '/classes' && parent ? t.kids : t.nav[k]}</button>)}</nav>
+        <Me teacher={teacher} t={t} onSignOut={onSignOut} />
+      </header>
+      {path === '/new' ? <Create parent={parent} />
+        : lessonId ? <LessonPage id={lessonId} parent={parent} />
+        : path.startsWith('/knowledge') ? <Knowledge />
+        : path.startsWith('/path') ? <Path parent={parent} />
+        : path.startsWith('/classes') ? <div className="page"><Classes parent={parent} /></div>
+        : path === '/insight/criteria' ? <Criteria />
+        : path.startsWith('/insight') ? <Insights parent={parent} />
+        : learnerId ? <Learner id={learnerId} parent={parent} />
+        : path === '/reminders' ? <Reminders parent={parent} />
+        : <Main teacher={teacher} t={t} />}
+    </div>
+  );
+}
+
+function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false), [credits, setCredits] = useState<Credits | null>(null), path = usePath();
+  useEffect(() => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }, [path]);
+  const name = teacher.name || teacher.email || t.demo;
+  return (
+    <div className="me">
+      <LangToggle />
+      {credits && <button className="btn ghost small" title={t.creditsHint} onClick={() => setOpen(!open)}>{t.credits(credits)}</button>}
+      <button className="row link" style={{ gap: 6, color: 'inherit' }} onClick={() => setOpen(!open)}><span className="avatar">{name.trim().slice(0, 1).toUpperCase()}</span><span className="small">{name}</span></button>
+      {open && <div className="menu">
+        <span className="small muted">{teacher.role ? t.role[teacher.role] : ''}{teacher.kind === 'demo' ? ` · ${t.demo}` : teacher.email ? ` · ${teacher.email}` : ''}</span>
+        {credits && <CreditBox credits={credits} account={teacher.kind === 'account'} onChange={setCredits} t={t} />}
+        <button className="link small" onClick={() => { setOpen(false); go('/reminders'); }}>{t.reminders}</button>
+        {teacher.role === 'teacher' && <button className="link small" onClick={() => { setOpen(false); go('/insight/criteria'); }}>{t.criteria}</button>}
         <Notice compact />
-        {path === '/new' ? <Create onKnowledge={() => { setTab('knowledge'); go('/'); }} /> : lessonId ? <LessonPage id={lessonId} /> : <>
-          {tab !== 'knowledge' && tab !== 'classes' && <div className="row"><h1 className="grow">{t.hello(teacher.name)}</h1>{tab === 'lessons' && !!rows?.length && <button className="btn coral" onClick={() => go('/new')}>+ {t.make}</button>}</div>}
-          {tab === 'lessons' && rows && (rows.length ? (
-            <div className="lessons">{rows.map((r) => (
-              <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
-                <span className="row small"><span className={`chip st-${r.status}`}>{t.status[r.status]}</span><span className="muted">{t.gradeN(r.setup.grade)}</span></span>
-                <b>{r.setup.title}</b><span className="small muted">{t.counts(r.slides, r.items)}</span>
-              </button>))}</div>
-          ) : (
-            <div className="empty">
-              <h2>{t.emptyTitle}</h2>
-              <p className="muted" style={{ maxWidth: 520 }}>{t.emptyText}</p>
-              <button className="btn coral lg" onClick={() => go('/new')}>{t.make}</button>
+        <div className="row"><button className="btn small" onClick={async () => { await api.logout().catch(() => {}); onSignOut(); go('/'); }}>{t.signOut}</button><button className="btn ghost small" onClick={() => setOpen(false)}>✕</button></div>
+      </div>}
+    </div>
+  );
+}
+
+// "Bài giảng": lessons grouped by Đang giao / Bản nháp / Đã xong, only one group open; a filter by
+// class (a parent: by child); this week's repeated mistakes on the right.
+function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
+  const lang = useLang(), parent = teacher.role === 'parent';
+  const [rows, setRows] = useState<LessonRow[] | null>(null), [classes, setClasses] = useState<{ id: string; name: string }[]>([]), [pick, setPick] = useState('');
+  const [open, setOpen] = useState<'open' | 'draft' | 'done'>('open'), [week, setWeek] = useState<{ what: string; where: string }[]>([]);
+  useEffect(() => {
+    api.lessons().then((r) => { setRows(r.lessons); if (!r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
+    api.classes().then((r) => setClasses(r.classes)).catch(() => {});
+    api.summary().then((s) => setWeek(s.classes.flatMap((k) => k.mistakes.map((m) => ({ what: m.what, where: k.name }))))).catch(() => {});
+  }, []);
+  useEffect(() => { if (!rows?.some((r) => r.status === 'working')) return; const id = setTimeout(() => api.lessons().then((r) => setRows(r.lessons)).catch(() => {}), 2500); return () => clearTimeout(id); }, [rows]);
+  if (!rows) return null;
+  const shown = rows.filter((r) => !pick || r.classes.some((k) => k.id === pick));
+  const groups = { open: shown.filter((r) => r.open), draft: shown.filter((r) => !r.given), done: shown.filter((r) => r.given && !r.open) };
+  const subject = SUBJ[teacher.subject]?.[lang];
+  return (
+    <div className="page">
+      <div className="cols">
+        <div className="stack" style={{ gap: 14 }}>
+          <div className="row"><div className="grow">
+            <h1>{parent ? t.helloP(teacher.name) : t.helloT(teacher.name)}</h1>
+            <p className="small muted">{parent ? t.leadP : t.lead}</p>
+            {(subject || classes.length > 0) && <p className="small muted">{parent ? t.kidsOf : t.teaches}: <b>{[!parent && subject, ...classes.map((k) => k.name)].filter(Boolean).join(', ')}</b></p>}
+          </div><button className="btn primary" onClick={() => go('/new')}>{t.make}</button></div>
+          {classes.length > 0 && <div className="row">{[{ id: '', name: parent ? t.all : t.allClasses }, ...classes].map((k) => <button key={k.id} className={`pill ${pick === k.id ? 'on' : ''}`} onClick={() => setPick(k.id)}>{k.name}</button>)}</div>}
+          {!rows.length && <div className="card"><p className="muted">{t.empty}</p></div>}
+          {rows.length > 0 && (['open', 'draft', 'done'] as const).map((g) => (
+            <div key={g} className={`group card ${open === g ? 'on' : ''}`}>
+              <button className="group-head" onClick={() => setOpen(g)} aria-expanded={open === g}>
+                <span className="caret">{open === g ? '▾' : '▸'}</span><span className="grow"><b>{t.groups[g]}</b><span className="small muted" style={{ display: 'block' }}>{t.n(groups[g].length)}</span></span>
+                <span className={`count ${g === 'draft' ? 'grey' : g === 'done' ? 'green' : ''}`}>{groups[g].length}</span>
+              </button>
+              {open === g && groups[g].length > 0 && <div className="lessons" style={{ paddingTop: 10 }}>{groups[g].map((r, i) => (
+                <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
+                  <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example || r.setup.title.split(/[:·]/)[0].slice(0, 22)}</div>
+                  {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}
+                  <b className="small">{r.setup.title}</b>
+                  <span className="small muted">{r.status === 'ready' ? t.parts(r.slides, r.items, r.cards) : t.status[r.status as 'working' | 'error']}</span>
+                </button>
+              ))}</div>}
             </div>
           ))}
-          {tab === 'knowledge' && <Knowledge />}
-          {tab === 'classes' && <Classes />}
-          {tab === 'insight' && <div className="empty"><p className="muted">{t.insightText}</p><span className="chip">{t.soon}</span></div>}
-        </>}
-      </main>
+        </div>
+        <aside className="card stack" style={{ gap: 8 }}>
+          <b>{t.week}</b>
+          {week.length ? <div className="banner warn"><b className="small" style={{ display: 'block' }}>{t.repeat}</b>{week.slice(0, 2).map((w, i) => <span key={i} className="small" style={{ display: 'block' }}>{w.what} – {w.where}</span>)}</div> : <p className="small muted">{t.noRepeat}</p>}
+          <button className="link small" onClick={() => go('/insight')}>{t.seeSummary}</button>
+        </aside>
+      </div>
     </div>
   );
 }
 
 // The assigner's credits, and a promo code box (email accounts only).
-function CreditBox({ credits, account, onChange, t }: { credits: Credits; account: boolean; onChange: (c: Credits) => void; t: (typeof T)['vi'] }) {
-  const lang = useLang(), [open, setOpen] = useState(false), [code, setCode] = useState(''), [msg, setMsg] = useState(''), [busy, setBusy] = useState(false);
+function CreditBox({ credits, account, onChange, t }: { credits: Credits; account: boolean; onChange: (c: Credits) => void; t: Dict }) {
+  const lang = useLang(), [code, setCode] = useState(''), [msg, setMsg] = useState(''), [busy, setBusy] = useState(false);
   const day = (d: string) => new Date(d).toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
   const apply = async () => {
     setBusy(true); setMsg('');
@@ -88,16 +158,16 @@ function CreditBox({ credits, account, onChange, t }: { credits: Credits; accoun
     catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); }
   };
   return (
-    <div className="credits stack" style={{ gap: 4 }} title={t.creditsHint}>
+    <div className="stack" style={{ gap: 4 }} title={t.creditsHint}>
       <b>{t.credits(credits)}</b>
-      {credits.daily && <span className="small">{t.daily(credits)}</span>}
-      {credits.subscriber && credits.planUntil && <span className="small">{t.until(day(credits.planUntil))}</span>}
-      {!open ? <button className="link small" onClick={() => setOpen(true)}>{t.promo}</button> : account ? (
+      {credits.daily && <span className="small muted">{t.daily(credits)}</span>}
+      {credits.subscriber && credits.planUntil && <span className="small muted">{t.until(day(credits.planUntil))}</span>}
+      {account ? (
         <form className="row" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); void apply(); }}>
-          <input className="grow" value={code} maxLength={32} placeholder={t.promoPh} onChange={(e) => setCode(e.target.value.toUpperCase())} style={{ minWidth: 0, padding: '6px 10px' }} />
+          <input className="grow" value={code} maxLength={32} placeholder={t.promoPh} aria-label={t.promo} onChange={(e) => setCode(e.target.value.toUpperCase())} style={{ minWidth: 0, padding: '6px 10px', border: '1px solid var(--line)', borderRadius: 8 }} />
           <button className="btn small" disabled={busy || code.trim().length < 4}>{t.apply}</button>
         </form>
-      ) : <span className="small">{t.promoDemo}</span>}
+      ) : <span className="small muted">{t.promoDemo}</span>}
       {msg && <span className="small" role="status">{msg}</span>}
     </div>
   );
