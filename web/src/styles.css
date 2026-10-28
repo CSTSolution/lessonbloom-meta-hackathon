@@ -230,3 +230,14 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .opts .opt.right { border-color: var(--ok); background: var(--ok-2); }
 .print-only { display: none; }
 @media print { .print-only { display: block; } .top, .stepper, .noprint { display: none !important; } .page { max-width: none; padding: 0; } .slide-big { break-inside: avoid; margin-bottom: 12px; } }
+
+/* lesson step 3: the slide list, the slide, the side panel; one column on a phone */
+.slide-grid { display: grid; grid-template-columns: 170px minmax(0, 1fr) 240px; gap: 14px; align-items: start; }
+.adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.tbl { display: block; overflow-x: auto; }
+@media (max-width: 860px) {
+  .slide-grid { grid-template-columns: 1fr; } .slide-grid .slide-list { display: flex; overflow-x: auto; gap: 6px; } .slide-grid .slide-list button { flex: none; max-width: 160px; }
+  .slide-big { padding: 16px; } .slide-big .row { flex-direction: column; align-items: stretch !important; } .slide-big img { width: 100% !important; }
+  .grid2 { grid-template-columns: 1fr; } .me .small:not(.btn) { display: none; } .top .brand { font-size: 14px; }
+  .stepper span { font-size: 11px; padding: 3px 6px; }
+}

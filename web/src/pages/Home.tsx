@@ -13,6 +13,7 @@ import { LangToggle } from './LangToggle.tsx';
 import { Learner } from './Learner.tsx';
 import { LessonPage } from './LessonPage.tsx';
 import { Notice } from './Notice.tsx';
+import { Notifications } from './Notifications.tsx';
 import { Path } from './Path.tsx';
 import { Profile } from './Profile.tsx';
 import { Reminders } from './Reminders.tsx';
@@ -28,7 +29,7 @@ const T = {
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Tín dụng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
     creditsHint: 'Một bài dùng khoảng 50 tín dụng.', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} tín dụng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
-    profile: 'Hồ sơ', reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
+    notifications: 'Thông báo', profile: 'Hồ sơ', reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
   },
   en: {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
@@ -39,7 +40,7 @@ const T = {
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
     creditsHint: 'A lesson uses about 50 credits.', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${c} credits` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
-    profile: 'Profile', reminders: 'Reminder settings', criteria: 'Summary criteria', signOut: 'Sign out', role: { teacher: 'Teacher', parent: 'Parent' },
+    notifications: 'Notifications', profile: 'Profile', reminders: 'Reminder settings', criteria: 'Summary criteria', signOut: 'Sign out', role: { teacher: 'Teacher', parent: 'Parent' },
   },
 };
 type Dict = (typeof T)['vi'];
@@ -70,6 +71,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
         : path.startsWith('/insight') ? <Insights parent={parent} />
         : learnerId ? <Learner id={learnerId} parent={parent} />
         : path === '/reminders' ? <Reminders parent={parent} />
+        : path === '/notifications' ? <Notifications parent={parent} />
         : path === '/profile' ? <Profile teacher={teacher} onChange={onChange} />
         : <Main teacher={teacher} t={t} />}
     </div>
@@ -83,11 +85,13 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
   return (
     <div className="me">
       <LangToggle />
+      <button className="btn ghost small" aria-label="Notifications" onClick={() => go('/notifications')}>🔔</button>
       {credits && <button className="btn ghost small" title={t.creditsHint} onClick={() => setOpen(!open)}>{t.credits(credits)}</button>}
       <button className="row link" style={{ gap: 6, color: 'inherit' }} onClick={() => setOpen(!open)}><span className="avatar">{name.trim().slice(0, 1).toUpperCase()}</span><span className="small">{name}</span></button>
       {open && <div className="menu">
         <span className="small muted">{teacher.role ? t.role[teacher.role] : ''}{teacher.kind === 'demo' ? ` · ${t.demo}` : teacher.email ? ` · ${teacher.email}` : ''}</span>
         {credits && <CreditBox credits={credits} account={teacher.kind === 'account'} onChange={setCredits} t={t} />}
+        <button className="link small" onClick={() => { setOpen(false); go('/notifications'); }}>{t.notifications}</button>
         <button className="link small" onClick={() => { setOpen(false); go('/profile'); }}>{t.profile}</button>
         <button className="link small" onClick={() => { setOpen(false); go('/reminders'); }}>{t.reminders}</button>
         {teacher.role === 'teacher' && <button className="link small" onClick={() => { setOpen(false); go('/insight/criteria'); }}>{t.criteria}</button>}

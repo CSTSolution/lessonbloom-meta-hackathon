@@ -79,7 +79,7 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
   return (
     <>
       <div className="row noprint" style={{ justifyContent: 'flex-end', marginBottom: 8 }}><button className="btn small" onClick={() => window.print()}>{t.pdf}</button></div>
-      <div className="noprint" style={{ display: 'grid', gridTemplateColumns: '170px minmax(0, 1fr) 240px', gap: 14, alignItems: 'start' }}>
+      <div className="noprint slide-grid">
         <div className="slide-list">{l.slides.map((x, j) => <button key={x.id} className={j === i ? 'on' : ''} onClick={() => setI(j)}>{j + 1}&nbsp; {x.heading}</button>)}</div>
         <div className="stack">
           <div className="slide-big">

@@ -15,7 +15,7 @@ const T = {
     labels: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' }, recent: (r: number, o: number) => `${r}/${o} câu gần nhất đúng`, answers: (n: number) => `${n} câu`, min: (n: number) => `${n} phút`, added: (n: number) => `Đã thêm ${n} câu cho riêng em.`,
   },
   en: {
-    back: '‹ Learning summary', path: 'See the path', now: 'Learning', weeks: (w: number, s: string, e: string, i: number) => `${w} weeks · ${s} – ${e} · in week ${i}`, video: 'Watched the lesson', noVideo: 'Not watched yet', left: (n: number) => `${n} items to go`, ends: (d: string) => `Ends: ${d}`,
+    back: '‹ Learning summary', path: 'See the path', now: 'Learning', weeks: (w: number, s: string, e: string, i: number) => `${w} week${w === 1 ? '' : 's'} · ${s} – ${e} · in week ${i}`, video: 'Watched the lesson', noVideo: 'Not watched yet', left: (n: number) => `${n} items to go`, ends: (d: string) => `Ends: ${d}`,
     advice: (n: string) => `Advice for ${n}`, adviceSub: 'From your criteria · the AI only words it', kinds: { practice: 'More practice', next: 'Next step', time: 'Lesson time' }, why: '› Why?', apply: 'Apply', keep: 'Keep as is', undo: 'Undo', applied: '✓ Applied', kept: 'Kept as is', lock: '🔒 The plan only changes when you press Apply.', none: 'No advice yet: more answers are needed.',
     bySkill: 'By skill', bySkillSub: (s: number, p: number, r: number) => `${s} mastered · ${p} practising · ${r} repeated mistake`, sessions: 'Recent sessions', sessionsSub: (n: number, d: string, m: number) => `${n} sessions${d ? ` · last ${d}, ${m} min` : ''}`, sent: 'Reminders sent', sentSub: (n: number) => `${n} reminders`,
     labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' }, recent: (r: number, o: number) => `${r}/${o} recent answers right`, answers: (n: number) => `${n} answers`, min: (n: number) => `${n} min`, added: (n: number) => `Added ${n} items for this learner only.`,
@@ -57,7 +57,7 @@ export function Learner({ id, parent }: { id: string; parent: boolean }) {
         <button className="btn small" onClick={() => go('/path')}>{t.path}</button>
       </div>
       <div className="row" style={{ margin: '16px 0 8px' }}><b>{t.advice(v.pupil.name)}</b><span className="small muted">{t.adviceSub}</span></div>
-      {v.advice.length ? <div className="grid2" style={{ gridTemplateColumns: `repeat(${Math.min(3, v.advice.length)}, minmax(0, 1fr))` }}>{v.advice.map((a) => (
+      {v.advice.length ? <div className="adv-grid">{v.advice.map((a) => (
         <div key={a.kind} className={`card adv ${a.kind} stack`} style={{ gap: 6 }}>
           <span className={`tag ${a.kind === 'next' ? 'solid' : a.kind === 'time' ? 'ai' : 'repeat'}`} style={{ alignSelf: 'start' }}>{t.kinds[a.kind]}</span>
           <b className="small">{a.text}</b>

@@ -108,6 +108,22 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     return out.filter((r) => r.date >= today).sort((a, b) => a.date.localeCompare(b.date));
   };
 
+  // "Thông báo": every in-app reminder of the last two weeks and the coming week, for all her classes
+  // (a parent: her children), newest day first. Worked out from the paths, like the reminders themselves.
+  app.get('/api/t/notifications', async (c) => {
+    const t = c.get('teacher'), s = await remindersOf(t.id), today = vnToday(), from = addDays(today, -14), to = addDays(today, 7);
+    const out: { date: string; who: 'pupils' | 'assigner'; kind: string; vi: string; en: string; className: string; classId: string }[] = [];
+    for (const pa of await sql.query<{ id: string; start: string; class_id: string; class_name: string }>(`select p.id, to_char(p.start_date, 'YYYY-MM-DD') as start, p.class_id, k.name as class_name from paths p join classes k on k.id = p.class_id where p.teacher_id = $1`, [t.id])) {
+      const steps = layout(pa.start, await sql.query<StepRow>(`select ps.section_id, s.title, s.page_from, s.page_to, s.topic, ps.weeks, ps.ord from path_steps ps join sections s on s.id = ps.section_id where ps.path_id = $1 order by ps.ord`, [pa.id]), today);
+      for (const st of steps.filter((x) => x.end >= from && x.start <= to)) {
+        const one = remindersFor([{ ...st, status: 'current' }], s, await progressOf(pa.class_id, st.sectionId), from);
+        out.push(...one.filter((r) => r.date >= from && r.date <= to).map((r) => ({ ...r, className: pa.class_name, classId: pa.class_id })));
+      }
+    }
+    out.sort((a, b) => b.date.localeCompare(a.date));
+    return c.json({ today, notifications: out });
+  });
+
   // ---- the path ----
   app.get('/api/t/path', async (c) => {
     const t = c.get('teacher'), classId = c.req.query('classId') || '', areaId = c.req.query('areaId') || '';
