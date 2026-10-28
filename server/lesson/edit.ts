@@ -18,6 +18,21 @@ import { makeVideo } from './video.ts';
 import { writeItems, writeSlides } from './writer.ts';
 
 const J = (x: unknown) => JSON.stringify(x);
+// The worked steps for a two-digit sum or difference, by code (for an item whose numbers she changed).
+export function explainMath(a: number, op: string, b: number, lang: 'vi' | 'en'): string {
+  const vi = lang === 'vi', ua = a % 10, ub = b % 10, ta = Math.floor(a / 10), tb = Math.floor(b / 10);
+  if (op === '+') {
+    const u = ua + ub, c = u >= 10 ? 1 : 0, r = a + b;
+    return vi ? `${ua} + ${ub} = ${u}${c ? `, viết ${u % 10} nhớ 1` : `, viết ${u}`}; ${ta} + ${tb}${c ? ' + 1' : ''} = ${ta + tb + c}. Vậy ${a} + ${b} = ${r}.`
+      : `${ua} + ${ub} = ${u}${c ? `: write ${u % 10}, carry 1` : `: write ${u}`}; ${ta} + ${tb}${c ? ' + 1' : ''} = ${ta + tb + c}. So ${a} + ${b} = ${r}.`;
+  }
+  if (op === '-') {
+    const borrow = ua < ub, r = a - b;
+    return vi ? `${borrow ? `${ua} không trừ được ${ub}, mượn 1 chục: ${ua + 10} − ${ub} = ${ua + 10 - ub}` : `${ua} − ${ub} = ${ua - ub}`}; ${ta}${borrow ? ' − 1' : ''} − ${tb} = ${ta - (borrow ? 1 : 0) - tb}. Vậy ${a} − ${b} = ${r}.`
+      : `${borrow ? `${ua} is smaller than ${ub}, take 1 ten: ${ua + 10} − ${ub} = ${ua + 10 - ub}` : `${ua} − ${ub} = ${ua - ub}`}; ${ta}${borrow ? ' − 1' : ''} − ${tb} = ${ta - (borrow ? 1 : 0) - tb}. So ${a} − ${b} = ${r}.`;
+  }
+  return `${a} ${op} ${b}`;
+}
 const clip = (s: unknown, n: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const MATH_T = ['mcq', 'fill', 'truefalse', 'word'], ENG_T = ['match', 'fill', 'listen', 'order'];
 
@@ -82,6 +97,8 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const n = (k: string, v: number) => (Number.isFinite(Number(b[k])) && String(b[k]).trim() !== '' ? Math.trunc(Number(b[k])) : v);
       const raw: RawMath = { template: it.template, skill: it.skill, level: it.level, a: n('a', it.a), op: it.op, b: n('b', it.b), blank: it.blank, shown: it.template === 'truefalse' ? n('shown', it.shown ?? 0) : undefined,
         distractors: Array.isArray(b.distractors) ? (b.distractors as unknown[]).map(Number).filter(Number.isFinite) : it.distractors, story: b.story !== undefined ? clip(b.story, 400) : it.story, unit: b.unit !== undefined ? clip(b.unit, 40) : it.unit, explain: b.explain !== undefined ? clip(b.explain, 300) : it.explain };
+      // new numbers with the old explanation: the explanation is written again by code
+      if ((raw.a !== it.a || raw.b !== it.b) && (raw.explain === it.explain || !raw.explain)) raw.explain = explainMath(raw.a, raw.op, raw.b, l.setup.lang);
       next = buildMath(raw, it.id, l.setup.lang);
     } else {
       const s = (k: string, v?: string) => (b[k] !== undefined ? clip(b[k], 300) : v);

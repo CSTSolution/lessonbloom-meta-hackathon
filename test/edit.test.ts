@@ -32,6 +32,7 @@ test('items: her edit is rebuilt and checked by code; similar and new kinds pass
   const it = lesson.items.find((i: any) => i.template === 'mcq');
   const ok = (await call('PUT', `/api/t/lessons/${id}/items/${it.id}`, { a: 45, b: 38 })).json.item;
   assert.equal(ok.answer, '83', 'the answer is worked out by code, never typed');
+  assert.equal(ok.explain, '5 + 8 = 13: write 3, carry 1; 4 + 3 + 1 = 8. So 45 + 38 = 83.', 'new numbers, a new explanation');
   const bad = await call('PUT', `/api/t/lessons/${id}/items/${it.id}`, { a: 70, b: 50 });
   assert.equal(bad.json.code, 'itemCheck', 'outside "within 100": refused');
   assert.ok(bad.json.issues.some((x: any) => x.code === 'scope'));

@@ -7,18 +7,18 @@ import { Notice } from './Notice.tsx';
 
 const T = {
   vi: {
-    title: 'Ghi chú của cô thành bài giảng, bài luyện tập và bức tranh học tập của cả lớp.',
-    lead: 'Cho lớp 1–5, Toán và Tiếng Anh. Cô gõ, chụp ảnh hoặc nói ghi chú bài học; trợ lý AI soạn và tự kiểm tra từng câu trước khi cô xem.',
-    steps: [['1', 'Ghi chú', 'Gõ, chụp ảnh hoặc đọc to'], ['2', 'Bài giảng', 'Slide, video, bài luyện tập'], ['3', 'Lớp học', 'Học sinh luyện, cô thấy lớp vướng ở đâu']],
+    title: 'Bài giảng từ chính sách của bạn, được kiểm tra trước khi đến tay các con.',
+    lead: 'Cho giáo viên và phụ huynh, lớp 1–5, Toán và Tiếng Anh. Tải sách lên, gõ một câu bài cần học: trợ lý AI soạn slide, video và bài luyện tập chỉ từ đúng trang sách đó, và code kiểm tra từng câu.',
+    steps: [['1', 'Sách của bạn', 'Tải PDF, chia theo bài và trang'], ['2', 'Bài giảng', 'Slide, video, bài luyện tập'], ['3', 'Lớp học', 'Các con luyện, bạn thấy chỗ vướng']],
     built: 'Chạy trên các mô hình của Meta: Muse Spark, Muse Wonder, Muse Image, SAM 3.1',
     door: 'Bắt đầu', demo: 'Dùng thử ngay', demoNote: 'Không cần đăng ký. Bản dùng thử được giữ 7 ngày.',
     or: 'hoặc đăng nhập bằng email', email: 'Email của cô', send: 'Gửi mã', code: 'Mã 6 số trong email', verify: 'Đăng nhập',
     sent: (e: string) => `Đã gửi mã tới ${e}. Mã dùng được trong 10 phút.`, other: 'Dùng email khác',
   },
   en: {
-    title: 'Your lesson notes become slides, practice and a clear picture of your class.',
-    lead: 'For grades 1–5, Maths and English. Type, photograph or say your notes; an AI agent writes the lesson and checks every item before you see it.',
-    steps: [['1', 'Notes', 'Type, photograph or speak'], ['2', 'Lesson', 'Slides, video, practice'], ['3', 'Class', 'Pupils practise; you see where they are stuck']],
+    title: 'Lessons from your own books, checked before they reach a child.',
+    lead: 'For teachers and parents, grades 1–5, Maths and English. Upload your book, type one sentence about what to learn: an AI agent makes slides, a video and practice from those pages only, and code checks every question.',
+    steps: [['1', 'Your books', 'Upload a PDF; split by lesson and page'], ['2', 'Lesson', 'Slides, video, practice'], ['3', 'Class', 'Children practise; you see where they are stuck']],
     built: "Built on Meta's models: Muse Spark, Muse Wonder, Muse Image, SAM 3.1",
     door: 'Get started', demo: 'Try it now', demoNote: 'No sign-up. A demo is kept for 7 days.',
     or: 'or sign in with email', email: 'Your email', send: 'Send code', code: '6-digit code from the email', verify: 'Sign in',
