@@ -1,11 +1,13 @@
 // The admin view: every assigner, what each one made and what each one cost. It is never on the public
 // site: it listens on its own port, which the server publishes on 127.0.0.1 only (reached through an
-// SSH tunnel, deploy/vps/admin.sh), and every API request needs LB_ADMIN_KEY. It only reads.
+// SSH tunnel, deploy/vps/admin.sh), and every API request needs LB_ADMIN_KEY. Besides reading, it makes
+// promo codes and gives an assigner credits or subscriber days (every grant is logged).
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
+import { cleanCode, CODE, creditState, grant, newCode } from '../credits.ts';
 import { credits, TODAY } from '../guard/guard.ts';
 
 const PAGE = await readFile(new URL('./page.html', import.meta.url), 'utf8');
@@ -36,13 +38,13 @@ export function createAdmin(sql: Sql, key = config.adminKey) {
         count(distinct teacher_id)::int as people, sum(usd) as usd, count(*) filter (where verdict <> 'ok')::int as blocked
         from ai_usage group by 1 order by 1 desc limit 30`);
     const people = await sql.one<Record<string, string>>(`select count(*) filter (where kind = 'demo') as demo, count(*) filter (where kind = 'account') as accounts,
-        count(*) filter (where seen_at >= ${TODAY}) as today from teachers`);
+        count(*) filter (where seen_at >= ${TODAY}) as today, count(*) filter (where plan_until > now()) as subscribers from teachers`);
     const lessons = await sql.one<Record<string, string>>(`select count(*) as all, count(*) filter (where status = 'ready') as ready,
         count(*) filter (where status = 'error') as failed, count(*) filter (where created_at >= ${TODAY}) as today from lessons`);
     return c.json({
-      money: { total: usdOut(m?.total), today: usdOut(m?.today), totalCapUsd: config.guard.totalUsd, dayCapUsd: config.guard.dayUsd, creditUsd: 0.01, teacherDayCredits: config.guard.teacherDayCredits, disabled: config.guard.disabled },
+      money: { total: usdOut(m?.total), today: usdOut(m?.today), totalCapUsd: config.guard.totalUsd, dayCapUsd: config.guard.dayUsd, creditUsd: 0.01, signupCredits: config.guard.signupCredits, subscriberDayCredits: config.guard.subscriberDayCredits, disabled: config.guard.disabled },
       calls: num(m?.calls), blocked: num(m?.blocked),
-      people: { demo: num(people?.demo), accounts: num(people?.accounts), today: num(people?.today) },
+      people: { demo: num(people?.demo), accounts: num(people?.accounts), today: num(people?.today), subscribers: num(people?.subscribers) },
       lessons: { all: num(lessons?.all), ready: num(lessons?.ready), failed: num(lessons?.failed), today: num(lessons?.today) },
       models: models.map((r) => ({ ...r, ...usdOut(r.usd) })),
       days: days.map((r) => ({ ...r, ...usdOut(r.usd) })),
@@ -52,6 +54,7 @@ export function createAdmin(sql: Sql, key = config.adminKey) {
   // Every assigner, most recently active first.
   app.get('/api/users', async (c) => {
     const rows = await sql.query<Record<string, unknown>>(`select t.id, t.kind, t.name, t.email, t.lang, t.created_at, t.seen_at,
+        greatest(0, floor(t.credits))::int as balance, case when t.plan_until > now() then t.plan_until end as plan_until,
         (select count(*) from lessons l where l.teacher_id = t.id)::int as lessons,
         (select count(*) from areas a where a.teacher_id = t.id)::int as areas,
         (select count(*) from books b join areas a on a.id = b.area_id where a.teacher_id = t.id)::int as books,
@@ -66,9 +69,8 @@ export function createAdmin(sql: Sql, key = config.adminKey) {
   // One assigner in full: her lessons with what each cost, her books, her calls and her refusals.
   app.get('/api/users/:id', async (c) => {
     const id = c.req.param('id');
-    const t = await sql.one<Record<string, unknown>>('select id, kind, name, email, lang, created_at, seen_at from teachers where id = $1', [id]);
+    const t = await sql.one<Record<string, unknown>>('select id, kind, name, email, lang, created_at, seen_at, plan_until from teachers where id = $1', [id]);
     if (!t) return c.json({ error: 'No such user.' }, 404);
-    const today = await sql.one<{ usd: string }>(`select coalesce(sum(usd), 0) as usd from ai_usage where teacher_id = $1 and at >= ${TODAY}`, [id]);
     const lessons = await sql.query<Record<string, unknown>>(`select l.id, l.status, l.created_at, l.request, l.error, l.setup->>'title' as title,
         (l.setup->>'grade')::int as grade, l.setup->>'subject' as subject, l.refs->0->>'vi' as citation,
         jsonb_array_length(l.slides)::int as slides, jsonb_array_length(l.items)::int as items, jsonb_array_length(l.cards)::int as cards,
@@ -82,9 +84,9 @@ export function createAdmin(sql: Sql, key = config.adminKey) {
       from ai_usage where teacher_id = $1 and model <> 'guard' group by 1, 2 order by sum(usd) desc`, [id]);
     const calls = await sql.query(`select at, endpoint, model, verdict, lesson_id, in_tokens as tin, out_tokens as tout, images, usd, ms
       from ai_usage where teacher_id = $1 order by at desc limit 300`, [id]);
-    const used = credits(num(today?.usd));
+    const grants = await sql.query('select at, credits, days, reason, ref from credit_log where teacher_id = $1 order by at desc limit 100', [id]);
     return c.json({
-      user: t, credits: { perDay: config.guard.teacherDayCredits, used, left: Math.max(0, config.guard.teacherDayCredits - used) },
+      user: t, credits: await creditState(sql, id), signupCredits: config.guard.signupCredits, grants,
       lessons: lessons.map(({ usd, ...r }) => ({ ...r, ...usdOut(usd) })), books,
       byEndpoint: byEndpoint.map((r) => ({ ...r, ...usdOut(r.usd) })),
       calls: calls.map((r) => ({ ...r, ...usdOut(r.usd) })),
@@ -97,6 +99,36 @@ export function createAdmin(sql: Sql, key = config.adminKey) {
     if (!l) return c.json({ error: 'No such lesson.' }, 404);
     const cost = await sql.query(`select endpoint, model, count(*)::int as n, sum(usd) as usd from ai_usage where lesson_id = $1 group by 1, 2 order by sum(usd) desc`, [l.id]);
     return c.json({ lesson: l, publicUrl: config.publicUrl, cost: cost.map((r) => ({ ...r, ...usdOut(r.usd) })) });
+  });
+  // ---- writes: promo codes and grants ----
+  const body = async (c: { req: { json: <T>() => Promise<T> } }) => (await c.req.json<Record<string, unknown>>().catch(() => ({}))) as Record<string, unknown>;
+  const int = (x: unknown, max: number) => Math.min(max, Math.max(0, Math.round(Number(x) || 0)));
+
+  app.get('/api/promo', async (c) => c.json({ codes: await sql.query(`select p.*, (select count(*) from promo_uses u where u.code = p.code)::int as people from promo_codes p order by created_at desc`) }));
+  app.post('/api/promo', async (c) => {
+    const b = await body(c), code = b.code ? cleanCode(b.code) : newCode();
+    const credits = int(b.credits, 100000), days = int(b.days, 3660), maxUses = Math.max(1, int(b.maxUses, 100000)), expiresDays = int(b.expiresDays, 3660);
+    if (!CODE.test(code)) return c.json({ error: 'A code is 4-32 letters, digits or dashes.' }, 400);
+    if (!credits && !days) return c.json({ error: 'A code gives credits, subscriber days or both.' }, 400);
+    const row = await sql.one(`insert into promo_codes (code, credits, days, max_uses, expires_at, note) values ($1, $2, $3, $4, case when $5 > 0 then now() + make_interval(days => $5) end, $6)
+      on conflict (code) do nothing returning *`, [code, credits, days, maxUses, expiresDays, String(b.note ?? '').slice(0, 200)]);
+    return row ? c.json({ code: row }) : c.json({ error: 'That code already exists.' }, 409);
+  });
+  app.post('/api/promo/:code/active', async (c) => {
+    const row = await sql.one('update promo_codes set active = $2 where code = $1 returning *', [cleanCode(c.req.param('code')), !!(await body(c)).active]);
+    return row ? c.json({ code: row }) : c.json({ error: 'No such code.' }, 404);
+  });
+  // credits and/or subscriber days for one assigner; "end": the subscription stops now
+  app.post('/api/users/:id/grant', async (c) => {
+    const id = c.req.param('id'), b = await body(c);
+    if (!(await sql.one('select 1 from teachers where id = $1', [id]))) return c.json({ error: 'No such user.' }, 404);
+    if (b.end) await sql.query('update teachers set plan_until = now() where id = $1 and plan_until > now()', [id]);
+    else {
+      const credits = int(b.credits, 100000), days = int(b.days, 3660);
+      if (!credits && !days) return c.json({ error: 'Give credits, subscriber days or both.' }, 400);
+      await grant(sql, id, { credits, days, reason: 'admin', ref: String(b.note ?? '') });
+    }
+    return c.json({ credits: await creditState(sql, id) });
   });
   return app;
 }

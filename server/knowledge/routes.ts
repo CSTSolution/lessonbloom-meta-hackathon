@@ -117,7 +117,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const request = String(b.request ?? '').trim().slice(0, 2000);
     if (request.length < 3) return fail(c, 'requestShort');
     const spent = await d.budget.check(t.id);
-    if (spent) return fail(c, spent === 'total' ? 'credit' : spent === 'teacher_day' ? 'credits' : 'budget', 429);
+    if (spent) return fail(c, spent === 'total' ? 'credit' : spent === 'credits' ? 'credits' : 'budget', 429);
     try {
       const m = await d.as(t.id, async () => { await requireOnTask(d.ai, request); return findSection(sql, d.ai, a.id, request); });
       return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, cited: m.cited,

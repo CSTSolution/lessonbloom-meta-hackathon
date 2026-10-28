@@ -32,9 +32,11 @@ export const config = {
     disabled: env('AI_DISABLED') === '1',
     totalUsd: num('LB_TOTAL_USD', 120),          // all real model spending ever: stops well before the $150 Meta credit
     dayUsd: num('LB_DAY_USD', 10),               // the whole app, per day (about 20 lessons)
-    teacherDayCredits: num('LB_TEACHER_DAY_CREDITS', 200), // one teacher, per Vietnam day (1 credit = $0.01; a lesson is about 50)
+    // credits (1 credit = $0.01 of Meta list price; a lesson is about 50)
+    signupCredits: num('LB_SIGNUP_CREDITS', 100),           // once, when an assigner joins
+    subscriberDayCredits: num('LB_SUBSCRIBER_DAY_CREDITS', 200), // subscribers, every Vietnam day, used before the balance
     lessonCredits: 60,                            // credits a teacher needs left to start a lesson
-    demoPerIpDay: num('LB_DEMO_PER_IP_DAY', 6),
+    demoPerIpDay: num('LB_DEMO_PER_IP_DAY', 3),  // each demo comes with the sign-up credits
     codesPerEmailDay: 5, codesPerIpDay: 20, codeGapSeconds: 60,
     lessonsDemoDay: num('LB_LESSONS_DEMO_DAY', 3), lessonsDay: num('LB_LESSONS_DAY', 10),
   },

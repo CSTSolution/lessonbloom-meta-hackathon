@@ -51,11 +51,11 @@ test('layer 4: a fooled model is stopped before its answer leaves the server', a
 
 test('layer 1: spending is logged at Meta\'s prices, and the teacher cap, app budget, total cap and kill switch stop new work', async () => {
   const s = await testServer();
-  await s.sql.query(`insert into teachers (id, kind) values ('t1', 'demo'), ('t2', 'demo')`);
+  await s.sql.query(`insert into teachers (id, kind, credits) values ('t1', 'demo', 100), ('t2', 'demo', 100)`);
   const b = new Budget(s.sql);
   assert.equal(await b.check('t1'), null);
-  await b.record({ endpoint: 'image', model: 'muse-image-1.0', images: config.guard.teacherDayCredits }, 't1');
-  assert.equal(await b.check('t1'), 'teacher_day');
+  await b.record({ endpoint: 'image', model: 'muse-image-1.0', images: 100 }, 't1');
+  assert.equal(await b.check('t1'), 'credits', '100 pictures at $0.01 use up the 100 credits');
   assert.equal(await b.check('t2'), null);
   await b.record({ endpoint: 'write', model: 'muse-spark-1.3', outTokens: (config.guard.dayUsd / 4.25) * 1e6 + 1 }, 't2');
   assert.equal(await b.check('t2'), 'app_day');

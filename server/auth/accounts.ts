@@ -19,7 +19,7 @@ export class Accounts {
   constructor(private sql: Sql) {}
 
   async createDemo(lang: 'vi' | 'en'): Promise<Teacher> {
-    return (await this.sql.one<Teacher>(`insert into teachers (id, kind, lang) values ($1, 'demo', $2) returning *`, [newId(), lang]))!;
+    return (await this.sql.one<Teacher>(`insert into teachers (id, kind, lang, credits) values ($1, 'demo', $2, $3) returning *`, [newId(), lang, config.guard.signupCredits]))!;
   }
 
   async startSession(teacherId: string, days: number): Promise<string> {
@@ -69,7 +69,7 @@ export class Accounts {
     const found = await this.sql.one<Teacher>('select * from teachers where lower(email) = $1', [email]);
     if (found) return found;
     if (current?.kind === 'demo') return (await this.sql.one<Teacher>(`update teachers set kind = 'account', email = $2 where id = $1 returning *`, [current.id, email]))!;
-    return (await this.sql.one<Teacher>(`insert into teachers (id, kind, email, lang) values ($1, 'account', $2, $3) returning *`, [newId(), email, current?.lang ?? 'vi']))!;
+    return (await this.sql.one<Teacher>(`insert into teachers (id, kind, email, lang, credits) values ($1, 'account', $2, $3, $4) returning *`, [newId(), email, current?.lang ?? 'vi', config.guard.signupCredits]))!;
   }
 
   async update(id: string, f: { name?: string; lang?: 'vi' | 'en' }): Promise<Teacher> {

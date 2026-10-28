@@ -1,7 +1,8 @@
 // The browser talks only to our API (cookie session). Errors carry both languages.
 export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; email: string | null; lang: 'vi' | 'en' }
-// 1 credit = US$0.01 of Meta's price; each assigner has a daily allowance (Vietnam days).
-export interface Credits { perDay: number; used: number; left: number }
+// 1 credit = US$0.01 of Meta's price: 100 when she joins, promo codes add more; subscribers also get a
+// daily allowance (Vietnam days), used first.
+export interface Credits { balance: number; subscriber: boolean; planUntil: string | null; daily: { perDay: number; used: number; left: number } | null; left: number }
 export type Level = 'basic' | 'good' | 'advanced';
 export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string }
 export interface Skill { tag: string; name: string; kind: string }
@@ -30,6 +31,7 @@ export const api = {
   verify: (email: string, code: string) => call<{ teacher: Teacher }>('POST', '/auth/verify', { email, code }),
   me: () => call<{ teacher: Teacher; budget: string | null; credits: Credits }>('GET', '/t/me'),
   update: (f: { name?: string; lang?: string }) => call<{ teacher: Teacher }>('PUT', '/t/me', f),
+  promo: (code: string) => call<{ added: { credits: number; days: number }; credits: Credits }>('POST', '/t/promo', { code }),
   logout: () => call<{ ok: boolean }>('POST', '/t/logout'),
   photos: (images: { data: string; type: string }[]) => call<{ text: string }>('POST', '/t/notes/photos', { images }),
   voice: (audio: Blob) => call<{ text: string }>('POST', '/t/notes/voice', undefined, audio),

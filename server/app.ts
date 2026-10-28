@@ -9,6 +9,7 @@ import type { AI } from './ai/types.ts';
 import { config } from './config.ts';
 import type { Sql } from './db/sql.ts';
 import { Budget, clientIp, Limiter } from './guard/guard.ts';
+import { cleanCode, CODE, redeem } from './credits.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
 import { knowledgeRoutes } from './knowledge/routes.ts';
@@ -87,6 +88,18 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     const b = await c.req.json<{ name?: string; lang?: string }>().catch(() => ({} as { name?: string; lang?: string }));
     const name = b.name === undefined ? undefined : String(b.name).replace(/\s+/g, ' ').trim().slice(0, 60);
     return c.json({ teacher: publicTeacher(await accounts.update(c.get('teacher').id, { name, lang: b.lang === undefined ? undefined : lang(b.lang) })) });
+  });
+  // A promo code: credits or subscriber days, once per assigner; email accounts only (codes are for people).
+  const promoTries = new Limiter(5, 20);
+  app.post('/api/t/promo', async (c) => {
+    const t = c.get('teacher'), b = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
+    if (t.kind !== 'account') return fail(c, 'promoAccount', 403);
+    if (!promoTries.take(t.id)) return fail(c, 'tooMany', 429);
+    const code = cleanCode(b.code);
+    const r = CODE.test(code) ? await redeem(sql, t.id, code) : 'bad';
+    if (r === 'bad') return fail(c, 'promoBad');
+    if (r === 'used') return fail(c, 'promoUsed');
+    return c.json({ added: r, credits: await budget.credits(t.id) });
   });
   app.post('/api/t/logout', async (c) => {
     await accounts.endSession(c.get('token'));

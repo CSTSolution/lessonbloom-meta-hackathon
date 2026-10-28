@@ -11,6 +11,7 @@ import type { Context } from 'hono';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import type { AI, JsonRequest, Usage } from '../ai/types.ts';
+import { charge, creditState } from '../credits.ts';
 
 export const REFUSAL = '[[OUT_OF_SCOPE]]';
 export const VERDICTS = ['on_task', 'off_task', 'injection', 'extraction', 'unsafe'] as const;
@@ -162,32 +163,27 @@ export const costOf = (u: Usage) => {
   return ((u.inTokens || 0) / 1e6) * inP + ((u.outTokens || 0) / 1e6) * outP;
 };
 
-// Money: every model call is logged with its cost (and its lesson); new AI work is refused once the
-// teacher's credits for the day are used, today's spending reaches the app's daily budget, all real
-// (non-mock) spending reaches the total cap set under the Meta credit, or when AI_DISABLED=1.
-// Days are Vietnam days: credits come back at midnight in Hanoi.
+// Money: every model call is logged with its cost (and its lesson) and taken off the assigner's credits;
+// new AI work is refused once she has no credits left, today's spending reaches the app's daily budget,
+// all real (non-mock) spending reaches the total cap set under the Meta credit, or when AI_DISABLED=1.
+// Days are Vietnam days.
 export const TODAY = `date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh'`;
 export class Budget {
   constructor(private sql: Sql) {}
   async record(u: Usage, teacherId: string | null, lessonId: string | null = null) {
+    const usd = costOf(u);
     await this.sql.query('insert into ai_usage (teacher_id, lesson_id, endpoint, model, verdict, in_tokens, out_tokens, images, usd, ms) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-      [teacherId, lessonId, u.endpoint, u.model, u.verdict || 'ok', Math.round(u.inTokens || 0), Math.round(u.outTokens || 0), u.images || 0, costOf(u), Math.round(u.ms || 0)]);
+      [teacherId, lessonId, u.endpoint, u.model, u.verdict || 'ok', Math.round(u.inTokens || 0), Math.round(u.outTokens || 0), u.images || 0, usd, Math.round(u.ms || 0)]);
+    if (teacherId) await charge(this.sql, teacherId, usd / CREDIT_USD);
   }
-  async check(teacherId: string): Promise<null | 'disabled' | 'total' | 'app_day' | 'teacher_day'> {
+  async check(teacherId: string): Promise<null | 'disabled' | 'total' | 'app_day' | 'credits'> {
     if (config.guard.disabled) return 'disabled';
-    const r = await this.sql.one<{ app: string; mine: string; total: string }>(
-      `select coalesce(sum(usd) filter (where at >= ${TODAY}), 0) as app,
-              coalesce(sum(usd) filter (where at >= ${TODAY} and teacher_id = $1), 0) as mine,
-              coalesce(sum(usd) filter (where model <> 'mock'), 0) as total from ai_usage`, [teacherId]);
+    const r = await this.sql.one<{ app: string; total: string }>(
+      `select coalesce(sum(usd) filter (where at >= ${TODAY}), 0) as app, coalesce(sum(usd) filter (where model <> 'mock'), 0) as total from ai_usage`);
     if (Number(r?.total) >= config.guard.totalUsd) return 'total';
     if (Number(r?.app) >= config.guard.dayUsd) return 'app_day';
-    if (credits(Number(r?.mine)) >= config.guard.teacherDayCredits) return 'teacher_day';
+    if ((await this.credits(teacherId)).left < 1) return 'credits';
     return null;
   }
-  // The teacher's credits today: what she has used and what is left.
-  async credits(teacherId: string) {
-    const r = await this.sql.one<{ usd: string }>(`select coalesce(sum(usd), 0) as usd from ai_usage where teacher_id = $1 and at >= ${TODAY}`, [teacherId]);
-    const used = credits(Number(r?.usd)), perDay = config.guard.teacherDayCredits;
-    return { perDay, used, left: Math.max(0, perDay - used) };
-  }
+  credits(teacherId: string) { return creditState(this.sql, teacherId); }
 }
