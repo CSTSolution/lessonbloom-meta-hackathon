@@ -10,7 +10,7 @@ export const langName = (l: 'vi' | 'en') => LANG[l];
 export const INTAKE_SYSTEM = `You read one section of a primary-school book (grades 1-5, Maths or English) and fill in the lesson setup for the assigner to confirm.
 - subject: "math" or "english". grade: 1-5 from the notes (default 2). title: the lesson's own title, short.
 - objectives: 1-3 things pupils will be able to do, in {{lang}}, each one short.
-- minutes: 15, 25 or 35. lang: "vi" for Maths; for English lessons "en" when the notes are mostly English, else "vi".
+- minutes: 15, 25 or 35. lang: the language the section itself is written in ("en" for an English-medium Maths book, "vi" for a Vietnamese one); for English lessons "en" when the notes are mostly English, else "vi".
 - usable: false if the text is not lesson material at all.`;
 export const INTAKE_SCHEMA = { type: 'object', properties: { usable: { type: 'boolean' }, subject: { type: 'string', enum: ['math', 'english'] }, grade: int, title: str, objectives: strs, minutes: int, lang: { type: 'string', enum: ['vi', 'en'] } }, required: ['usable', 'subject', 'grade', 'title', 'objectives', 'minutes', 'lang'] };
 

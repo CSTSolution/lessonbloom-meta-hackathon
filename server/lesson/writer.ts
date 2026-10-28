@@ -28,10 +28,16 @@ export function cleanSetup(x: unknown): Setup | null {
 
 const material = (setup: Setup, source: string) => wrapUser(`SETUP: ${JSON.stringify(setup)}\n\nBOOK SECTION (the only source):\n${source}`);
 
+// The language a section is written in, by code: Vietnamese letters, or not.
+const VI_LETTERS = /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệịỉĩọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/gi;
+export const sourceLang = (text: string): 'vi' | 'en' => ((text.match(VI_LETTERS) || []).length > text.length / 200 ? 'vi' : 'en');
+
 export async function intake(ai: AI, notes: string, uiLang: 'vi' | 'en'): Promise<Setup> {
-  const r = await guardedJson<Setup & { usable: boolean }>(ai, { endpoint: 'intake', system: fill(INTAKE_SYSTEM, { lang: langName(uiLang) }), prompt: wrapUser(notes), schema: INTAKE_SCHEMA, fixture: { notes } });
+  // a Maths lesson is in its book's language; an English lesson's instructions may be either
+  const own = sourceLang(notes);
+  const r = await guardedJson<Setup & { usable: boolean }>(ai, { endpoint: 'intake', system: fill(INTAKE_SYSTEM, { lang: langName(own === 'en' ? 'en' : uiLang) }), prompt: wrapUser(notes), schema: INTAKE_SCHEMA, fixture: { notes } });
   if (!r.usable) throw new NotLesson();
-  return cleanSetup({ ...r, objectives: (r.objectives || []).slice(0, 3) })!;
+  return cleanSetup({ ...r, lang: r.subject === 'math' || own === 'en' ? own : r.lang, objectives: (r.objectives || []).slice(0, 3) })!;
 }
 
 export async function readPhotos(ai: AI, images: { data: Buffer; mime: string }[]): Promise<string> {
