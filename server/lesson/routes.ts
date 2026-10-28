@@ -30,7 +30,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const t = c.get('teacher');
     if (!perTeacher.take(t.id)) return fail(c, 'aiBusy', 429);
     const b = await d.budget.check(t.id);
-    return b ? fail(c, 'budget', 429) : null;
+    return b ? fail(c, b === 'total' ? 'credit' : 'budget', 429) : null;
   };
   const aiError = (c: Context<Env>, e: unknown) => {
     if (e instanceof NotLesson) return fail(c, 'notLesson');

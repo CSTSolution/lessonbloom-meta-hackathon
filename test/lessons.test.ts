@@ -113,6 +113,8 @@ test('API: the demo lesson limit and the money check stop new lessons', async ()
   const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: match.sectionId })).json;
   for (let i = 0; i < 3; i++) assert.equal((await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'Unit 6', setup })).status, 200);
   assert.equal((await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'Unit 6', setup })).json.code, 'lessonLimit');
-  await s.sql.query(`insert into ai_usage (endpoint, usd) values ('items', 1000)`);
+  await s.sql.query(`insert into ai_usage (endpoint, model, usd) values ('items', 'mock', 1000)`);
   assert.equal((await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Unit 5 animals' })).json.code, 'budget');
+  await s.sql.query(`insert into ai_usage (endpoint, model, usd, at) values ('agent', 'muse-wonder-1.0', 1000, now() - interval '3 days')`);
+  assert.equal((await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Unit 5 animals' })).json.code, 'credit', 'the Meta credit cap says so, not "try tomorrow"');
 });

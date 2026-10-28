@@ -144,26 +144,36 @@ export class Limiter {
   }
 }
 
-// List prices are estimates until Meta's price sheet for our account is read; env-overridable (USD).
-const p = (k: string, d: number) => Number(process.env[k] || d);
-export const PRICE = { inPerM: p('LB_PRICE_IN', 1), outPerM: p('LB_PRICE_OUT', 4), image: p('LB_PRICE_IMAGE', 0.04), segment: p('LB_PRICE_SAM', 0.01), transcribePerCall: p('LB_PRICE_ASR', 0.002) };
-export const costOf = (u: Usage) =>
-  (u.endpoint === 'segment' ? PRICE.segment : u.endpoint === 'transcribe' ? PRICE.transcribePerCall : 0)
-  + (u.endpoint === 'image' ? (u.images || 0) * PRICE.image : 0)
-  + ((u.inTokens || 0) / 1e6) * PRICE.inPerM + ((u.outTokens || 0) / 1e6) * PRICE.outPerM;
+// Meta's Standard-mode list prices in USD (dev.meta.ai/docs/pricing-rate-limits, read 28 Oct 2026).
+// Cached input is billed lower; counting it as full input keeps our numbers on the safe side, and an
+// unknown text model is priced as Muse Wonder, the dearest.
+const TOKENS: [string, number, number][] = [['muse-spark', 1.25, 4.25], ['muse-wonder', 4, 20]];
+export const PRICE = { image: 0.01, segment: 0.0025, transcribePerCall: 0.015 }; // a voice note is at most 5 min ($0.18/h)
+const perM = (model: string) => TOKENS.find(([m]) => model.startsWith(m))?.slice(1) as [number, number] ?? [4, 20];
+export const costOf = (u: Usage) => {
+  if (u.endpoint === 'image') return (u.images || 0) * PRICE.image;
+  if (u.endpoint === 'segment') return PRICE.segment;
+  if (u.endpoint === 'transcribe') return PRICE.transcribePerCall;
+  const [inP, outP] = perM(u.model || '');
+  return ((u.inTokens || 0) / 1e6) * inP + ((u.outTokens || 0) / 1e6) * outP;
+};
 
 // Money: every model call is logged with its cost; new AI work is refused once today's spending
-// reaches the teacher's cap or the app's budget, or when AI_DISABLED=1.
+// reaches the teacher's cap or the app's daily budget, once all real (non-mock) spending reaches the
+// total cap set under the Meta credit, or when AI_DISABLED=1.
 export class Budget {
   constructor(private sql: Sql) {}
   async record(u: Usage, teacherId: string | null) {
     await this.sql.query('insert into ai_usage (teacher_id, endpoint, model, in_tokens, out_tokens, images, usd, ms) values ($1,$2,$3,$4,$5,$6,$7,$8)',
       [teacherId, u.endpoint, u.model, Math.round(u.inTokens || 0), Math.round(u.outTokens || 0), u.images || 0, costOf(u), Math.round(u.ms || 0)]);
   }
-  async check(teacherId: string): Promise<null | 'disabled' | 'app_day' | 'teacher_day'> {
+  async check(teacherId: string): Promise<null | 'disabled' | 'total' | 'app_day' | 'teacher_day'> {
     if (config.guard.disabled) return 'disabled';
-    const r = await this.sql.one<{ app: string; mine: string }>(
-      `select coalesce(sum(usd), 0) as app, coalesce(sum(usd) filter (where teacher_id = $1), 0) as mine from ai_usage where at >= date_trunc('day', now())`, [teacherId]);
+    const r = await this.sql.one<{ app: string; mine: string; total: string }>(
+      `select coalesce(sum(usd) filter (where at >= date_trunc('day', now())), 0) as app,
+              coalesce(sum(usd) filter (where at >= date_trunc('day', now()) and teacher_id = $1), 0) as mine,
+              coalesce(sum(usd) filter (where model <> 'mock'), 0) as total from ai_usage`, [teacherId]);
+    if (Number(r?.total) >= config.guard.totalUsd) return 'total';
     if (Number(r?.app) >= config.guard.dayUsd) return 'app_day';
     if (Number(r?.mine) >= config.guard.teacherDayUsd) return 'teacher_day';
     return null;

@@ -29,7 +29,8 @@ export const config = {
   // guard layer 1: limits and money
   guard: {
     disabled: env('AI_DISABLED') === '1',
-    dayUsd: num('LB_DAY_USD', 20),               // the whole app, per day (Meta credit: $150 in all)
+    totalUsd: num('LB_TOTAL_USD', 120),          // all real model spending ever: stops well before the $150 Meta credit
+    dayUsd: num('LB_DAY_USD', 10),               // the whole app, per day (about 20 lessons)
     teacherDayUsd: num('LB_TEACHER_DAY_USD', 2),  // one teacher, per day
     demoPerIpDay: num('LB_DEMO_PER_IP_DAY', 6),
     codesPerEmailDay: 5, codesPerIpDay: 20, codeGapSeconds: 60,
