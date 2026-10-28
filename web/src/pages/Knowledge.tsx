@@ -117,8 +117,8 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
       <div className="row"><button className="btn primary" disabled={busy || !file}>{busy ? t.form.busy : t.form.go}</button><span className="grow" />
         <span className="small muted">{t.form.sample}</span>
         <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('maths2')).area.id)}>📘 {t.form.maths}</button>
-        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('toan2')).area.id)}>📘 {t.form.toan}</button>
-        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('english3')).area.id)}>📗 {t.form.eng}</button></div>
+        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('english3')).area.id)}>📗 {t.form.eng}</button>
+        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('toan2')).area.id)}>📘 {t.form.toan}</button></div>
       {err && <p className="note">{err}</p>}
     </form>
   );

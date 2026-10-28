@@ -39,7 +39,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     setCookie(c, COOKIE, token, { httpOnly: true, secure: c.req.url.startsWith('https:') || !!c.req.header('x-client-ip'), sameSite: 'Lax', path: '/', maxAge: (t.kind === 'demo' ? config.session.demoDays : config.session.days) * 86400 });
     return c.json({ teacher: publicTeacher(t) });
   };
-  const lang = (x: unknown): 'vi' | 'en' => (x === 'en' ? 'en' : 'vi');
+  const lang = (x: unknown): 'vi' | 'en' => (x === 'vi' ? 'vi' : 'en');   // English first
 
   app.get('/api/health', async (c) => {
     await sql.one('select 1');

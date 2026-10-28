@@ -69,7 +69,7 @@ export class Accounts {
     const found = await this.sql.one<Teacher>('select * from teachers where lower(email) = $1', [email]);
     if (found) return found;
     if (current?.kind === 'demo') return (await this.sql.one<Teacher>(`update teachers set kind = 'account', email = $2 where id = $1 returning *`, [current.id, email]))!;
-    return (await this.sql.one<Teacher>(`insert into teachers (id, kind, email, lang, credits) values ($1, 'account', $2, $3, $4) returning *`, [newId(), email, current?.lang ?? 'vi', config.guard.signupCredits]))!;
+    return (await this.sql.one<Teacher>(`insert into teachers (id, kind, email, lang, credits) values ($1, 'account', $2, $3, $4) returning *`, [newId(), email, current?.lang ?? 'en', config.guard.signupCredits]))!;
   }
 
   async update(id: string, f: { name?: string; lang?: 'vi' | 'en' }): Promise<Teacher> {

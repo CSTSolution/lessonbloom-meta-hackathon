@@ -1,10 +1,10 @@
-// Vietnamese first, English second; the choice is remembered in this browser only.
+// English first, Vietnamese second; the choice is remembered in this browser only.
 import { useEffect, useState } from 'react';
 
 export type Lang = 'vi' | 'en';
 const KEY = 'lbm.lang';
-// first visit: English unless the browser is set to Vietnamese (Chi: an English browser opens EN)
-const fromBrowser = (): Lang => (/^vi\b/i.test(navigator.language || '') ? 'vi' : 'en');
+// first visit: English (Son, 28 Oct: English first for the international demo; Vietnamese is the switch)
+const fromBrowser = (): Lang => 'en';
 let current: Lang = (() => { try { const v = localStorage.getItem(KEY); return v === 'en' || v === 'vi' ? v : fromBrowser(); } catch { return fromBrowser(); } })();
 const subs = new Set<(l: Lang) => void>();
 export const getLang = () => current;
