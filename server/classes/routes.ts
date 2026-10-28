@@ -236,13 +236,13 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (c
     const it = a.content.items.find((i) => i.id === b.itemId);
     if (!it) return fail(c, 'notFound', 404);
     const before = await sql.one<{ n: string }>('select count(*) as n from answers where assignment_id = $1 and pupil_id = $2 and item_id = $3', [a.id, p.id, it.id]);
-    if (!a.retry && Number(before?.n) > 0) return c.json({ correct: null, again: false, explain: a.hints ? hintOf(it) : '' });
+    if (!a.retry && Number(before?.n) > 0) return c.json({ correct: null, again: false, explain: a.hints ? hintOf(it, String(b.answer ?? ''), a.content.lang) : '' });
     const correct = isRight(it, b.answer);
     await sql.query('insert into answers (assignment_id, pupil_id, item_id, skill, level, answer, correct) values ($1, $2, $3, $4, $5, $6, $7)', [a.id, p.id, it.id, it.skill, it.level, String(b.answer ?? '').slice(0, 300), correct]);
     const left = await sql.one<{ n: string }>(`select count(*) as n from jsonb_array_elements(($3::jsonb)) x where not exists (select 1 from answers w where w.assignment_id = $1 and w.pupil_id = $2 and w.item_id = x->>'id')`, [a.id, p.id, J(a.content.items.map((i) => ({ id: i.id })))]);
     if (Number(left?.n) === 0) await sql.query(`insert into pupil_progress (assignment_id, pupil_id, done_at) values ($1, $2, now()) on conflict (assignment_id, pupil_id) do update set done_at = coalesce(pupil_progress.done_at, now())`, [a.id, p.id]);
     // a wrong answer: try again (when allowed), with the explanation as a hint when hints are on
-    return c.json({ correct, again: !correct && a.retry, explain: correct ? it.explain : a.hints ? hintOf(it) : '', done: Number(left?.n) === 0 });
+    return c.json({ correct, again: !correct && a.retry, explain: correct ? it.explain : a.hints ? hintOf(it, String(b.answer ?? ''), a.content.lang) : '', done: Number(left?.n) === 0 });
   });
 
   app.post('/api/p/a/:id/seen', async (c) => {

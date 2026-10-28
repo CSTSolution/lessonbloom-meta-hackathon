@@ -34,7 +34,7 @@ test('an English Maths lesson end to end: book, match, lesson, assign, pupil, su
   assert.equal(today.lessons[0].lang, 'en');
   const fill = l.items.find((i: any) => i.op === '+' && i.template !== 'truefalse')!;
   const wrong = (await kid('POST', `/api/p/a/${a.id}/answer`, { itemId: fill.id, answer: String(Number(fill.answer) - 10) })).json;
-  assert.ok(wrong.explain && !/[ăâđêôơư]/i.test(wrong.explain), `an English hint: ${wrong.explain}`);
+  assert.equal(wrong.explain, 'Remember to carry 1 to the tens.', 'a nudge for the mistake she made, in English, never the answer');
   for (let i = 0; i < 2; i++) await kid('POST', `/api/p/a/${a.id}/answer`, { itemId: fill.id, answer: String(Number(fill.answer) - 10) });
   const sum = (await call('GET', '/api/t/summary')).json.classes[0];
   assert.ok(sum.mistakes.some((m: any) => m.what === 'Forgot to carry 1 to the tens'), JSON.stringify(sum.mistakes));
