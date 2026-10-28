@@ -19,7 +19,7 @@ const T = {
     opts: 'Tuỳ chọn', due: 'Hạn làm bài', retry: 'Làm lại không giới hạn', hints: 'Gợi ý khi làm sai', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'Không hạn'} · ${r ? 'làm lại không giới hạn' : 'mỗi câu một lần'} · ${h ? 'có gợi ý' : 'không gợi ý'}`,
     kids: (n: string) => `Học sinh lớp ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} đã vào học · mã lớp ${c}`, none: 'Lớp chưa có học sinh: cô thêm tên gọi trong mục Lớp học.',
     parents: 'Gửi cho phụ huynh', parentsSub: 'Link riêng cho từng em, không cần đăng nhập', isNew: 'Mới',
-    checkedN: (n: number, r: number) => `Đã kiểm tra ${n} câu bằng code · ${r} câu tạo lại`, confirm: 'Tôi đã đọc và kiểm tra slide, bài tập AI soạn trước khi giao bài.', confirmSub: 'Tick lại mỗi lần giao bài.', go: 'Giao bài', tickFirst: 'Tick ô xác nhận ở trên để giao bài.',
+    checkedN: (n: number, r: number, ai = 0) => `Đã kiểm tra ${n} câu bằng code · ${r} câu tạo lại${ai ? ` · AI rà soát bỏ ${ai} câu` : ''}`, confirm: 'Tôi đã đọc và kiểm tra slide, bài tập AI soạn trước khi giao bài.', confirmSub: 'Tick lại mỗi lần giao bài.', go: 'Giao bài', tickFirst: 'Tick ô xác nhận ở trên để giao bài.',
     done: (n: string) => `Đã giao cho lớp ${n}. Học sinh thấy bài ngay ở “Hôm nay con học gì”.`, earlier: 'Đã giao', progress: (d: number, n: number) => `${d}/${n} em làm xong`,
   },
   en: {
@@ -28,12 +28,12 @@ const T = {
     opts: 'Options', due: 'Due date', retry: 'Unlimited retries', hints: 'Hints after a wrong answer', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'No due date'} · ${r ? 'unlimited retries' : 'one try per item'} · ${h ? 'hints' : 'no hints'}`,
     kids: (n: string) => `Pupils of ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} joined · class code ${c}`, none: 'No pupils yet: add their first names under Classes.',
     parents: 'Send to parents', parentsSub: 'A private link for each child, no sign-in', isNew: 'New',
-    checkedN: (n: number, r: number) => `Code checked ${n} items · ${r} written again`, confirm: 'I have read and checked the AI-generated slides and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
+    checkedN: (n: number, r: number, ai = 0) => `Code checked ${n} items · ${r} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, confirm: 'I have read and checked the AI-generated slides and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
     done: (n: string) => `Assigned to ${n}. Pupils see it straight away under “Today”.`, earlier: 'Assigned', progress: (d: number, n: number) => `${d}/${n} pupils finished`,
   },
 };
 
-export function Assign({ lessonId, parent = false, checked, redone }: { lessonId: string; parent?: boolean; checked?: number; redone?: number }) {
+export function Assign({ lessonId, parent = false, checked, redone, removed }: { lessonId: string; parent?: boolean; checked?: number; redone?: number; removed?: number }) {
   const t0 = useT(T), lang = useLang(), t = parent ? { ...t0, ...P[lang] } : t0;
   const [classes, setClasses] = useState<ClassRow[] | null>(null), [pick, setPick] = useState(''), [view, setView] = useState<ClassView | null>(null);
   const [due, setDue] = useState(''), [retry, setRetry] = useState(true), [hints, setHints] = useState(true), [ticked, setTicked] = useState(false);
@@ -92,7 +92,7 @@ export function Assign({ lessonId, parent = false, checked, redone }: { lessonId
             <div key={p.id} className="row small"><b style={{ minWidth: 90 }}>{p.name}</b><span className="grow muted ellipsis">{p.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(p.url, p.id)}>{copied === p.id ? t.copied : t.copy}</button></div>
           ))}</div> : <p className="small muted">{t.none}</p>}
         </Group></>}
-        {checked !== undefined && <div className="banner">✓ {t.checkedN(checked, redone ?? 0)}</div>}
+        {checked !== undefined && <div className="banner">✓ {t.checkedN(checked, redone ?? 0, removed ?? 0)}</div>}
         <label className={`card confirm ${ticked ? 'on' : ''}`}>
           <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
           <span><b>{t.confirm}</b><span className="small muted" style={{ display: 'block' }}>{t.confirmSub}</span></span>

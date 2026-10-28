@@ -9,6 +9,8 @@ import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
 import { Assign } from './Assign.tsx';
 import { Stepper } from './Create.tsx';
+// items the AI second review dropped (the rest of `rejected` failed a code check and were written again)
+const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.startsWith('ai:'))).length;
 
 const T = {
   vi: {
@@ -19,7 +21,7 @@ const T = {
     redoneWhy: 'Tạo lại vì', edit: 'Sửa', qText: 'Câu hỏi', save: 'Lưu', cancel: 'Huỷ', similar: 'Tạo câu tương tự', addTpl: '+ Thêm mẫu', tplKind: 'Dạng câu', skill: 'Dạng bài', level: 'Mức', create: 'Tạo 2 câu', working2: 'Đang viết…', story: 'Đề bài', unit: 'Đơn vị', wrongs: 'Đáp án sai (cách nhau bằng dấu phẩy)', shown: 'Kết quả ghi trong câu', opts: 'Lựa chọn (cách nhau bằng dấu phẩy)', ans: 'Đáp án', sentence: 'Câu có chỗ trống ___', sayIt: 'Từ được đọc to', words: 'Các từ (cách nhau bằng dấu phẩy)', codeAns: 'Đáp án do code tính.',
     newPic: 'Đổi hình minh họa', cut: 'Cắt từ ảnh của cô', cutHint: 'Chọn ảnh đồ vật (không có người) và gõ tên đồ vật cần cắt.', cutName: 'Ví dụ: quả táo', cutGo: 'Cắt bằng SAM 3.1', cutDone: (n: number) => `Đã cắt ${n} vật.`, busy: 'Đang làm…',
     video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', parts: 'Các đoạn', subs: 'Phụ đề', toItems: 'Tiếp: bài tập',
-    items: 'Bài tập', itemsLead: 'Đọc kỹ từng câu trước khi giao bài.', checked: (n: number, r: number) => `Đã kiểm tra ${n + r} câu · ${r} câu tạo lại`, details: 'Chi tiết', why: 'Lý do tạo lại',
+    items: 'Bài tập', itemsLead: 'Đọc kỹ từng câu trước khi giao bài.', checked: (n: number, r: number, ai = 0) => `Đã kiểm tra ${n + r} câu · ${r - ai} câu tạo lại${ai ? ` · AI rà soát bỏ ${ai} câu` : ''}`, details: 'Chi tiết', why: 'Lý do tạo lại hoặc bỏ',
     levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, allLevels: 'Tất cả', kind: 'Dạng', explain: 'Lời giải', page: 'Nguồn', remove: 'Xóa', removeAsk: 'Xoá câu này khỏi bài?', seeAll: (n: number) => `Xem cả ${n} câu`, n: (n: number) => `${n} câu`, q: (i: number) => `Câu ${i}.`, tf: { true: 'Đúng', false: 'Sai' }, answer: 'Đáp án',
     groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ', pairs: 'Lật thẻ tìm cặp' }, pairsLead: 'Trò chơi cho em, làm từ thẻ nhớ (tối đa 6 cặp).', toAssign: 'Duyệt xong, sang giao bài',
   },
@@ -31,7 +33,7 @@ const T = {
     redoneWhy: 'Written again because', edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
     newPic: 'New picture', cut: 'Cut out from your photo', cutHint: 'Choose a photo of objects (no people) and type what to cut out.', cutName: 'e.g. apples', cutGo: 'Cut out with SAM 3.1', cutDone: (n: number) => `Cut out ${n}.`, busy: 'Working…',
     video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
-    items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number) => `Checked ${n + r} items · ${r} written again`, details: 'Details', why: 'Why they were written again',
+    items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number, ai = 0) => `Checked ${n + r} items · ${r - ai} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, details: 'Details', why: 'Why they were written again or removed',
     levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, allLevels: 'All', kind: 'Skill', explain: 'Explanation', page: 'Source', remove: 'Delete', removeAsk: 'Remove this item from the lesson?', seeAll: (n: number) => `See all ${n}`, n: (n: number) => `${n} items`, q: (i: number) => `${i}.`, tf: { true: 'True', false: 'False' }, answer: 'Answer',
     groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards', pairs: 'Find the pairs' }, pairsLead: 'A game for the child, made from the flashcards (up to 6 pairs).', toAssign: 'Reviewed: go to assigning',
   },
@@ -67,7 +69,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(parent ? 5 : 4)} />}
       {l.status === 'ready' && step === 4 && !parent && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
-      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length} /></div>}
+      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} /></div>}
     </div>
   );
 }
@@ -193,7 +195,7 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
         <button className="btn primary small" disabled={!!busy} onClick={() => run('tpl', async () => { const r = await api.addItems(l.id, tpl); onChange(r.items); setOpen(tpl.template); setTpl(null); })}>{busy === 'tpl' ? t.working2 : t.create}</button>
         <button className="btn ghost small" onClick={() => setTpl(null)}>{t.cancel}</button></div>}
       {msg && <p className="note noprint">{msg}</p>}
-      <div className="banner row"><b className="grow">✓ {t.checked(l.items.length, l.rejected.length)}</b>{!!l.rejected.length && <details className="small"><summary>{t.details}</summary><b>{t.why}</b><ul>{l.rejected.map((r, i) => <li key={i}>{r.issues.join('; ')}</li>)}</ul></details>}</div>
+      <div className="banner row"><b className="grow">✓ {t.checked(l.items.length, l.rejected.length, aiOut(l))}</b>{!!l.rejected.length && <details className="small"><summary>{t.details}</summary><b>{t.why}</b><ul>{l.rejected.map((r, i) => <li key={i}>{r.issues.join('; ')}</li>)}</ul></details>}</div>
       {kinds.map((k) => { const list = items.filter((i) => i.template === k), shown = all[k] ? list : list.slice(0, 3); if (!list.length) return null; return (
         <div key={k} className={`group card ${first === k ? 'on' : ''}`}>
           <button className="group-head" onClick={() => setOpen(first === k ? '-' : k)}><span className="caret">{first === k ? '▾' : '▸'}</span><span className="grow"><b className="small">{t.groups[k] ?? k}</b><span className="small muted" style={{ display: 'block' }}>{t.n(list.length)}</span></span></button>

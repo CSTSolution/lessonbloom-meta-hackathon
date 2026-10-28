@@ -53,7 +53,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
   if (!teacher.role) return <SignupRole teacher={teacher} onDone={onChange} />;
   const parent = teacher.role === 'parent';
   const tabs = Object.keys(t.nav) as Tab[];
-  const tab = tabs.find((k) => (k === '/' ? path === '/' || path.startsWith('/lesson') || path === '/new' : path.startsWith(k) || (k === '/insight' && path.startsWith('/learner')))) ?? '/';
+  const tab = tabs.find((k) => (k === '/' ? path === '/' || path.startsWith('/lesson') || path === '/new' : path.startsWith(k) || (k === '/insight' && path.startsWith('/learner')) || (k === '/path' && path.startsWith('/reminders')))) ?? '/';
   const lessonId = /^\/lesson\/([\w-]+)$/.exec(path)?.[1], learnerId = /^\/learner\/([\w-]+)$/.exec(path)?.[1];
   return (
     <div>
