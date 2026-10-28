@@ -85,10 +85,10 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   });
 
   // A sample book written by the LessonBloom team (no copyrighted textbook), so anyone can try it at once.
-  const SAMPLES = { toan2: { name: 'Toán 2 (sách mẫu)', subject: 'math', grade: 2, title: 'Toán 2 – Sách mẫu LessonBloom' }, english3: { name: 'English 3 (sample)', subject: 'english', grade: 3, title: 'English 3 – LessonBloom sample book' } } as const;
+  const SAMPLES = { toan2: { name: 'Toán 2 (sách mẫu)', subject: 'math', grade: 2, title: 'Toán 2 – Sách mẫu LessonBloom' }, english3: { name: 'English 3 (sample)', subject: 'english', grade: 3, title: 'English 3 – LessonBloom sample book' }, maths2: { name: 'Maths 2 (sample)', subject: 'math', grade: 2, title: 'Maths 2 – LessonBloom sample book' } } as const;
   app.post('/api/t/areas/sample', async (c) => {
     const t = c.get('teacher'), b = await c.req.json<{ book?: string }>().catch(() => ({} as { book?: string }));
-    const key = b.book === 'english3' ? 'english3' : 'toan2', s = SAMPLES[key];
+    const key = b.book === 'english3' || b.book === 'maths2' ? b.book : 'toan2', s = SAMPLES[key];
     if (Number((await sql.one<{ n: string }>('select count(*) as n from areas where teacher_id = $1', [t.id]))?.n) >= LIMITS.areas) return fail(c, 'limitReached', 429);
     const pdf = await readFile(new URL(`../../samples/books/${key}.pdf`, import.meta.url));
     const areaId = newId(10), id = newId(10);

@@ -15,7 +15,7 @@ const T = {
     view: 'Xem tài liệu', remove: 'Xoá khỏi kho', removeAsk: 'Xoá nguồn này khỏi kho? Bài đã soạn vẫn còn.', parts: (n: number) => `Phạm vi kiến thức (${n})`, partsLead: 'Mỗi bài chỉ chọn một phạm vi làm giới hạn kiến thức.',
     page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
     splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Thêm sách PDF hoặc dùng sách mẫu.',
-    form: { title: 'Thêm nguồn kiến thức', name: 'Tên nguồn', namePh: 'Ví dụ: Toán 2 · Tập 1', subject: 'Môn', grade: 'Lớp', file: 'Tệp PDF (có chữ)', go: 'Tải lên', busy: 'Đang tải lên…', sample: 'Hoặc dùng sách mẫu (đội LessonBloom tự viết):', toan: 'Toán 2', eng: 'Tiếng Anh 3' },
+    form: { title: 'Thêm nguồn kiến thức', name: 'Tên nguồn', namePh: 'Ví dụ: Toán 2 · Tập 1', subject: 'Môn', grade: 'Lớp', file: 'Tệp PDF (có chữ)', go: 'Tải lên', busy: 'Đang tải lên…', sample: 'Hoặc dùng sách mẫu (đội LessonBloom tự viết):', toan: 'Toán 2', maths: 'Maths 2 (tiếng Anh)', eng: 'Tiếng Anh 3' },
   },
   en: {
     title: 'Knowledge', lead: 'Lessons come only from these sources, with their pages.', add: '+ Add a source', private: '🔒 Only you can see these; nothing is shared.', all: 'All', math: 'Maths', english: 'English',
@@ -24,7 +24,7 @@ const T = {
     view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
     page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${n} lessons`, rename: 'Rename', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${n} parts`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
     splitAt: 'Split from page', newTitle: 'New part name', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Add a PDF book or use a sample book.',
-    form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file (with text)', go: 'Upload', busy: 'Uploading…', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Maths 2', eng: 'English 3' },
+    form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file (with text)', go: 'Upload', busy: 'Uploading…', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Toán 2 (Vietnamese)', maths: 'Maths 2', eng: 'English 3' },
   },
 };
 
@@ -116,6 +116,7 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
       </div>
       <div className="row"><button className="btn primary" disabled={busy || !file}>{busy ? t.form.busy : t.form.go}</button><span className="grow" />
         <span className="small muted">{t.form.sample}</span>
+        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('maths2')).area.id)}>📘 {t.form.maths}</button>
         <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('toan2')).area.id)}>📘 {t.form.toan}</button>
         <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('english3')).area.id)}>📗 {t.form.eng}</button></div>
       {err && <p className="note">{err}</p>}

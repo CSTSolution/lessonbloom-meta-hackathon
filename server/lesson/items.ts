@@ -15,10 +15,10 @@ export interface CheckContext { subject: Subject; grade: number; lang: Lang; ski
 // Chi's scope rule: the lesson stays inside its section of the book. "phạm vi 100" caps every number;
 // only the operations the section teaches are allowed (a section on addition gets no subtraction).
 export function scopeOf(source: string): Scope {
-  const t = source.toLowerCase(), title = t.split('\n')[0], caps = [...t.matchAll(/phạm vi\s+(\d{1,5})/g)].map((m) => Number(m[1]));
+  const t = source.toLowerCase(), title = t.split('\n')[0], caps = [...t.matchAll(/(?:phạm vi|within|up to)\s+(\d{1,5})/g)].map((m) => Number(m[1]));
   // whole words, Unicode-aware (\b does not know "ừ" is a letter)
   const word = (w: string) => new RegExp(`(?<!\\p{L})(${w})(?!\\p{L})`, 'u');
-  const named = (x: string) => [word('cộng|addition').test(x) && '+', word('trừ|subtraction').test(x) && '-', word('nhân|multiplication').test(x) && '×', word('chia|division').test(x) && ':'].filter(Boolean) as Op[];
+  const named = (x: string) => [word('cộng|addition|adding|add').test(x) && '+', word('trừ|subtraction|subtracting|subtract|take away').test(x) && '-', word('nhân|multiplication|multiplying|multiply|times tables?').test(x) && '×', word('chia|division|dividing|divide').test(x) && ':'].filter(Boolean) as Op[];
   // the section's title names its operation ("Phép trừ có nhớ…"): only that one. Otherwise its examples and wording.
   let ops = named(title);
   if (!ops.length) {

@@ -26,12 +26,12 @@ type Call = ReturnType<Awaited<ReturnType<typeof testServer>>['client']>;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // A knowledge area with one of the sample books, read and ready.
-export async function areaWithBook(call: Call, book: 'toan2' | 'english3') {
+export async function areaWithBook(call: Call, book: 'toan2' | 'english3' | 'maths2') {
   const { readFile } = await import('node:fs/promises');
-  const math = book === 'toan2';
-  const { area } = (await call('POST', '/api/t/areas', { name: math ? 'Toán 2' : 'English 3', subject: math ? 'math' : 'english', grade: math ? 2 : 3 })).json;
+  const B = { toan2: ['Toán 2', 'math', 2, 'Toán 2 – Sách mẫu'], maths2: ['Maths 2', 'math', 2, 'Maths 2 – Sample'], english3: ['English 3', 'english', 3, 'English 3 – Sample'] } as const, [name, subject, grade, title] = B[book];
+  const { area } = (await call('POST', '/api/t/areas', { name, subject, grade })).json;
   const pdf = await readFile(new URL(`../samples/books/${book}.pdf`, import.meta.url));
-  const up = await call('POST', `/api/t/areas/${area.id}/books?title=${encodeURIComponent(math ? 'Toán 2 – Sách mẫu' : 'English 3 – Sample')}`, undefined, { type: 'application/pdf', data: pdf });
+  const up = await call('POST', `/api/t/areas/${area.id}/books?title=${encodeURIComponent(title)}`, undefined, { type: 'application/pdf', data: pdf });
   for (let i = 0; i < 200; i++) {
     const a = (await call('GET', '/api/t/areas')).json.areas.find((x: any) => x.id === area.id);
     if (a.books[0]?.status !== 'processing') break;

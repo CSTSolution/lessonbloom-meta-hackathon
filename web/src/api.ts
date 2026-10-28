@@ -81,7 +81,7 @@ export const api = {
   voice: (audio: Blob) => call<{ text: string }>('POST', '/t/notes/voice', undefined, audio),
   areas: () => call<{ areas: AreaRow[] }>('GET', '/t/areas'),
   createArea: (a: { name: string; subject: string; grade: number }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
-  sampleArea: (book: 'toan2' | 'english3') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
+  sampleArea: (book: 'toan2' | 'english3' | 'maths2') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
   area: (id: string) => call<{ area: AreaRow; books: BookRow[]; sections: SectionRow[] }>('GET', `/t/areas/${id}`),
   uploadBook: (areaId: string, file: File, title: string) => call<{ book: BookRow }>('POST', `/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, undefined, file),
   match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),

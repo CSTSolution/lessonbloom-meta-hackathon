@@ -82,7 +82,7 @@ export function Create({ parent: _parent }: { parent: boolean }) {
   if (!areas.length) return (
     <div className="page narrow">{top}<Stepper at={1} />
       <div className="card stack"><p>{t.noArea}</p><div className="row"><button className="btn primary" onClick={() => go('/knowledge')}>{t.openKnowledge}</button>
-        <button className="btn" disabled={!!busy} onClick={() => run('sample', async () => { await api.sampleArea(lang === 'en' ? 'english3' : 'toan2'); await loadAreas(); })}>{t.sample}</button></div>{err && <p className="note">{err}</p>}</div></div>
+        <button className="btn" disabled={!!busy} onClick={() => run('sample', async () => { await api.sampleArea(lang === 'en' ? 'maths2' : 'toan2'); await loadAreas(); })}>{t.sample}</button></div>{err && <p className="note">{err}</p>}</div></div>
   );
 
   if (!setup) return (
