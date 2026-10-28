@@ -34,21 +34,36 @@ const snapshot = (l: Lesson): Content => ({
   slides: l.slides, items: l.items, cards: l.cards,
 });
 
-export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI }) {
+// A parent's child: a class of one, named after the child, with the child as its only pupil.
+export async function addChild(sql: Sql, teacherId: string, name: string, grade: number) {
+  for (let i = 0; i < 5; i++) {
+    const id = newId(10), row = await sql.one('insert into classes (id, teacher_id, name, code, kind, grade) values ($1, $2, $3, $4, \'child\', $5) on conflict (code) do nothing returning id', [id, teacherId, name, code6(), grade]);
+    if (row) { await sql.query('insert into pupils (id, class_id, name, link) values ($1, $2, $3, $4)', [newId(10), id, name, randomBytes(12).toString('base64url')]); return id; }
+  }
+  throw new Error('no free class code');
+}
+
+export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (classId: string, pupilId: string) => Promise<{ vi: string; en: string } | null> }) {
   const { sql } = d;
   const mine = (c: Context<Env>, id: string) => sql.one<{ id: string; name: string; code: string }>('select id, name, code from classes where id = $1 and teacher_id = $2', [id, c.get('teacher').id]);
 
   // ---- the assigner ----
-  app.get('/api/t/classes', async (c) => c.json({ classes: await sql.query(`select c.id, c.name, c.code, c.created_at,
+  app.get('/api/t/classes', async (c) => c.json({ classes: await sql.query(`select c.id, c.name, c.code, c.kind, c.grade, c.created_at,
       (select count(*) from pupils p where p.class_id = c.id)::int as pupils,
       (select count(*) from pupils p where p.class_id = c.id and p.joined_at is not null)::int as joined,
       (select count(*) from assignments a where a.class_id = c.id)::int as assignments
     from classes c where c.teacher_id = $1 order by c.created_at`, [c.get('teacher').id]) }));
 
   app.post('/api/t/classes', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ name?: string; pupils?: string }>().catch(() => ({} as { name?: string; pupils?: string }));
+    const t = c.get('teacher'), b = await c.req.json<{ name?: string; grade?: number }>().catch(() => ({} as { name?: string; grade?: number }));
     const name = cleanName(b.name);
     if (!name) return fail(c, 'className');
+    if (t.role === 'parent') {
+      if (Number((await sql.one<{ n: string }>(`select count(*) as n from classes where teacher_id = $1 and kind = 'child'`, [t.id]))?.n) >= 4) return fail(c, 'tooMany', 429);
+      const id = await addChild(sql, t.id, name, Math.min(5, Math.max(1, Math.round(Number(b.grade)) || 1)));
+      const row = await sql.one<{ id: string; name: string; code: string; kind: string; grade: number }>('select id, name, code, kind, grade from classes where id = $1', [id]);
+      return c.json({ class: row });
+    }
     if (Number((await sql.one<{ n: string }>('select count(*) as n from classes where teacher_id = $1', [t.id]))?.n) >= MAX_CLASSES) return fail(c, 'tooMany', 429);
     let row;
     for (let i = 0; i < 5 && !row; i++) row = await sql.one('insert into classes (id, teacher_id, name, code) values ($1, $2, $3, $4) on conflict (code) do nothing returning id, name, code', [newId(10), t.id, name, code6()]);
@@ -182,14 +197,18 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI }) {
         (select count(distinct item_id) from answers w where w.assignment_id = a.id and w.pupil_id = $2)::int as answered
       from assignments a left join pupil_progress g on g.assignment_id = a.id and g.pupil_id = $2
       where a.class_id = $1 and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
-    return c.json({ pupil: { name: p.name }, class: { name: p.class_name }, lessons: rows });
+    return c.json({ pupil: { name: p.name }, class: { name: p.class_name }, lessons: rows, reminder: d.reminder ? await d.reminder(p.class_id, p.id).catch(() => null) : null });
   });
 
   const assignmentOf = async (c: Context) => {
     const p = await pupilOf(c);
     if (!p) return { error: fail(c, 'signIn', 401) };
     const a = await sql.one<{ id: string; content: Content; retry: boolean; hints: boolean }>('select id, content, retry, hints from assignments where id = $1 and class_id = $2', [c.req.param('id'), p.class_id]);
-    return a ? { p, a } : { error: fail(c, 'notFound', 404) };
+    if (!a) return { error: fail(c, 'notFound', 404) };
+    // items the assigner added for her alone (advice "Luyện thêm" / "Bước tiếp") come after the lesson's
+    const extra = await sql.query<{ items: Item[] }>('select items from pupil_extra where assignment_id = $1 and pupil_id = $2 order by id', [a.id, p.id]);
+    a.content.items = [...a.content.items, ...extra.flatMap((e) => e.items)];
+    return { p, a };
   };
 
   app.get('/api/p/a/:id', async (c) => {

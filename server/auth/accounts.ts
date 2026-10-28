@@ -7,7 +7,7 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 
-export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; email: string | null; lang: 'vi' | 'en'; created_at: string }
+export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; email: string | null; lang: 'vi' | 'en'; role: 'teacher' | 'parent' | null; subject: string; created_at: string }
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const ALPHA = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -78,4 +78,4 @@ export class Accounts {
 }
 
 // What the browser may see of a teacher.
-export const publicTeacher = (t: Teacher) => ({ id: t.id, kind: t.kind, name: t.name, email: t.email, lang: t.lang });
+export const publicTeacher = (t: Teacher) => ({ id: t.id, kind: t.kind, name: t.name, email: t.email, lang: t.lang, role: t.role, subject: t.subject });
