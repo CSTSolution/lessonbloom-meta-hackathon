@@ -18,7 +18,7 @@ const T = {
     write: 'Viết gợi ý nhận xét', writing: 'Đang viết…', copy: 'Chép', none: 'Chưa có kết quả. Khi các em làm bài tập, tóm tắt hiện ở đây.', pupils: (n: number) => `${n} em`, next: 'Có thể làm thêm bài nâng cao hoặc sang bài tiếp trong lộ trình.', noMist: 'Không có dạng lỗi lặp lại.', aiNote: 'AI chỉ viết câu từ các nhãn; tên các em không gửi cho AI.',
   },
   en: {
-    title: 'Learning summary', advice: 'Advice for each learner', adviceSub: (n: number) => `${n} learners have results to advise on.`, seeEach: 'See each learner ›', lesson: 'Lesson', allLessons: 'All lessons', cls: 'Class', child: 'Child',
+    title: 'Learning summary', advice: 'Advice for each learner', adviceSub: (n: number) => `${n} learner${n === 1 ? ' has' : 's have'} results to advise on.`, seeEach: 'See each learner ›', lesson: 'Lesson', allLessons: 'All lessons', cls: 'Class', child: 'Child',
     tt27: 'Supports regular assessment under Circular 27/2020: comments, no marks, no comparing pupils. Final levels stay the teacher\'s decision; LessonBloom is not used for tests or end-of-term assessment.',
     grid: 'Skills × classes table', clsRepeat: (n: number) => `${n} class skill${n === 1 ? '' : 's'} with a repeated mistake`, kidsRepeat: (n: number) => `${n} learner${n === 1 ? '' : 's'} repeating it`,
     overview: 'All classes', overviewP: 'All children', ratio: 'Skills · all classes', byClass: 'By class', byChild: 'By child', detail: 'Details ›', labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
@@ -80,7 +80,7 @@ export function Insights({ parent }: { parent: boolean }) {
             {cls.pupils.map((p) => <tr key={p.id}><td><button className="link" onClick={() => go(`/learner/${p.id}`)}>{p.name}</button></td>{cls.skills.map((x) => <td key={x.skill}>{p.skills[x.skill] ? <span className={`tag ${p.skills[x.skill]}`}>{t.labels[p.skills[x.skill]]}</span> : '·'}</td>)}</tr>)}
           </tbody></table>
         ))}
-        {cls && section('mist', t.mist(cls.name), cls.mistakes.length ? cls.mistakes.map((m) => m.what).join(' · ') : t.noMist, cls.mistakes.length ? <span className="tag repeat">{t.kidsRepeat(cls.mistakes.reduce((a, m) => a + m.pupils, 0))}</span> : null, (
+        {cls && section('mist', t.mist(cls.name), cls.mistakes.length ? [...new Set(cls.mistakes.map((m) => m.what))].join(' · ') : t.noMist, cls.mistakes.length ? <span className="tag repeat">{t.kidsRepeat(cls.mistakes.reduce((a, m) => a + m.pupils, 0))}</span> : null, (
           cls.mistakes.length ? <div className="stack" style={{ gap: 6 }}>{cls.mistakes.map((m, i) => <div key={i} className="list-row small"><span className="grow"><b>{m.what}</b> · {m.skill}</span><span className="muted">{t.pupils(m.pupils)}</span></div>)}</div> : <p className="small muted">{t.noMist}</p>
         ))}
         {cls && section('solid', t.solid(cls.name), cls.skills.filter((x) => x.label === 'solid').map((x) => x.name).join(' · ') || '—', <span className="tag ai">AI</span>, (

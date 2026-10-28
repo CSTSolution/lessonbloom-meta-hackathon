@@ -111,7 +111,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
   useEffect(() => {
     api.lessons().then((r) => { setRows(r.lessons); if (!r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
     api.classes().then((r) => setClasses(r.classes)).catch(() => {});
-    api.summary().then((s) => setWeek(s.classes.flatMap((k) => k.mistakes.map((m) => ({ what: m.what, where: k.name }))))).catch(() => {});
+    api.summary().then((s) => setWeek(s.classes.flatMap((k) => [...new Set(k.mistakes.map((m) => m.what))].map((what) => ({ what, where: k.name }))))).catch(() => {});
   }, []);
   useEffect(() => { if (!rows?.some((r) => r.status === 'working')) return; const id = setTimeout(() => api.lessons().then((r) => setRows(r.lessons)).catch(() => {}), 2500); return () => clearTimeout(id); }, [rows]);
   if (!rows) return null;

@@ -84,7 +84,7 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
   return (
     <div className="stack" style={{ gap: 14, paddingTop: 8 }}>
       {parent && me && <div className="row small"><b>{t.link}:</b><span className="grow muted ellipsis">{me.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(me.url, 'me')}>{copied === 'me' ? t.copied : t.copy}</button><button className="link small" onClick={() => go(`/learner/${me.id}`)}>{lang === 'en' ? 'See details' : 'Xem chi tiết'}</button></div>}
-      {mist.length > 0 && <div className="banner warn row"><span className="grow"><b>{lang === 'en' ? 'Mistake that keeps coming back' : 'Dạng đang lặp lỗi'}:</b> {mist.map((m) => m.what).join(' · ')}</span><button className="link small" onClick={() => go(`/insight?class=${id}`)}>{lang === 'en' ? 'See the summary ›' : 'Xem tóm tắt ›'}</button></div>}
+      {mist.length > 0 && <div className="banner warn row"><span className="grow"><b>{lang === 'en' ? 'Mistake that keeps coming back' : 'Dạng đang lặp lỗi'}:</b> {[...new Set(mist.map((m) => m.what))].join(' · ')}</span><button className="link small" onClick={() => go(`/insight?class=${id}`)}>{lang === 'en' ? 'See the summary ›' : 'Xem tóm tắt ›'}</button></div>}
       <div className="row"><h3 className="grow">{t.assigned}</h3><AssignMore classId={id} /></div>
       {v.assignments.length ? (
         <table className="tbl"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th>{lang === 'en' ? 'Status' : 'Trạng thái'}</th><th /></tr></thead><tbody>
