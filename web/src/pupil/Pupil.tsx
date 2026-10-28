@@ -181,7 +181,7 @@ function Practice({ l, t, onHome, onCards, onSlides }: { l: PLesson; t: (typeof 
       {it.template === 'truefalse' && <div className="p-opts two">{(['true', 'false'] as const).map((o) => <button key={o} className={optClass(o)} disabled={!!answered} onClick={() => choose(o)}>{o === 'true' ? t.tr : t.fa}</button>)}</div>}
       {(it.template === 'fill' || it.template === 'word') && !it.options && (
         <form className="p-stack" onSubmit={(e) => { e.preventDefault(); if (given.trim()) void send(given.trim()); }}>
-          <div className="row center"><input className="p-input num" inputMode="numeric" autoFocus placeholder={t.type} value={given} disabled={!!answered} onChange={(e) => setGiven(e.target.value.replace(/[^\d]/g, '').slice(0, 7))} />{it.unit && <span className="p-q">{it.unit}</span>}</div>
+          <div className="row center"><input className="p-input p-num" inputMode="numeric" autoFocus placeholder={t.type} value={given} disabled={!!answered} onChange={(e) => setGiven(e.target.value.replace(/[^\d]/g, '').slice(0, 7))} />{it.unit && <span className="p-q">{it.unit}</span>}</div>
           {!answered && <button className="p-btn main" disabled={!given.trim() || busy}>{t.check}</button>}
         </form>
       )}
