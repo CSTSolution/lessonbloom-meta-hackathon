@@ -30,6 +30,8 @@ export const cleanReminders = (x: unknown): ReminderSettings => {
 const TOPIC_SYSTEM = `You group the parts of a primary-school book into its chapters ("chủ đề"), e.g. Toán 2: "Số và phép tính", "Hình học", "Đo lường"; English: the unit themes. Use the book's own chapter names when the titles show them. Give every part exactly one short chapter name, in the book's language. Keep the parts in their order.`;
 const TOPIC_SCHEMA = { type: 'object', properties: { parts: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, topic: { type: 'string' } }, required: ['id', 'topic'] } } }, required: ['parts'] };
 const COMMENT_SYSTEM = `You write one short comment (1-2 sentences, in {{lang}}) for each learner, for the teacher's regular feedback under Vietnam's Circular 27/2020 (nhận xét thường xuyên): what the learner has mastered and what they are practising, by skill. Positive and specific; never "yếu", "chậm", "trễ", never marks, ranks or comparisons with others. Learners are called "Em 1", "Em 2"…; keep exactly those names.`;
+const ADVICE_SYSTEM = `You word advice cards for a primary-school teacher or parent about ONE learner. The decision is already made by code; never change it, never add advice. For each card write one or two short, warm, specific sentences in {{lang}}: what was seen and what to do. Call the learner exactly {child}. No marks, no percentages unless given, no comparisons, never "yếu", "chậm", "trễ".`;
+const ADVICE_SCHEMA = { type: 'object', properties: { cards: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string' }, text: { type: 'string' } }, required: ['kind', 'text'] } } }, required: ['cards'] };
 const COMMENT_SCHEMA = { type: 'object', properties: { comments: { type: 'array', items: { type: 'object', properties: { who: { type: 'string' }, text: { type: 'string' } }, required: ['who', 'text'] } } }, required: ['comments'] };
 
 interface StepRow { section_id: string; title: string; page_from: number; page_to: number; topic: string | null; weeks: number; ord: number }
@@ -211,6 +213,25 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     return c.json({ reminders: r });
   });
 
+  // Advice in the AI's words (Chi: code decides, the AI only words it). The learner is "{child}" to the
+  // model; her name is put in here. Worded once per set of facts; on any problem the template stays.
+  const worded = new Map<string, Record<string, string>>();
+  const wordAdvice = async (tid: string, name: string, lang: 'vi' | 'en', cards: { kind: string; text: string; why: string }[]) => {
+    if (!cards.length) return cards;
+    const facts = cards.map((x) => ({ kind: x.kind, decision: x.text.split(name).join('{child}'), because: x.why.split(name).join('{child}') }));
+    const key = JSON.stringify([lang, facts]);
+    let w = worded.get(key);
+    if (!w && (await d.budget.check(tid)) === null) {
+      try {
+        const r = await d.as(tid, () => guardedJson<{ cards: { kind: string; text: string }[] }>(d.ai, { endpoint: 'comments', system: ADVICE_SYSTEM.replace('{{lang}}', lang === 'vi' ? 'Vietnamese' : 'English'), prompt: wrapUser(JSON.stringify(facts)), schema: ADVICE_SCHEMA, fixture: { advice: facts } }));
+        w = Object.fromEntries((r.cards || []).filter((x) => x.text?.includes('{child}')).map((x) => [x.kind, String(x.text).slice(0, 300)]));
+        if (worded.size > 2000) worded.clear();
+        worded.set(key, w);
+      } catch { w = {}; }
+    }
+    return cards.map((x) => (w?.[x.kind] ? { ...x, text: w[x.kind].split('{child}').join(name) } : x));
+  };
+
   // ---- one learner: labels by skill, recent sessions, reminders, and the three advice cards ----
   const pupilMine = (c: Context<Env>) => sql.one<{ id: string; name: string; class_id: string; class_name: string; kind: string }>(
     `select p.id, p.name, p.class_id, k.name as class_name, k.kind from pupils p join classes k on k.id = p.class_id where p.id = $1 and k.teacher_id = $2`, [c.req.param('id'), c.get('teacher').id]);
@@ -251,7 +272,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     if (current && current.daysLeft <= 2 && current.itemsLeft > 0) { const a = isDone('time', current.sectionId); cards.push({ kind: 'time', skill: current.sectionId, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
       text: vi ? `Còn ${Math.max(0, current.daysLeft)} ngày, ${p.name} còn ${current.itemsLeft} câu bài tập. Nên kéo dài bài này thêm 1 tuần.` : `${Math.max(0, current.daysLeft)} days left and ${current.itemsLeft} items to go. Give this lesson one more week.`,
       why: vi ? `Bài “${current.title}” hết ngày ${current.end.slice(8, 10)}/${current.end.slice(5, 7)}.` : `“${current.title}” ends on ${current.end}.` }); }
-    return { skills, sessions, current, advice: cards, lang };
+    return { skills, sessions, current, advice: await wordAdvice(tid, p.name, lang, cards), lang };
   };
 
   app.get('/api/t/pupils/:id', async (c) => {

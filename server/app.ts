@@ -88,9 +88,15 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
   });
   app.get('/api/t/me', async (c) => c.json({ teacher: publicTeacher(c.get('teacher')), budget: await budget.check(c.get('teacher').id), credits: await budget.credits(c.get('teacher').id) }));
   app.put('/api/t/me', async (c) => {
-    const b = await c.req.json<{ name?: string; lang?: string }>().catch(() => ({} as { name?: string; lang?: string }));
+    const t = c.get('teacher'), b = await c.req.json<{ name?: string; lang?: string; role?: string; subject?: string }>().catch(() => ({} as { name?: string; lang?: string; role?: string; subject?: string }));
     const name = b.name === undefined ? undefined : String(b.name).replace(/\s+/g, ' ').trim().slice(0, 60);
-    return c.json({ teacher: publicTeacher(await accounts.update(c.get('teacher').id, { name, lang: b.lang === undefined ? undefined : lang(b.lang) })) });
+    // the profile: a role changes here only (never in the header); a parent needs at least one child
+    if (b.role === 'teacher' || b.role === 'parent') {
+      if (b.role === 'parent' && t.role !== 'parent' && !(await sql.one(`select 1 from classes where teacher_id = $1 and kind = 'child'`, [t.id]))) return fail(c, 'children');
+      await sql.query('update teachers set role = $2 where id = $1', [t.id, b.role]);
+    }
+    if (b.subject !== undefined && ['math', 'english', 'both', ''].includes(String(b.subject))) await sql.query('update teachers set subject = $2 where id = $1', [t.id, b.subject]);
+    return c.json({ teacher: publicTeacher(await accounts.update(t.id, { name, lang: b.lang === undefined ? undefined : lang(b.lang) })) });
   });
   // A promo code: credits or subscriber days, once per assigner; email accounts only (codes are for people).
   const promoTries = new Limiter(5, 20);

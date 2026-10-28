@@ -77,6 +77,8 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   assert.ok(d.current && d.current.week === 1 && d.skills.length);
   const practice = d.advice.find((x: any) => x.kind === 'practice');
   assert.ok(practice, 'a practice card for the skill she is stuck on');
+  assert.ok(practice.text.startsWith('✎') && practice.text.includes('An'), `worded by the AI, her name put in by us: ${practice.text}`);
+  assert.ok(!s.ai.calls.some((x: any) => x.endpoint === 'comments' && JSON.stringify(x).includes('"An"')), 'her name never went to the model');
   const r = (await call('POST', `/api/t/pupils/${anId}/advice`, { kind: 'practice', skill: practice.skill, action: 'apply' })).json;
   assert.ok(r.added > 0);
   const hers = (await an('GET', `/api/p/a/${a.id}`)).json.lesson.items.length, his = (await binh('GET', `/api/p/a/${a.id}`)).json.lesson.items.length;

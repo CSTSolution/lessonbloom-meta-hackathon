@@ -70,7 +70,7 @@ export const lessonAnswers: [string, (r: JsonRequest) => unknown][] = [
     const cited = bySection.get(best[0])!.slice(0, 3).map((c: F) => ({ id: c.id, quote: c.text.split(/\s+/).slice(0, 12).join(' ') }));
     return { found: true, section_id: best[0], cited, reason: 'the section teaches this' };
   }],
-  ['comments', (r) => ({ comments: Array.from({ length: (r.fixture as F).who }, (_, i) => ({ who: `Em ${i + 1}`, text: `Em ${i + 1} đã vững cách đặt tính, đang luyện nhớ 1 sang hàng chục.` })) })],
+  ['comments', (r) => (r.fixture as F).advice ? { cards: ((r.fixture as F).advice as F[]).map((x) => ({ kind: x.kind, text: `✎ ${x.decision}` })) } : ({ comments: Array.from({ length: (r.fixture as F).who }, (_, i) => ({ who: `Em ${i + 1}`, text: `Em ${i + 1} đã vững cách đặt tính, đang luyện nhớ 1 sang hàng chục.` })) })],
   ['toc', (r) => (r.fixture as F).topics ? { parts: ((r.fixture as F).topics as string[]).map((id) => ({ id, topic: 'Số và phép tính' })) } : ({ sections: Array.from({ length: (r.fixture as F).pages }, (_, i) => ({ title: `Trang ${i + 1}`, page: i + 1 })) })],
   ['intake', (r) => {
     const notes = String((r.fixture as F).notes), english = isEnglish(notes);
