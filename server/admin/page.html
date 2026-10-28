@@ -75,7 +75,7 @@ async function overview() {
   const [o, u] = await Promise.all([get('/overview'), get('/users')]);
   const m = o.money;
   view.innerHTML = `
-    <h1>Overview</h1><p class="muted">1 credit = ${usd(m.creditUsd)} of Meta list price. Each assigner has ${n(m.teacherDayCredits)} credits a day (Vietnam days). ${m.disabled ? '<b class="err">AI is switched off (AI_DISABLED=1).</b>' : ''}</p>
+    <h1>Overview</h1><p class="muted">1 credit = $${m.creditUsd.toFixed(2)} of Meta list price. Each assigner has ${n(m.teacherDayCredits)} credits a day (Vietnam days). ${m.disabled ? '<b class="err">AI is switched off (AI_DISABLED=1).</b>' : ''}</p>
     <div class="cards">
       <div class="card"><div class="muted small">Meta credit used (all time)</div><div class="big">${usd(m.total.usd)}</div><div class="small muted">AI stops at ${usd(m.totalCapUsd)} · Meta credit $150</div>${bar(m.total.usd, m.totalCapUsd)}</div>
       <div class="card"><div class="muted small">Today</div><div class="big">${usd(m.today.usd)}</div><div class="small muted">${n(m.today.credits)} credits · app stops at ${usd(m.dayCapUsd)} a day</div>${bar(m.today.usd, m.dayCapUsd)}</div>
@@ -107,7 +107,7 @@ async function user(id) {
     <p class="muted">${esc(u.name || '')} · id ${esc(u.id)} · language ${esc(u.lang)} · joined ${when(u.created_at)} · last seen ${when(u.seen_at)}</p>
     <div class="cards">
       <div class="card"><div class="muted small">Credits today</div><div class="big">${n(d.credits.used)} / ${n(d.credits.perDay)}</div><div class="small muted">${n(d.credits.left)} left, new at midnight (Vietnam)</div>${bar(d.credits.used, d.credits.perDay)}</div>
-      <div class="card"><div class="muted small">Credits in all</div><div class="big">${n(d.byEndpoint.reduce((a, r) => a + r.credits, 0))}</div><div class="small muted">${usd(d.byEndpoint.reduce((a, r) => a + r.usd, 0))}</div></div>
+      <div class="card"><div class="muted small">Credits in all</div><div class="big">${n(Math.ceil(Math.round(d.byEndpoint.reduce((a, r) => a + r.usd, 0) * 1e6) / 1e4))}</div><div class="small muted">${usd(d.byEndpoint.reduce((a, r) => a + r.usd, 0))}</div></div>
       <div class="card"><div class="muted small">Lessons</div><div class="big">${n(d.lessons.length)}</div><div class="small muted">${n(d.lessons.filter((l) => l.status === 'ready').length)} ready · ${n(d.lessons.filter((l) => l.status === 'error').length)} failed</div></div>
       <div class="card"><div class="muted small">Refused by the guard</div><div class="big">${n(d.calls.filter((c) => c.verdict !== 'ok').length)}</div><div class="small muted">in the last ${n(d.calls.length)} calls</div></div>
     </div>
