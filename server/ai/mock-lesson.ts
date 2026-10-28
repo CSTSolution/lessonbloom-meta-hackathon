@@ -76,6 +76,7 @@ export const lessonAnswers: [string, (r: JsonRequest) => unknown][] = [
     return { usable: notes.replace(/[^\p{L}]/gu, '').length > 20, subject: english ? 'english' : 'math', grade, title: (notes.split('\n')[0] || 'Bài học').split(/[–:]/).pop()!.replace(/[.]$/, '').trim().slice(0, 60),
       objectives: english ? ['Name six colours.', 'Ask and answer "What colour is it?".'] : ['Cộng có nhớ hai số có hai chữ số.', 'Giải bài toán có lời văn một bước.'], minutes: 25, lang: english ? 'en' : 'vi' };
   }],
+  ['work', () => ({ usable: true, topic: 'Phép cộng có nhớ trong phạm vi 100', kind: 'add_carry', mistakes: ['Quên nhớ 1 sang hàng chục (36 + 27 = 53)'] })],
   ['ocr', (r) => ({ usable: true, text: Array.from({ length: (r.fixture as F).photos }, (_, i) => `Trang ${i + 1}: Phép cộng có nhớ trong phạm vi 100. Ví dụ: 36 + 27 = 63. Luyện tập: 48 + 25; 19 + 36.`).join('\n') })],
   ['plan', (r) => plan((r.fixture as F).setup, (r.fixture as F).count)],
   ['slides', (r) => {

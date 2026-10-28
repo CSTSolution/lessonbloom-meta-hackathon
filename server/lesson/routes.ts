@@ -15,7 +15,7 @@ import { illustrate } from './pictures.ts';
 import { areaOf, sectionOf } from '../knowledge/routes.ts';
 import { citation, sourceOf } from '../knowledge/search.ts';
 import type { Setup } from './types.ts';
-import { cleanSetup, intake, NotLesson, readPhotos } from './writer.ts';
+import { cleanSetup, intake, NotLesson, readPhotos, readWork } from './writer.ts';
 
 const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
 const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
@@ -49,6 +49,20 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     }
     const g = await gate(c); if (g) return g;
     try { return c.json({ text: await d.as(c.get('teacher').id, () => readPhotos(d.ai, images)) }); } catch (e) { return aiError(c, e); }
+  });
+
+  // A photo of the child's finished exercise: the kind of exercise and the mistakes (same photo limits).
+  app.post('/api/t/notes/work', async (c) => {
+    const b = await c.req.json<{ images?: { data?: string; type?: string }[] }>().catch(() => ({ images: undefined }));
+    if (!Array.isArray(b.images) || !b.images.length || b.images.length > MAX_PHOTOS) return fail(c, 'photos');
+    const images: { data: Buffer; mime: string }[] = [];
+    for (const x of b.images) {
+      const mime = String(x?.type || ''), data = Buffer.from(String(x?.data || ''), 'base64');
+      if (!/^image\/(jpeg|png|webp)$/.test(mime) || data.length < 100 || data.length > MAX_PHOTO) return fail(c, 'photos');
+      images.push({ data, mime });
+    }
+    const g = await gate(c); if (g) return g;
+    try { return c.json(await d.as(c.get('teacher').id, () => readWork(d.ai, images))); } catch (e) { return aiError(c, e); }
   });
 
   // The recording comes as the raw request body (audio/webm from the browser's recorder).

@@ -6,7 +6,7 @@ import { guardedJson, wrapUser } from '../guard/guard.ts';
 import { buildEnglish, buildMath, checkItem, contextOf, type RawEnglish, type RawMath } from './items.ts';
 import {
   CARDS_SCHEMA, CARDS_SYSTEM, ENG_ITEMS_SCHEMA, ENG_ITEMS_SYSTEM, fill, INTAKE_SCHEMA, INTAKE_SYSTEM, langName, MATH_ITEMS_SCHEMA, MATH_ITEMS_SYSTEM,
-  maxWords, OCR_SCHEMA, OCR_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
+  maxWords, OCR_SCHEMA, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
 } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 
@@ -38,6 +38,14 @@ export async function readPhotos(ai: AI, images: { data: Buffer; mime: string }[
   const r = await guardedJson<{ usable: boolean; text: string }>(ai, { endpoint: 'ocr', system: OCR_SYSTEM, prompt: `Copy out the lesson text from these ${images.length} photo(s), in order.`, images, schema: OCR_SCHEMA, fixture: { photos: images.length } });
   if (!r.usable || !r.text?.trim()) throw new NotLesson();
   return r.text.trim().slice(0, 20000);
+}
+
+// A child's finished exercise: the request to find the section with, and the mistakes to aim at.
+export async function readWork(ai: AI, images: { data: Buffer; mime: string }[]): Promise<{ request: string; focus: string }> {
+  const r = await guardedJson<{ usable: boolean; topic: string; mistakes: string[] }>(ai, { endpoint: 'work', system: WORK_SYSTEM, prompt: `Look at the ${images.length} photo(s) of the child's exercise.`, images, schema: WORK_SCHEMA, fixture: { photos: images.length } });
+  const topic = clip(r.topic, 200), mistakes = (Array.isArray(r.mistakes) ? r.mistakes : []).map((m) => clip(m, 160)).filter(Boolean).slice(0, 4);
+  if (!r.usable || !topic) throw new NotLesson();
+  return { request: topic, focus: mistakes.join('; ') };
 }
 
 // Skills keep only a known kind, a unique snake_case tag and a short name.

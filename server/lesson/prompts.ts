@@ -17,6 +17,15 @@ export const INTAKE_SCHEMA = { type: 'object', properties: { usable: { type: 'bo
 export const OCR_SYSTEM = `You read photos a teacher took of her lesson material (a textbook page, handwritten notes, a worksheet, a whiteboard) and copy out the text, in order, as plain lesson notes. Keep maths exactly as written. Leave out page numbers and decoration. usable: false if there is no lesson text.`;
 export const OCR_SCHEMA = { type: 'object', properties: { usable: { type: 'boolean' }, text: str }, required: ['usable', 'text'] };
 
+// A photo of a child's finished exercise: what kind of exercise it is and the mistakes, so the new
+// practice is the same kind (inside the chosen section of the book) and aims at those mistakes.
+export const WORK_SYSTEM = `You look at photos of a primary-school child's finished exercise (Maths or English), already marked or not. Work out:
+- topic: what the exercise practises, as a short lesson title (e.g. "Phép cộng có nhớ trong phạm vi 100", "Unit 3: Our friends"), in the exercise's language;
+- kind: the closest skill kind from the list;
+- mistakes: up to 4 short descriptions of the mistakes the child made, each with one example from the page (e.g. "Quên nhớ 1 sang hàng chục (36 + 27 = 53)"). Describe the mistake, never the child: no names, no judgement words.
+Never copy names, schools or other personal details. usable: false if this is not a child's exercise.`;
+export const WORK_SCHEMA = { type: 'object', properties: { usable: { type: 'boolean' }, topic: str, kind: { type: 'string', enum: [...MATH_KINDS, ...ENG_KINDS] }, mistakes: { type: 'array', items: str } }, required: ['usable', 'topic', 'mistakes'] };
+
 const SKILL = { type: 'object', properties: { tag: str, name: str, kind: { type: 'string', enum: [...MATH_KINDS, ...ENG_KINDS] } }, required: ['tag', 'name', 'kind'] };
 const SLIDE_KINDS = ['title', 'warmup', 'teach', 'example', 'practice', 'summary'];
 export const PLAN_SCHEMA = { type: 'object', properties: { skills: { type: 'array', items: SKILL }, outline: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string', enum: SLIDE_KINDS }, heading: str, objective: str }, required: ['kind', 'heading'] } } }, required: ['skills', 'outline'] };

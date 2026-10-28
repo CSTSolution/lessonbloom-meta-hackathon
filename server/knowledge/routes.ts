@@ -56,7 +56,9 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   app.get('/api/t/areas/:id', async (c) => {
     const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
     if (!a) return fail(c, 'notFound', 404);
-    const sections = await sql.query(`select s.id, s.book_id, s.title, s.page_from, s.page_to from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
+    const sections = await sql.query(`select s.id, s.book_id, s.title, s.page_from, s.page_to,
+        (select count(*) from lessons l where l.refs->0->>'sectionId' = s.id)::int as lessons
+      from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
     const books = await sql.query('select id, title, status, pages, error from books where area_id = $1 order by created_at', [a.id]);
     return c.json({ area: { id: a.id, name: a.name, subject: a.subject, grade: a.grade }, books, sections });
   });
@@ -106,6 +108,51 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (!ok) return fail(c, 'notFound', 404);
     const data = await readFile(bookFile(c.req.param('id'))).catch(() => null);
     return data ? c.body(new Uint8Array(data), 200, { 'content-type': 'application/pdf', 'cache-control': 'private, max-age=3600' }) : fail(c, 'notFound', 404);
+  });
+
+  // ---- the contents: rename, split at a page, merge with the next part; remove a book ----
+  const sectionMine = (c: Context<Env>) => sql.one<{ id: string; book_id: string; ord: number; title: string; page_from: number; page_to: number }>(
+    `select s.* from sections s join books b on b.id = s.book_id join areas a on a.id = b.area_id where s.id = $1 and a.teacher_id = $2 and s.title <> '—'`, [c.req.param('id'), c.get('teacher').id]);
+  app.put('/api/t/sections/:id', async (c) => {
+    const s = await sectionMine(c), title = clip((await c.req.json<{ title?: string }>().catch(() => ({} as { title?: string }))).title, 120);
+    if (!s) return fail(c, 'notFound', 404);
+    if (!title || title === '—') return fail(c, 'bad');
+    await sql.query('update sections set title = $2 where id = $1', [s.id, title]);
+    return c.json({ ok: true });
+  });
+  app.post('/api/t/sections/:id/split', async (c) => {
+    const s = await sectionMine(c), b = await c.req.json<{ page?: number; title?: string }>().catch(() => ({} as { page?: number; title?: string }));
+    const page = Math.round(Number(b.page)), title = clip(b.title, 120);
+    if (!s) return fail(c, 'notFound', 404);
+    if (!(page > s.page_from && page <= s.page_to) || !title || title === '—') return fail(c, 'split');
+    const id = `${s.book_id}-x${newId(6)}`;
+    await sql.tx(async (q) => {
+      await q.query('update sections set ord = ord + 1 where book_id = $1 and ord > $2', [s.book_id, s.ord]);
+      await q.query('insert into sections (id, book_id, ord, title, page_from, page_to) values ($1, $2, $3, $4, $5, $6)', [id, s.book_id, s.ord + 1, title, page, s.page_to]);
+      await q.query('update sections set page_to = $2 where id = $1', [s.id, page - 1]);
+      await q.query('update passages set section_id = $2 where section_id = $1 and page >= $3', [s.id, id, page]);
+    });
+    return c.json({ id });
+  });
+  app.post('/api/t/sections/:id/merge', async (c) => {
+    const s = await sectionMine(c);
+    if (!s) return fail(c, 'notFound', 404);
+    const next = await sql.one<{ id: string; page_to: number }>(`select id, page_to from sections where book_id = $1 and ord > $2 and title <> '—' order by ord limit 1`, [s.book_id, s.ord]);
+    if (!next) return fail(c, 'merge');
+    await sql.tx(async (q) => {
+      await q.query('update passages set section_id = $1 where section_id = $2', [s.id, next.id]);
+      await q.query('update sections set page_to = greatest(page_to, $2) where id = $1', [s.id, next.page_to]);
+      await q.query('delete from sections where id = $1', [next.id]);
+    });
+    return c.json({ ok: true });
+  });
+  app.delete('/api/t/books/:id', async (c) => {
+    const ok = await sql.one('select 1 from books b join areas a on a.id = b.area_id where b.id = $1 and a.teacher_id = $2', [c.req.param('id'), c.get('teacher').id]);
+    if (!ok) return fail(c, 'notFound', 404);
+    await sql.query('delete from books where id = $1', [c.req.param('id')]);
+    const { unlink } = await import('node:fs/promises');
+    await unlink(bookFile(c.req.param('id'))).catch(() => {});
+    return c.json({ ok: true });
   });
 
   // What should this lesson teach? Her request (typed, read from a photo, or spoken) is matched to one
