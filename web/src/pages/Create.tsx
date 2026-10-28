@@ -30,7 +30,7 @@ const T = {
     scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Cô cần một nguồn có sách trước. Bài giảng chỉ lấy nội dung từ sách của cô.', sample: '📘 Dùng sách mẫu',
     h2: 'Một vài câu hỏi về bài học', lead2: 'AI đã điền sẵn. Cô xem và sửa nếu cần.', fromAi: 'Gợi ý từ AI', optional: 'Không bắt buộc',
     q: { goal: 'Mục tiêu', title: 'Tên bài', minutes: 'Thời lượng', level: 'Mức của lớp', make: 'Cần tạo', lang: 'Ngôn ngữ', note: 'Ghi chú cho AI' },
-    min: (n: number) => `${n} phút`, lv: { mixed: 'Nhiều mức (3 mức bài tập)', basic: 'Phần lớn cơ bản', advanced: 'Phần lớn nâng cao' }, mk: { slides: 'Slide bài giảng', items: 'Bài tập theo mẫu', video: 'Video có giọng đọc', cards: 'Thẻ nhớ' }, vi: 'Tiếng Việt', en: 'Tiếng Anh', none: 'Chưa có', notePh: 'Ví dụ: dùng tình huống ở chợ',
+    min: (n: number) => `${n} phút`, lv: { mixed: 'Nhiều mức (3 mức bài tập)', basic: 'Phần lớn cơ bản', advanced: 'Phần lớn nâng cao' }, mk: { slides: 'Slide bài giảng', items: 'Bài tập theo mẫu', video: 'Video có giọng đọc', cards: 'Thẻ nhớ' }, always: 'luôn có', vi: 'Tiếng Việt', en: 'Tiếng Anh', none: 'Chưa có', notePh: 'Ví dụ: dùng tình huống ở chợ',
     back: 'Quay lại', create: 'Tạo bài giảng', thinking: 'Đang đọc phạm vi…', page: 'tr.',
   },
   en: {
@@ -42,7 +42,7 @@ const T = {
     scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You need a source with a book first. Lessons come only from your books.', sample: '📘 Use a sample book',
     h2: 'A few questions about the lesson', lead2: 'The AI filled these in. Check and change them if needed.', fromAi: 'Suggested by AI', optional: 'Optional',
     q: { goal: 'Objectives', title: 'Title', minutes: 'Length', level: 'Class level', make: 'To make', lang: 'Language', note: 'Note for the AI' },
-    min: (n: number) => `${n} min`, lv: { mixed: 'Mixed (3 practice levels)', basic: 'Mostly basic', advanced: 'Mostly advanced' }, mk: { slides: 'Slides', items: 'Practice from templates', video: 'Narrated video', cards: 'Flashcards' }, vi: 'Vietnamese', en: 'English', none: 'None', notePh: 'e.g. use market examples',
+    min: (n: number) => `${n} min`, lv: { mixed: 'Mixed (3 practice levels)', basic: 'Mostly basic', advanced: 'Mostly advanced' }, mk: { slides: 'Slides', items: 'Practice from templates', video: 'Narrated video', cards: 'Flashcards' }, always: 'always made', vi: 'Vietnamese', en: 'English', none: 'None', notePh: 'e.g. use market examples',
     back: 'Back', create: 'Make the lesson', thinking: 'Reading the part…', page: 'p.',
   },
 };
@@ -145,7 +145,7 @@ export function Create({ parent }: { parent: boolean }) {
         {row('min', t.q.minutes, t.min(setup.minutes), <div className="row">{([15, 25, 35] as const).map((m) => <button key={m} className={`pill ${setup.minutes === m ? 'on' : ''}`} onClick={() => set('minutes', m)}>{t.min(m)}</button>)}</div>)}
         {row('level', t.q.level, t.lv[setup.level || 'mixed'], <div className="row">{(['mixed', 'basic', 'advanced'] as const).map((v) => <button key={v} className={`pill ${(setup.level || 'mixed') === v ? 'on' : ''}`} onClick={() => set('level', v)}>{t.lv[v]}</button>)}</div>)}
         {row('make', t.q.make, [t.mk.slides, t.mk.items, setup.make?.video !== false && t.mk.video, setup.make?.cards !== false && t.mk.cards].filter(Boolean).join(', '), <div className="stack" style={{ gap: 6 }}>
-          <label className="check"><input type="checkbox" checked disabled /> {t.mk.slides}</label><label className="check"><input type="checkbox" checked disabled /> {t.mk.items}</label>
+          <span className="small">✓ {t.mk.slides} · ✓ {t.mk.items} <span className="muted">({t.always})</span></span>
           {(['video', 'cards'] as const).map((k) => <label key={k} className="check"><input type="checkbox" checked={setup.make?.[k] !== false} onChange={(e) => set('make', { video: setup.make?.video !== false, cards: setup.make?.cards !== false, [k]: e.target.checked })} /> {t.mk[k]}</label>)}
         </div>)}
         {row('lang', t.q.lang, setup.lang === 'en' ? t.en : t.vi, <div className="row">{(['vi', 'en'] as const).map((l) => <button key={l} className={`pill ${setup.lang === l ? 'on' : ''}`} onClick={() => set('lang', l)}>{l === 'vi' ? t.vi : t.en}</button>)}</div>)}
