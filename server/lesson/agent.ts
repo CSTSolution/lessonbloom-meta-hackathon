@@ -12,7 +12,7 @@ import { Blocked, checkOutput, guardedJson, newCanary, scopedSystem, wrapUser } 
 import { checkItem, contextOf } from './items.ts';
 import { fill, langName, maxWords, slideCount, SLIDES_SCHEMA } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
-import { cleanSkills, planLesson, writeCards, writeItems, writeSlides } from './writer.ts';
+import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides } from './writer.ts';
 
 export const LIMITS = { maxTurns: 18, maxItemCalls: 14, maxItems: 30, minItems: 8, maxFixes: 6 };
 export type Say = (vi: string, en: string) => void | Promise<void>;
@@ -194,6 +194,10 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   if (!cards.length) cards = await writeCards(ai, setup, source);
   // Last line of defence: every item passes the checks once more against the final skills.
   items = items.filter((i) => !checkItem(i, ctx()).length).slice(0, LIMITS.maxItems);
+  // Then the AI second review (Chi's doc 2): Muse Spark reads them once more; it can only drop.
+  const rv = await reviewItems(ai, setup, source, skills, items, LIMITS.minItems);
+  if (rv.rejected.length) { items = rv.kept; rejected.push(...rv.rejected); changes.push(setup.lang === 'en' ? `The AI review removed ${rv.rejected.length} item${rv.rejected.length === 1 ? '' : 's'}.` : `Bước AI rà soát bỏ ${rv.rejected.length} câu.`); }
+  await say(`AI rà soát lần hai: giữ ${items.length} câu.`, `AI second review: kept ${items.length} items.`);
 
   if (!note) note = setup.lang === 'en'
     ? `I made ${slides.length} slides, ${items.length} practice items and ${cards.length} flashcards from the section of your book. Every item passed the code checks.`

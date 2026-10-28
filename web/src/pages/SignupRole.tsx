@@ -10,13 +10,13 @@ const T = {
     step: 'Bước 2/2 · Tạo tài khoản', who: 'Bạn là ai?', pick: 'Chọn vai để bắt đầu.', teacher: 'Tôi là giáo viên', teacherSub: 'Giao bài cho lớp, học sinh vào bằng mã lớp.', parent: 'Tôi là phụ huynh', parentSub: 'Giao bài cho con, mỗi con một lộ trình.',
     name: 'Tên gọi của bạn', classes: 'Lớp dạy (cách nhau bằng dấu phẩy)', classesPh: 'Ví dụ: 2A, 2B, 2C', namePhT: 'Ví dụ: Cô Hạnh', namePhP: 'Ví dụ: Mẹ An', subject: 'Môn dạy', math: 'Toán', english: 'Tiếng Anh', both: 'Cả hai',
     kids: 'Các con', onlyNames: '🔒 Chỉ lưu tên gọi.', kidName: 'Tên gọi của con', grade: 'Lớp', addKid: '+ Thêm con', remove: 'Bỏ',
-    same: 'Cùng bộ công cụ: kho kiến thức, tạo bài, lộ trình học.', go: 'Tiếp tục',
+    same: 'Cùng bộ công cụ: kho kiến thức, tạo bài, lộ trình học.', later: 'Đổi vai sau trong Hồ sơ.', go: 'Tiếp tục',
   },
   en: {
     step: 'Step 2/2 · Create your account', who: 'Who are you?', pick: 'Choose a role to start.', teacher: "I'm a teacher", teacherSub: 'Assign to a class; pupils join with the class code.', parent: "I'm a parent", parentSub: 'Assign to your children, one path each.',
     name: 'Your name', classes: 'Your classes (comma-separated)', classesPh: 'e.g. 2A, 2B, Year 2 Blue', namePhT: 'e.g. Ms Hanh', namePhP: "e.g. An's mum", subject: 'Subject', math: 'Maths', english: 'English', both: 'Both',
     kids: 'Your children', onlyNames: '🔒 Only first names are kept.', kidName: "Child's first name", grade: 'Grade', addKid: '+ Add a child', remove: 'Remove',
-    same: 'The same tools: knowledge, lessons, learning path.', go: 'Continue',
+    same: 'The same tools: knowledge, lessons, learning path.', later: 'You can change the role later in Profile.', go: 'Continue',
   },
 };
 
@@ -63,7 +63,7 @@ export function SignupRole({ teacher, onDone }: { teacher: Teacher; onDone: (t: 
             </div>
           )}
           <div className="banner blue">ⓘ {t.same}</div>
-          <div className="row"><span className="grow" /><button className="btn primary" disabled={!ok || busy}>{t.go}</button></div>
+          <div className="row"><span className="small muted grow">{t.later}</span><button className="btn primary" disabled={!ok || busy}>{t.go}</button></div>
           {err && <p className="note">{err}</p>}
         </form>
       </div>

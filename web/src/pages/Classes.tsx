@@ -12,7 +12,7 @@ const T = {
     pupils: (n: number) => `${n} em`, given: (n: number) => `${n} bài đã giao`, notJoined: (n: number) => `${n} em chưa vào`, allIn: 'Cả lớp đã vào',
     assigned: 'Bài đã giao', none: 'Chưa giao bài nào. Mở một bài giảng và bấm “Giao bài”.', due: 'Hạn', doneOf: 'Đã làm', open: 'Mở bài',
     kids: 'Học sinh', joined: 'Đã vào học', waiting: 'Chưa vào', addKids: '+ Thêm học sinh', kidsPh: 'Mỗi dòng một tên gọi, ví dụ:\nAn\nBình', save: 'Thêm',
-    code: 'Mã lớp', link: 'Đường dẫn vào lớp', print: 'In mã lớp', copy: 'Chép', copied: 'Đã chép', parentLink: 'Link riêng cho phụ huynh', remove: 'Xoá', rename: 'Đổi tên', del: 'Xoá lớp', delAsk: 'Xoá lớp này cùng bài đã giao và kết quả của các em?',
+    code: 'Mã lớp', onlyNames: 'Chỉ lưu tên gọi.', link: 'Đường dẫn vào lớp', print: 'In mã lớp', copy: 'Chép', copied: 'Đã chép', parentLink: 'Link riêng cho phụ huynh', remove: 'Xoá', rename: 'Đổi tên', del: 'Xoá lớp', delAsk: 'Xoá lớp này cùng bài đã giao và kết quả của các em?',
     empty: 'Cô tạo lớp đầu tiên, rồi thêm tên gọi các em.', noDue: 'Không hạn',
   },
   en: {
@@ -20,7 +20,7 @@ const T = {
     pupils: (n: number) => `${n} pupils`, given: (n: number) => `${n} lessons assigned`, notJoined: (n: number) => `${n} not joined yet`, allIn: 'Everyone has joined',
     assigned: 'Assigned lessons', none: 'Nothing assigned yet. Open a lesson and press “Assign”.', due: 'Due', doneOf: 'Done', open: 'Open lesson',
     kids: 'Pupils', joined: 'Joined', waiting: 'Not yet', addKids: '+ Add pupils', kidsPh: 'One first name per line, e.g.:\nAn\nBinh', save: 'Add',
-    code: 'Class code', link: 'Link to join', print: 'Print class code', copy: 'Copy', copied: 'Copied', parentLink: 'Private link for parents', remove: 'Remove', rename: 'Rename', del: 'Delete class', delAsk: 'Delete this class with its assigned lessons and the pupils\' results?',
+    code: 'Class code', onlyNames: 'First names only.', link: 'Link to join', print: 'Print class code', copy: 'Copy', copied: 'Copied', parentLink: 'Private link for parents', remove: 'Remove', rename: 'Rename', del: 'Delete class', delAsk: 'Delete this class with its assigned lessons and the pupils\' results?',
     empty: 'Create your first class, then add the pupils\' first names.', noDue: 'No due date',
   },
 };
@@ -84,14 +84,6 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
   return (
     <div className="stack" style={{ gap: 14, paddingTop: 8 }}>
       {parent && me && <div className="row small"><b>{t.link}:</b><span className="grow muted ellipsis">{me.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(me.url, 'me')}>{copied === 'me' ? t.copied : t.copy}</button><button className="link small" onClick={() => go(`/learner/${me.id}`)}>{lang === 'en' ? 'See details' : 'Xem chi tiết'}</button></div>}
-      {!parent && <div className="join-box">
-        <img src={`/api/t/classes/${id}/qr.svg`} alt="QR" width={96} height={96} />
-        <div className="stack" style={{ gap: 4 }}>
-          <span className="small muted">{t.code}</span><b className="code">{v.class.code}</b>
-          <span className="small muted">{t.link}: <a href={v.class.url} target="_blank" rel="noreferrer">{v.class.url.replace(/^https?:\/\//, '')}</a></span>
-          <div className="row small"><button className="btn ghost small" onClick={() => copy(v.class.url, 'url')}>{copied === 'url' ? t.copied : t.copy}</button><button className="btn ghost small" onClick={() => printCode(v.class.name, v.class.code, v.class.url, id)}>{t.print}</button></div>
-        </div>
-      </div>}
       {mist.length > 0 && <div className="banner warn row"><span className="grow"><b>{lang === 'en' ? 'Mistake that keeps coming back' : 'Dạng đang lặp lỗi'}:</b> {mist.map((m) => m.what).join(' · ')}</span><button className="link small" onClick={() => go(`/insight?class=${id}`)}>{lang === 'en' ? 'See the summary ›' : 'Xem tóm tắt ›'}</button></div>}
       <div className="row"><h3 className="grow">{t.assigned}</h3><AssignMore classId={id} /></div>
       {v.assignments.length ? (
@@ -104,7 +96,8 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
           ))}
         </tbody></table>
       ) : <p className="small muted">{t.none}</p>}
-      {!parent && <><div className="row"><h3 className="grow">{t.kids}</h3><button className="btn ghost small" onClick={() => setNames(names === null ? '' : null)}>{t.addKids}</button></div>
+      {!parent && <><div className="row"><h3 className="grow">{t.kids}</h3><button className="btn small" onClick={() => setNames(names === null ? '' : null)}>{t.addKids}</button><button className="btn small" onClick={() => printCode(v.class.name, v.class.code, v.class.url, id)}>{t.print}</button></div>
+      <p className="small muted">{t.code}: <b>{v.class.code}</b> · <a href={v.class.url} target="_blank" rel="noreferrer">{v.class.url.replace(/^https?:\/\//, '')}</a> · <button className="link small" onClick={() => copy(v.class.url, 'url')}>{copied === 'url' ? t.copied : t.copy}</button> · {t.onlyNames}</p>
       {names !== null && <form className="stack" onSubmit={async (e) => { e.preventDefault(); await api.addPupils(id, names); setNames(null); await load(); onChange(); }}>
         <textarea rows={4} placeholder={t.kidsPh} value={names} onChange={(e) => setNames(e.target.value)} />
         <div className="row"><button className="btn primary small" disabled={!names.trim()}>{t.save}</button><button type="button" className="btn ghost small" onClick={() => setNames(null)}>{t.cancel}</button></div>

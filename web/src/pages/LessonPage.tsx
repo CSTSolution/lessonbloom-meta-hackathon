@@ -21,7 +21,7 @@ const T = {
     video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', parts: 'Các đoạn', subs: 'Phụ đề', toItems: 'Tiếp: bài tập',
     items: 'Bài tập', itemsLead: 'Đọc kỹ từng câu trước khi giao bài.', checked: (n: number, r: number) => `Đã kiểm tra ${n + r} câu · ${r} câu tạo lại`, details: 'Chi tiết', why: 'Lý do tạo lại',
     levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, allLevels: 'Tất cả', kind: 'Dạng', explain: 'Lời giải', page: 'Nguồn', remove: 'Xóa', removeAsk: 'Xoá câu này khỏi bài?', seeAll: (n: number) => `Xem cả ${n} câu`, n: (n: number) => `${n} câu`, q: (i: number) => `Câu ${i}.`, tf: { true: 'Đúng', false: 'Sai' }, answer: 'Đáp án',
-    groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ' }, toAssign: 'Duyệt xong, sang giao bài',
+    groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ', pairs: 'Lật thẻ tìm cặp' }, pairsLead: 'Trò chơi cho em, làm từ thẻ nhớ (tối đa 6 cặp).', toAssign: 'Duyệt xong, sang giao bài',
   },
   en: {
     working: 'The agent is making your lesson…', left: (m: number) => (m > 1 ? `About ${m} minutes left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${n} credits.`, pdf: 'Export PDF', printItems: 'Print worksheet',
@@ -33,7 +33,7 @@ const T = {
     video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
     items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number) => `Checked ${n + r} items · ${r} written again`, details: 'Details', why: 'Why they were written again',
     levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, allLevels: 'All', kind: 'Skill', explain: 'Explanation', page: 'Source', remove: 'Delete', removeAsk: 'Remove this item from the lesson?', seeAll: (n: number) => `See all ${n}`, n: (n: number) => `${n} items`, q: (i: number) => `${i}.`, tf: { true: 'True', false: 'False' }, answer: 'Answer',
-    groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards' }, toAssign: 'Reviewed: go to assigning',
+    groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards', pairs: 'Find the pairs' }, pairsLead: 'A game for the child, made from the flashcards (up to 6 pairs).', toAssign: 'Reviewed: go to assigning',
   },
 };
 type Dict = (typeof T)['vi'];
@@ -222,6 +222,10 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
       {l.cards.length > 0 && <div className={`group card ${first === 'cards' ? 'on' : ''}`}>
         <button className="group-head" onClick={() => setOpen(first === 'cards' ? '-' : 'cards')}><span className="caret">{first === 'cards' ? '▾' : '▸'}</span><span className="grow"><b className="small">{t.groups.cards}</b><span className="small muted" style={{ display: 'block' }}>{t.n(l.cards.length)}</span></span></button>
         {first === 'cards' && <div className="cards" style={{ paddingTop: 8 }}>{l.cards.map((c) => <div key={c.id} className="fc"><span className="emo">{c.emoji}</span><b>{c.front}</b><span className="muted">{c.back}</span></div>)}</div>}
+      </div>}
+      {l.cards.length >= 3 && <div className={`group card ${first === 'pairs' ? 'on' : ''}`}>
+        <button className="group-head" onClick={() => setOpen(first === 'pairs' ? '-' : 'pairs')}><span className="caret">{first === 'pairs' ? '▾' : '▸'}</span><span className="grow"><b className="small">{t.groups.pairs}</b><span className="small muted" style={{ display: 'block' }}>{t.n(Math.min(6, l.cards.length))}</span></span></button>
+        {first === 'pairs' && <div className="stack" style={{ paddingTop: 8 }}><p className="small muted">{t.pairsLead}</p><div className="opts">{l.cards.slice(0, 6).map((c) => <span key={c.id} className="opt right">{c.emoji} {c.front} ↔ {c.back}</span>)}</div></div>}
       </div>}
       <div className="row noprint"><span className="grow" /><button className="btn primary" onClick={onNext}>{t.toAssign}</button></div>
     </div>

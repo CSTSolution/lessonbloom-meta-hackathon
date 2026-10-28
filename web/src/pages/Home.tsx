@@ -23,7 +23,7 @@ const T = {
   vi: {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
-    teaches: 'Cô dạy', kidsOf: 'Con học', make: '+ Tạo bài giảng mới', allClasses: 'Tất cả các lớp', all: 'Tất cả',
+    teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', allClasses: 'Tất cả các lớp', all: 'Tất cả',
     groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
@@ -34,7 +34,7 @@ const T = {
   en: {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
-    teaches: 'You teach', kidsOf: 'Your children', make: '+ New lesson', allClasses: 'All classes', all: 'All',
+    teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', allClasses: 'All classes', all: 'All',
     groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${n} lessons`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${i} items`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
@@ -106,7 +106,7 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
 // class (a parent: by child); this week's repeated mistakes on the right.
 function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
   const lang = useLang(), parent = teacher.role === 'parent';
-  const [rows, setRows] = useState<LessonRow[] | null>(null), [classes, setClasses] = useState<{ id: string; name: string }[]>([]), [pick, setPick] = useState('');
+  const [rows, setRows] = useState<LessonRow[] | null>(null), [classes, setClasses] = useState<{ id: string; name: string; grade?: number | null }[]>([]), [pick, setPick] = useState('');
   const [open, setOpen] = useState<'open' | 'draft' | 'done'>('open'), [week, setWeek] = useState<{ what: string; where: string }[]>([]);
   useEffect(() => {
     api.lessons().then((r) => { setRows(r.lessons); if (!r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
@@ -125,7 +125,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
           <div className="row"><div className="grow">
             <h1>{parent ? t.helloP(teacher.name) : t.helloT(teacher.name)}</h1>
             <p className="small muted">{parent ? t.leadP : t.lead}</p>
-            {(subject || classes.length > 0) && <p className="small muted">{parent ? t.kidsOf : t.teaches}: <b>{[!parent && subject, ...classes.map((k) => k.name)].filter(Boolean).join(', ')}</b></p>}
+            <p className="small muted">{parent ? t.kidsOf : t.teaches}: <b>{[!parent && subject, ...classes.map((k) => (parent && k.grade ? `${k.name} · ${t.grade(k.grade)}` : k.name))].filter(Boolean).join(', ') || '—'}</b> · <button className="link small" onClick={() => go('/profile')}>{t.change}</button></p>
           </div><button className="btn primary" onClick={() => go('/new')}>{t.make}</button></div>
           {classes.length > 0 && <div className="row">{[{ id: '', name: parent ? t.all : t.allClasses }, ...classes].map((k) => <button key={k.id} className={`pill ${pick === k.id ? 'on' : ''}`} onClick={() => setPick(k.id)}>{k.name}</button>)}</div>}
           {!rows.length && <div className="card"><p className="muted">{t.empty}</p></div>}

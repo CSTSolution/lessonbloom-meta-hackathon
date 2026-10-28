@@ -64,6 +64,11 @@ export const ENG_ITEMS_SCHEMA = { type: 'object', properties: { items: { type: '
 export const CARDS_SYSTEM = `You make {{count}} flashcards for primary pupils (grade {{grade}}) from the book section: front = a word or a short calculation, back = its meaning or result in {{lang}}, emoji when it helps, say = what to read aloud for English words. Only from the section.`;
 export const CARDS_SCHEMA = { type: 'object', properties: { cards: { type: 'array', items: { type: 'object', properties: { front: str, back: str, emoji: str, say: str }, required: ['front', 'back'] } } }, required: ['cards'] };
 
+// The AI second review (Chi's doc 2): after the code checks, Muse Spark reads the kept items once more
+// against the book section and flags only real faults. It cannot change an item, only flag it.
+export const REVIEW_SYSTEM = `You review practice items for primary pupils (grade {{grade}}) that already passed code checks. Flag an item only when it is clearly wrong: Q = it does not practise its skill, U = the answer or unit does not fit the question, off = it teaches beyond the book section, unclear = a child could not understand what to do. Do not flag style. Most items are fine: return an empty list when nothing is clearly wrong.`;
+export const REVIEW_SCHEMA = { type: 'object', properties: { flags: { type: 'array', items: { type: 'object', properties: { id: str, code: { type: 'string', enum: ['Q', 'U', 'off', 'unclear'] }, why: str }, required: ['id', 'code', 'why'] } } }, required: ['flags'] };
+
 export const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => String(v[k] ?? ''));
 export const slideCount = (minutes: number) => (minutes <= 15 ? 7 : minutes <= 25 ? 9 : 11);
 export const maxWords = (grade: number) => (grade <= 2 ? 12 : grade === 3 ? 16 : 20);

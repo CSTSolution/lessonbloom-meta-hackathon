@@ -6,7 +6,7 @@ import { guardedJson, wrapUser } from '../guard/guard.ts';
 import { buildEnglish, buildMath, checkItem, contextOf, type RawEnglish, type RawMath } from './items.ts';
 import {
   CARDS_SCHEMA, CARDS_SYSTEM, ENG_ITEMS_SCHEMA, ENG_ITEMS_SYSTEM, fill, INTAKE_SCHEMA, INTAKE_SYSTEM, langName, MATH_ITEMS_SCHEMA, MATH_ITEMS_SYSTEM,
-  maxWords, OCR_SCHEMA, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
+  maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
 } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 
@@ -112,6 +112,26 @@ export async function writeItems(ai: AI, setup: Setup, source: string, skills: S
     }
   }
   return { kept, rejected };
+}
+
+// The AI second review, after the code checks: flagged items are dropped (and logged) while at least
+// `keep` remain, worst first. If the review itself fails, the code-checked items stand.
+export async function reviewItems(ai: AI, setup: Setup, source: string, skills: Skill[], items: Item[], keep: number): Promise<ItemResult> {
+  if (!items.length) return { kept: items, rejected: [] };
+  const list = items.map((i) => { const x = i as Item & { sentence?: string; story?: string; say?: string; unit?: string }; return { id: i.id, skill: skills.find((k) => k.tag === i.skill)?.name || i.skill, template: i.template, prompt: i.prompt, sentence: x.sentence, story: x.story, say: x.say, options: i.options, answer: i.answer, unit: x.unit }; });
+  let flags: { id: string; code: string; why: string }[] = [];
+  try {
+    const r = await guardedJson<{ flags: typeof flags }>(ai, { endpoint: 'check', system: fill(REVIEW_SYSTEM, { grade: setup.grade }), prompt: `${material(setup, source)}\n\nITEMS:\n${wrapUser(JSON.stringify(list))}`, schema: REVIEW_SCHEMA, fixture: { setup, items: list } });
+    flags = (r.flags || []).filter((f) => items.some((i) => i.id === f.id));
+  } catch (e) { console.warn(`[review] skipped: ${String((e as Error).message).slice(0, 200)}`); return { kept: items, rejected: [] }; }
+  const order = ['U', 'Q', 'off', 'unclear'], drop = new Set<string>(), rejected: Rejected[] = [];
+  for (const f of flags.sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code))) {
+    if (items.length - drop.size <= keep || drop.has(f.id)) continue;
+    const it = items.find((i) => i.id === f.id)!;
+    drop.add(f.id);
+    rejected.push({ skill: it.skill, template: it.template, level: it.level, codes: [`ai:${f.code}`], issues: [`[AI review: ${f.code}] ${clip(f.why, 200)}`] });
+  }
+  return { kept: items.filter((i) => !drop.has(i.id)), rejected };
 }
 
 export async function writeCards(ai: AI, setup: Setup, source: string): Promise<Card[]> {

@@ -92,6 +92,8 @@ export const lessonAnswers: [string, (r: JsonRequest) => unknown][] = [
   ['critic', (r) => ((r.fixture as F).slide === 'sl02' && (r.fixture as F).attempt === 1
     ? { hasText: true, unsafe: false, offTopic: false, broken: false, score: 3, revisedPrompt: 'the same scene with no writing anywhere' }
     : { hasText: false, unsafe: false, offTopic: false, broken: false, score: 8 })],
+  // the AI second review: nothing wrong (a test sets its own answer to see items dropped)
+  ['check', () => ({ flags: [] })],
   ['items', (r) => ((r.fixture as F).setup.subject === 'math' ? mathItems(r.fixture as F) : englishItems(r.fixture as F))],
   ['cards', (r) => ((r.fixture as F).setup.subject === 'math'
     ? { cards: [['36 + 27', '63'], ['48 + 25', '73'], ['19 + 36', '55'], ['57 + 28', '85']].map(([front, back]) => ({ front, back })) }
