@@ -8,13 +8,13 @@ import { LangToggle } from './LangToggle.tsx';
 const T = {
   vi: {
     step: 'Bước 2/2 · Tạo tài khoản', who: 'Bạn là ai?', pick: 'Chọn vai để bắt đầu.', teacher: 'Tôi là giáo viên', teacherSub: 'Giao bài cho lớp, học sinh vào bằng mã lớp.', parent: 'Tôi là phụ huynh', parentSub: 'Giao bài cho con, mỗi con một lộ trình.',
-    name: 'Tên gọi của bạn', namePhT: 'Ví dụ: Cô Hạnh', namePhP: 'Ví dụ: Mẹ An', subject: 'Môn dạy', math: 'Toán', english: 'Tiếng Anh', both: 'Cả hai',
+    name: 'Tên gọi của bạn', classes: 'Lớp dạy (cách nhau bằng dấu phẩy)', classesPh: 'Ví dụ: 2A, 2B, 2C', namePhT: 'Ví dụ: Cô Hạnh', namePhP: 'Ví dụ: Mẹ An', subject: 'Môn dạy', math: 'Toán', english: 'Tiếng Anh', both: 'Cả hai',
     kids: 'Các con', onlyNames: '🔒 Chỉ lưu tên gọi.', kidName: 'Tên gọi của con', grade: 'Lớp', addKid: '+ Thêm con', remove: 'Bỏ',
     same: 'Cùng bộ công cụ: kho kiến thức, tạo bài, lộ trình học.', go: 'Tiếp tục',
   },
   en: {
     step: 'Step 2/2 · Create your account', who: 'Who are you?', pick: 'Choose a role to start.', teacher: "I'm a teacher", teacherSub: 'Assign to a class; pupils join with the class code.', parent: "I'm a parent", parentSub: 'Assign to your children, one path each.',
-    name: 'Your name', namePhT: 'e.g. Ms Hanh', namePhP: "e.g. An's mum", subject: 'Subject', math: 'Maths', english: 'English', both: 'Both',
+    name: 'Your name', classes: 'Your classes (comma-separated)', classesPh: 'e.g. 2A, 2B, Year 2 Blue', namePhT: 'e.g. Ms Hanh', namePhP: "e.g. An's mum", subject: 'Subject', math: 'Maths', english: 'English', both: 'Both',
     kids: 'Your children', onlyNames: '🔒 Only first names are kept.', kidName: "Child's first name", grade: 'Grade', addKid: '+ Add a child', remove: 'Remove',
     same: 'The same tools: knowledge, lessons, learning path.', go: 'Continue',
   },
@@ -22,12 +22,12 @@ const T = {
 
 export function SignupRole({ teacher, onDone }: { teacher: Teacher; onDone: (t: Teacher) => void }) {
   const t = useT(T), lang = useLang();
-  const [role, setRole] = useState<'teacher' | 'parent'>('teacher'), [name, setName] = useState(teacher.name || ''), [subject, setSubject] = useState('math');
+  const [role, setRole] = useState<'teacher' | 'parent'>('teacher'), [name, setName] = useState(teacher.name || ''), [subject, setSubject] = useState('math'), [classes, setClasses] = useState('');
   const [kids, setKids] = useState([{ name: '', grade: 1 }]), [err, setErr] = useState(''), [busy, setBusy] = useState(false);
   const ok = name.trim() && (role === 'teacher' || kids.some((k) => k.name.trim()));
   const go2 = async () => {
     setBusy(true); setErr('');
-    try { onDone((await api.setRole({ role, name: name.trim(), subject: role === 'teacher' ? subject : '', children: role === 'parent' ? kids.filter((k) => k.name.trim()) : [] })).teacher); }
+    try { onDone((await api.setRole({ role, name: name.trim(), subject: role === 'teacher' ? subject : '', classes: role === 'teacher' ? classes.split(',').map((x) => x.trim()).filter(Boolean) : [], children: role === 'parent' ? kids.filter((k) => k.name.trim()) : [] })).teacher); }
     catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); }
   };
   return (
@@ -47,7 +47,9 @@ export function SignupRole({ teacher, onDone }: { teacher: Teacher; onDone: (t: 
           <label className="field">{t.name}<input value={name} maxLength={60} placeholder={role === 'teacher' ? t.namePhT : t.namePhP} onChange={(e) => setName(e.target.value)} /></label>
           {role === 'teacher' ? (
             <label className="field">{t.subject}<select value={subject} onChange={(e) => setSubject(e.target.value)}><option value="math">{t.math}</option><option value="english">{t.english}</option><option value="both">{t.both}</option></select></label>
-          ) : (
+          ) : null}
+          {role === 'teacher' && <label className="field">{t.classes}<input value={classes} maxLength={200} placeholder={t.classesPh} onChange={(e) => setClasses(e.target.value)} /></label>}
+          {role === 'teacher' ? null : (
             <div className="stack" style={{ gap: 8 }}>
               <b className="small">{t.kids}</b><span className="small ok-text">{t.onlyNames}</span>
               {kids.map((k, i) => (

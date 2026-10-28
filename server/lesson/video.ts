@@ -40,7 +40,7 @@ export function slideHtml(s: Slide, n: number, total: number, title: string, pic
 }
 
 let busy: Promise<unknown> = Promise.resolve();
-export async function makeVideo(d: { sql: Sql; ai: AI; files: Files }, lesson: Lesson, opts: { subtitles: boolean; voice: number }) {
+export async function makeVideo(d: { sql: Sql; ai: AI; files: Files }, lesson: Lesson, opts: { subtitles: boolean; voice: number; speed?: number }) {
   const job = busy.then(() => render(d, lesson, opts)).catch(async (e) => {
     console.warn(`[video] ${lesson.id}: ${String((e as Error).message).slice(0, 300)}`);
     await d.sql.query(`update lessons set video_status = 'error', updated_at = now() where id = $1`, [lesson.id]);
@@ -49,14 +49,14 @@ export async function makeVideo(d: { sql: Sql; ai: AI; files: Files }, lesson: L
   return job;
 }
 
-async function render(d: { sql: Sql; ai: AI; files: Files }, l: Lesson, opts: { subtitles: boolean; voice: number }) {
+async function render(d: { sql: Sql; ai: AI; files: Files }, l: Lesson, opts: { subtitles: boolean; voice: number; speed?: number }) {
   const dir = await mkdtemp(join(tmpdir(), 'lbm-video-'));
   try {
     const parts: { file: string; seconds: number; heading: string; start: number }[] = [];
     let start = 0;
     for (const [i, s] of l.slides.entries()) {
       const text = (s.narration || s.notes || s.heading).slice(0, 1500);
-      const wav = await d.ai.speak({ text, lang: l.setup.lang, voice: opts.voice });
+      const wav = await d.ai.speak({ text, lang: l.setup.lang, voice: opts.voice, speed: opts.speed });
       const seconds = Math.max(2, wavSeconds(wav) + 0.6);
       let picture: string | null = null;
       const m = s.image && /^\/media\/([\w-]+)\/([\w.-]+)$/.exec(s.image);
@@ -75,6 +75,6 @@ async function render(d: { sql: Sql; ai: AI; files: Files }, l: Lesson, opts: { 
     await run(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', join(dir, 'list.txt'), '-c', 'copy', '-movflags', '+faststart', join(dir, 'lesson.mp4')], { timeout: 180e3 });
     const url = await d.files.put(l.id, 'mp4', await readFile(join(dir, 'lesson.mp4')));
     const chapters = parts.map((p) => ({ heading: p.heading, start: Math.round(p.start) }));
-    await d.sql.query(`update lessons set video = $2::jsonb, video_status = 'ready', updated_at = now() where id = $1`, [l.id, JSON.stringify({ url, seconds: Math.round(start), chapters, subtitles: opts.subtitles })]);
+    await d.sql.query(`update lessons set video = $2::jsonb, video_status = 'ready', updated_at = now() where id = $1`, [l.id, JSON.stringify({ url, seconds: Math.round(start), chapters, subtitles: opts.subtitles, voice: opts.voice, speed: opts.speed ?? 1 })]);
   } finally { await rm(dir, { recursive: true, force: true }); }
 }

@@ -63,7 +63,10 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
   const base = { id, subject: 'math' as const, template: r.template, skill: String(r.skill || ''), level: r.level, a, op, b, explain: String(r.explain || '').trim() };
   switch (r.template) {
     case 'mcq': {
-      const distractors = (r.distractors || []).map((d) => Math.trunc(Number(d))).filter(Number.isFinite).slice(0, 3);
+      let distractors = (r.distractors || []).map((d) => Math.trunc(Number(d))).filter(Number.isFinite).slice(0, 3);
+      // Chi: wrong options are mistakes children really make. With carrying or borrowing, the forgotten 1 is always one of them
+      const slip = op === '+' && (a % 10) + (b % 10) >= 10 ? result - 10 : op === '-' && a % 10 < b % 10 ? result + 10 : null;
+      if (slip !== null && slip >= 0 && slip !== result && !distractors.includes(slip)) distractors = [slip, ...distractors.filter((d) => d !== result)].slice(0, 3);
       return { ...base, distractors, prompt: `${INSTRUCTION[lang].mcq}: ${calc} = ?`, options: shuffle([result, ...distractors].map(String), id + calc), answer: String(result) };
     }
     case 'fill': {
@@ -147,12 +150,17 @@ function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
   }
 }
 
+// words any sentence may use although the section does not print them
+const FUNCTION_WORDS = new Set(['a', 'an', 'the', 'is', 'are', 'am', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these', 'those', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'with', 'what', 'do', 'does', 'have', 'has', 'can', 'not', 'yes', 'no', 's']);
+
 function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
   const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind, lesson = new Set(words(ctx.source));
   const inOptions = (o: string[] | undefined) => (o || []).filter((x) => x.toLowerCase() === e.answer.toLowerCase()).length === 1;
   const shown = ` ${words(e.prompt).join(' ')} `;
+  const notInLesson = (s: string) => words(s).filter((w) => !lesson.has(w) && !FUNCTION_WORDS.has(w) && !/^\d+$/.test(w));
   if (e.template === 'listen') {
     if (!e.say) out.push({ code: 'empty', msg: 'nothing to read aloud' });
+    else if (notInLesson(e.say).length) out.push({ code: 'offlesson', msg: `"${notInLesson(e.say).join(', ')}" is not from the lesson` });
     else if (shown.includes(` ${words(e.say).join(' ')} `)) out.push({ code: 'K', msg: 'the question shows the words that are read aloud' });
     if (!inOptions(e.options)) out.push({ code: 'shape', msg: 'the answer must be exactly one of the options' });
   }
@@ -165,6 +173,7 @@ function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
     const want = e.answer.replace(/[.!?]$/, '').split(/\s+/).map((x) => x.toLowerCase()).sort().join(' ');
     const got = (e.words || []).map((x) => x.toLowerCase().replace(/[.!?]$/, '')).sort().join(' ');
     if (want !== got) out.push({ code: 'Q', msg: 'the word cards do not make the answer sentence exactly (punctuation included)' });
+    if (notInLesson(e.answer).length) out.push({ code: 'offlesson', msg: `"${notInLesson(e.answer).join(', ')}" is not from the lesson` });
     if ((e.words || []).join(' ').toLowerCase().replace(/[.!?]$/, '') === e.answer.toLowerCase().replace(/[.!?]$/, '')) out.push({ code: 'shape', msg: 'the word cards are not shuffled' });
   }
   if (e.template === 'match') {

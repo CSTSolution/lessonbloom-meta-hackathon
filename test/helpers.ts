@@ -2,8 +2,12 @@
 // that keeps the codes it would have sent. Requests go through Hono directly, with a cookie jar.
 import { MockProvider } from '../server/ai/mock.ts';
 import { createApp } from '../server/app.ts';
+import { config } from '../server/config.ts';
 import { migrate } from '../server/db/migrate.ts';
 import { pgliteSql } from '../server/db/sql.ts';
+
+// tests make their videos only when they ask for one
+config.autoVideo = false;
 
 export async function testServer() {
   const sql = await pgliteSql();

@@ -106,6 +106,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const raw: RawEnglish = { template: it.template, skill: it.skill, level: it.level, prompt: s('prompt', it.prompt)!, sentence: s('sentence', it.sentence), say: s('say', it.say), options: list('options', it.options), words: list('words', it.words), answer: s('answer', it.answer), explain: s('explain', it.explain), pairs: it.pairs };
       next = buildEnglish(raw, it.id);
     }
+    next.page = it.page;
     const issues = checkItem(next, contextOf(l.setup, l.skills, l.source));
     if (issues.length) return c.json({ code: 'itemCheck', error: issues.map((i) => i.msg).join('; '), errorEn: issues.map((i) => i.msg).join('; '), issues }, 400);
     await saveItems(l.id, l.items.map((x) => (x.id === it.id ? next : x)));
@@ -117,9 +118,9 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     const l = await mine(c);
     if (!l) return fail(c, 'notFound', 404);
     if (String((l as Lesson & { video_status?: string }).video_status || '').startsWith('working')) return c.json({ ok: true });
-    const b = await c.req.json<{ subtitles?: boolean; voice?: number }>().catch(() => ({} as { subtitles?: boolean; voice?: number }));
+    const b = await c.req.json<{ subtitles?: boolean; voice?: number; speed?: number }>().catch(() => ({} as { subtitles?: boolean; voice?: number; speed?: number }));
     await sql.query(`update lessons set video_status = 'working:0', updated_at = now() where id = $1`, [l.id]);
-    void makeVideo({ sql, ai: d.ai, files: d.files }, l, { subtitles: b.subtitles !== false, voice: [0, 1, 2].includes(Number(b.voice)) ? Number(b.voice) : 0 });
+    void makeVideo({ sql, ai: d.ai, files: d.files }, l, { subtitles: b.subtitles !== false, voice: [0, 1, 2].includes(Number(b.voice)) ? Number(b.voice) : 0, speed: [0.85, 1, 1.15].includes(Number(b.speed)) ? Number(b.speed) : 1 });
     return c.json({ ok: true });
   });
 
@@ -129,6 +130,8 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     try {
       const r = await d.as(c.get('teacher').id, () => writeItems(d.ai, l.setup, l.source, l.skills, req, newItemId(l.items)), l.id);
       if (!r.kept.length) return c.json({ code: 'itemCheck', error: 'Chưa viết được câu đạt kiểm tra, cô thử lại nhé.', errorEn: 'No item passed the checks; please try again.' }, 400);
+      const page = l.items.find((x) => x.skill === req.skill && x.page)?.page ?? (l.refs?.[0] as { pageFrom?: number } | undefined)?.pageFrom;
+      for (const it of r.kept) it.page = page;
       const at = req.after ? l.items.findIndex((x) => x.id === req.after) + 1 : l.items.length;
       const items = [...l.items.slice(0, at), ...r.kept, ...l.items.slice(at)];
       await saveItems(l.id, items);

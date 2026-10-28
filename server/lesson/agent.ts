@@ -26,7 +26,7 @@ Work in this order:
 4. write_cards.
 5. review, then fix only real problems: simplify_slide for text too hard for the grade, drop_item for an item that should not be there.
 6. finish: a note to the teacher in {{lang}} (2-3 sentences: what you made, what you checked and changed, anything she should look at herself), and one line per change.
-Never add content that is not in the book section; harder items extend only within it. Practice is "bài luyện tập", never a test; no scores. You have at most {{turns}} turns.`;
+If SETUP has "level": "basic", give most practice at basic level (still some good); if "advanced", lean to good and advanced. If SETUP.note has a focus, aim the practice at it. Never add content that is not in the book section; harder items extend only within it. Practice is "bài luyện tập", never a test; no scores. You have at most {{turns}} turns.`;
 
 const MATHT = ['mcq', 'fill', 'truefalse', 'word'], ENGT = ['match', 'fill', 'listen', 'order'];
 const TOOLS = (subject: Setup['subject']): ToolSpec[] => [

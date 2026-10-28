@@ -24,7 +24,7 @@ const T = {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
     teaches: 'Cô dạy', kidsOf: 'Con học', make: '+ Tạo bài giảng mới', allClasses: 'Tất cả các lớp', all: 'Tất cả',
-    groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number) => [s && 'Slide', 'Video', i && `${i} bài tập`, c && 'Lật thẻ'].filter(Boolean).join(' · '),
+    groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Tín dụng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
@@ -35,7 +35,7 @@ const T = {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
     teaches: 'You teach', kidsOf: 'Your children', make: '+ New lesson', allClasses: 'All classes', all: 'All',
-    groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${n} lessons`, parts: (s: number, i: number, c: number) => [s && 'Slides', 'Video', i && `${i} items`, c && 'Flip cards'].filter(Boolean).join(' · '),
+    groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${n} lessons`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${i} items`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
@@ -140,7 +140,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
                   <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example || r.setup.title.split(/[:·]/)[0].slice(0, 22)}</div>
                   {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}
                   <b className="small">{r.setup.title}</b>
-                  <span className="small muted">{r.status === 'ready' ? t.parts(r.slides, r.items, r.cards) : t.status[r.status as 'working' | 'error']}</span>
+                  <span className="small muted">{r.status === 'ready' ? t.parts(r.slides, r.items, r.cards, r.video) : t.status[r.status as 'working' | 'error']}</span>
                 </button>
               ))}</div>}
             </div>

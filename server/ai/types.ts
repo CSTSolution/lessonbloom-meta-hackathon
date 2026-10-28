@@ -15,7 +15,7 @@ export interface JsonRequest {
 }
 
 export interface ImageRequest { prompt: string; aspect?: '4:3' | '1:1' | '16:9'; editOf?: Buffer }
-export interface SpeechRequest { text: string; lang: 'vi' | 'en'; voice?: number }
+export interface SpeechRequest { text: string; lang: 'vi' | 'en'; voice?: number; speed?: number }
 
 // Tool calling (the lesson agent). Tool arguments arrive as a JSON string.
 export interface ToolSpec { name: string; description: string; parameters: object }

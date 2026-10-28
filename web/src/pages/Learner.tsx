@@ -9,13 +9,13 @@ import { go } from '../router.ts';
 
 const T = {
   vi: {
-    back: '‹ Tóm tắt học tập', path: 'Xem lộ trình', now: 'Đang học', weeks: (w: number, s: string, e: string, i: number) => `${w} tuần · ${s} – ${e} · đang ở tuần ${i}`, video: 'Đã xem video', noVideo: 'Chưa xem video', left: (n: number) => `còn ${n} câu bài tập`, ends: (d: string) => `Hết thời gian bài: ${d}`,
+    back: '‹ Tóm tắt học tập', path: 'Xem lộ trình', now: 'Đang học', weeks: (w: number, s: string, e: string, i: number) => `${w} tuần · ${s} – ${e} · đang ở tuần ${i}`, video: 'Đã xem video', slides: 'Đã xem slide', noVideo: 'Chưa xem bài', left: (n: number) => `còn ${n} câu bài tập`, ends: (d: string) => `Hết thời gian bài: ${d}`,
     advice: (n: string) => `Tư vấn cho ${n}`, adviceSub: 'Theo tiêu chí của cô · AI chỉ viết câu', kinds: { practice: 'Luyện thêm', next: 'Bước tiếp', time: 'Thời gian bài' }, why: '› Vì sao?', apply: 'Áp dụng', keep: 'Giữ nguyên', undo: 'Hoàn tác', applied: '✓ Đã áp dụng', kept: 'Đã giữ nguyên', lock: '🔒 Lịch chỉ đổi khi cô bấm Áp dụng.', none: 'Chưa có tư vấn: cần thêm kết quả làm bài.',
     bySkill: 'Theo dạng bài', bySkillSub: (s: number, p: number, r: number) => `${s} đã vững · ${p} đang luyện · ${r} lỗi lặp lại`, sessions: 'Các buổi gần đây', sessionsSub: (n: number, d: string, m: number) => `${n} buổi${d ? ` · gần nhất ${d}, ${m} phút` : ''}`, sent: 'Lời nhắc đã gửi', sentSub: (n: number) => `${n} lời nhắc`,
     labels: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' }, recent: (r: number, o: number) => `${r}/${o} câu gần nhất đúng`, answers: (n: number) => `${n} câu`, min: (n: number) => `${n} phút`, added: (n: number) => `Đã thêm ${n} câu cho riêng em.`,
   },
   en: {
-    back: '‹ Learning summary', path: 'See the path', now: 'Learning', weeks: (w: number, s: string, e: string, i: number) => `${w} week${w === 1 ? '' : 's'} · ${s} – ${e} · in week ${i}`, video: 'Watched the lesson', noVideo: 'Not watched yet', left: (n: number) => `${n} items to go`, ends: (d: string) => `Ends: ${d}`,
+    back: '‹ Learning summary', path: 'See the path', now: 'Learning', weeks: (w: number, s: string, e: string, i: number) => `${w} week${w === 1 ? '' : 's'} · ${s} – ${e} · in week ${i}`, video: 'Watched the video', slides: 'Saw the slides', noVideo: 'Not watched yet', left: (n: number) => `${n} items to go`, ends: (d: string) => `Ends: ${d}`,
     advice: (n: string) => `Advice for ${n}`, adviceSub: 'From your criteria · the AI only words it', kinds: { practice: 'More practice', next: 'Next step', time: 'Lesson time' }, why: '› Why?', apply: 'Apply', keep: 'Keep as is', undo: 'Undo', applied: '✓ Applied', kept: 'Kept as is', lock: '🔒 The plan only changes when you press Apply.', none: 'No advice yet: more answers are needed.',
     bySkill: 'By skill', bySkillSub: (s: number, p: number, r: number) => `${s} mastered · ${p} practising · ${r} repeated mistake`, sessions: 'Recent sessions', sessionsSub: (n: number, d: string, m: number) => `${n} sessions${d ? ` · last ${d}, ${m} min` : ''}`, sent: 'Reminders sent', sentSub: (n: number) => `${n} reminders`,
     labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' }, recent: (r: number, o: number) => `${r}/${o} recent answers right`, answers: (n: number) => `${n} answers`, min: (n: number) => `${n} min`, added: (n: number) => `Added ${n} items for this learner only.`,
@@ -52,7 +52,7 @@ export function Learner({ id, parent }: { id: string; parent: boolean }) {
         <div className="grow stack" style={{ gap: 4 }}>
           <div className="row"><h2>{v.pupil.name}</h2>{!parent && <span className="tag ai">{v.pupil.className}</span>}</div>
           {c ? <><span className="small">{t.now}: <b>{c.title}</b> · {lang === 'en' ? 'p.' : 'tr.'} {c.pages}</span>
-            <span className="small muted">📅 {t.weeks(c.weeks, dm(c.start), dm(c.end), c.week)} · {c.slidesSeen ? '✓ ' + t.video : t.noVideo} · {t.left(c.itemsLeft)} · ⚑ {t.ends(dm(c.end))}</span></> : null}
+            <span className="small muted">📅 {t.weeks(c.weeks, dm(c.start), dm(c.end), c.week)} · {c.videoSeen ? '✓ ' + t.video : c.slidesSeen ? '✓ ' + t.slides : t.noVideo} · {t.left(c.itemsLeft)} · ⚑ {t.ends(dm(c.end))}</span></> : null}
         </div>
         <button className="btn small" onClick={() => go('/path')}>{t.path}</button>
       </div>

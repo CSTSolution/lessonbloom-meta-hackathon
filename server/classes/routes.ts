@@ -15,6 +15,8 @@ import type { Sql } from '../db/sql.ts';
 import { clientIp, Limiter } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import type { Card, Item, Lesson, Slide } from '../lesson/types.ts';
+import type { Files } from '../files.ts';
+import { makeVideo } from '../lesson/video.ts';
 import { forPupil, hintOf, isRight } from './check.ts';
 
 const PCOOKIE = 'lbm_p';
@@ -34,6 +36,15 @@ const snapshot = (l: Lesson): Content => ({
   slides: l.slides, items: l.items, cards: l.cards,
 });
 
+// A teacher's class, named as she typed it.
+export async function addClass(sql: Sql, teacherId: string, name: string) {
+  for (let i = 0; i < 5; i++) {
+    const row = await sql.one<{ id: string }>('insert into classes (id, teacher_id, name, code) values ($1, $2, $3, $4) on conflict (code) do nothing returning id', [newId(10), teacherId, name, code6()]);
+    if (row) return row.id;
+  }
+  throw new Error('no free class code');
+}
+
 // A parent's child: a class of one, named after the child, with the child as its only pupil.
 export async function addChild(sql: Sql, teacherId: string, name: string, grade: number) {
   for (let i = 0; i < 5; i++) {
@@ -43,7 +54,7 @@ export async function addChild(sql: Sql, teacherId: string, name: string, grade:
   throw new Error('no free class code');
 }
 
-export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (classId: string, pupilId: string) => Promise<{ vi: string; en: string } | null> }) {
+export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files; reminder?: (classId: string, pupilId: string) => Promise<{ vi: string; en: string } | null> }) {
   const { sql } = d;
   const mine = (c: Context<Env>, id: string) => sql.one<{ id: string; name: string; code: string }>('select id, name, code from classes where id = $1 and teacher_id = $2', [id, c.get('teacher').id]);
 
@@ -137,6 +148,11 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (c
     const id = newId(10);
     await sql.query(`insert into assignments (id, lesson_id, class_id, teacher_id, content, due, retry, hints, confirmed_at) values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, now())`,
       [id, l.id, k.id, t.id, J(snapshot(l)), due, b.retry !== false, b.hints !== false]);
+    // a parent has no Video step (Chi): the child's video is made now, in the background (local voices, free)
+    if (t.role === 'parent' && d.files && config.autoVideo && (l as Lesson & { video_status?: string }).video_status === 'none') {
+      await sql.query(`update lessons set video_status = 'working:0' where id = $1`, [l.id]);
+      void makeVideo({ sql, ai: d.ai, files: d.files }, l, { subtitles: true, voice: 0 });
+    }
     return c.json({ assignment: { id, classId: k.id, className: k.name } });
   });
   app.get('/api/t/lessons/:id/assignments', async (c) => c.json({ assignments: await sql.query(`select a.id, a.class_id, k.name as class_name, a.due, a.created_at, a.confirmed_at,
@@ -193,7 +209,8 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (c
     await sql.query(`update pupils set seen_at = now() where id = $1 and (seen_at is null or seen_at < now() - interval '5 minutes')`, [p.id]);
     const rows = await sql.query(`select a.id, a.content->>'title' as title, a.content->>'subject' as subject, a.content->>'lang' as lang, a.due,
         jsonb_array_length(a.content->'slides')::int as slides, jsonb_array_length(a.content->'items')::int as items, jsonb_array_length(a.content->'cards')::int as cards,
-        g.slides_at is not null as slides_seen, g.cards_at is not null as cards_seen, g.done_at is not null as done,
+        (select l.video_status = 'ready' from lessons l where l.id = a.lesson_id) as video,
+        g.slides_at is not null as slides_seen, g.video_at is not null as video_seen, g.cards_at is not null as cards_seen, g.done_at is not null as done,
         (select count(distinct item_id) from answers w where w.assignment_id = a.id and w.pupil_id = $2)::int as answered
       from assignments a left join pupil_progress g on g.assignment_id = a.id and g.pupil_id = $2
       where a.class_id = $1 and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
@@ -216,9 +233,10 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (c
     if (r.error) return r.error;
     const { a, p } = r, x = a.content;
     const tried = await sql.query<{ item_id: string; correct: boolean }>('select item_id, bool_or(correct) as correct from answers where assignment_id = $1 and pupil_id = $2 group by 1', [a.id, p.id]);
+    const v = await sql.one<{ video: { url: string } | null }>(`select case when l.video_status = 'ready' then l.video end as video from assignments s join lessons l on l.id = s.lesson_id where s.id = $1`, [a.id]);
     return c.json({
       lesson: {
-        id: a.id, title: x.title, subject: x.subject, lang: x.lang, retry: a.retry, hints: a.hints,
+        id: a.id, title: x.title, subject: x.subject, lang: x.lang, retry: a.retry, hints: a.hints, video: v?.video?.url ?? null,
         slides: x.slides.map((s) => ({ id: s.id, kind: s.kind, heading: s.heading, bullets: s.bullets, example: s.example, image: s.image })),
         items: x.items.map(forPupil),
         cards: x.cards.map((k) => ({ id: k.id, front: k.front, back: k.back, emoji: k.emoji })),
@@ -249,7 +267,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; reminder?: (c
     const r = await assignmentOf(c);
     if (r.error) return r.error;
     const what = (await c.req.json<{ what?: string }>().catch(() => ({} as { what?: string }))).what;
-    if (what !== 'slides' && what !== 'cards') return fail(c, 'bad');
+    if (what !== 'slides' && what !== 'cards' && what !== 'video') return fail(c, 'bad');
     await sql.query(`insert into pupil_progress (assignment_id, pupil_id, ${what}_at) values ($1, $2, now()) on conflict (assignment_id, pupil_id) do update set ${what}_at = coalesce(pupil_progress.${what}_at, now())`, [r.a.id, r.p.id]);
     return c.json({ ok: true });
   });

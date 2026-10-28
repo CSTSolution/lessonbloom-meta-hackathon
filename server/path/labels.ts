@@ -7,13 +7,16 @@
 import type { Item } from '../lesson/types.ts';
 import { compute } from '../lesson/items.ts';
 
-export interface Criteria { recent: number; min: number; solid: number; repeat: number; same: number; sessions: number; classRepeat: number; classSolid: number }
-export const DEFAULT_CRITERIA: Criteria = { recent: 10, min: 5, solid: 80, repeat: 50, same: 3, sessions: 2, classRepeat: 30, classSolid: 70 };
+export interface Criteria { recent: number; min: number; solid: number; repeat: number; same: number; sessions: number; classRepeat: number; classSolid: number; practice: boolean; time: boolean; next: boolean }
+// practice / time / next: which advice cards to suggest (Chi: repeated mistake → more practice, practising → more time, mastered → next step)
+export const DEFAULT_CRITERIA: Criteria = { recent: 10, min: 5, solid: 80, repeat: 50, same: 3, sessions: 2, classRepeat: 30, classSolid: 70, practice: true, time: true, next: true };
 export type Label = 'solid' | 'practising' | 'repeat';
 
 export function cleanCriteria(x: unknown): Criteria {
   const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>, c = { ...DEFAULT_CRITERIA };
-  const n = (k: keyof Criteria, lo: number, hi: number) => { const v = Math.round(Number(o[k])); if (Number.isFinite(v) && v >= lo && v <= hi) c[k] = v; };
+  type Num = 'recent' | 'min' | 'solid' | 'repeat' | 'same' | 'sessions' | 'classRepeat' | 'classSolid';
+  const n = (k: Num, lo: number, hi: number) => { const v = Math.round(Number(o[k])); if (Number.isFinite(v) && v >= lo && v <= hi) c[k] = v; };
+  for (const k of ['practice', 'time', 'next'] as const) if (typeof o[k] === 'boolean') c[k] = o[k] as boolean;
   n('recent', 3, 50); n('min', 1, 50); n('solid', 50, 100); n('repeat', 0, 90); n('same', 2, 10); n('sessions', 1, 10); n('classRepeat', 5, 100); n('classSolid', 10, 100);
   if (c.repeat >= c.solid) c.repeat = Math.max(0, c.solid - 10);
   return c;
@@ -55,6 +58,9 @@ export function classLabel(labels: Label[], c: Criteria): Label {
   const share = (l: Label) => (100 * labels.filter((x) => x === l).length) / labels.length;
   return share('repeat') >= c.classRepeat ? 'repeat' : share('solid') >= c.classSolid ? 'solid' : 'practising';
 }
+
+// The clock (tests set the time of day).
+export const clock = { now: () => Date.now() };
 
 // Dates in Vietnam days, as YYYY-MM-DD strings.
 export const vnToday = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);

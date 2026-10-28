@@ -41,7 +41,10 @@ export function createAdmin(sql: Sql, key = config.adminKey) {
         count(*) filter (where seen_at >= ${TODAY}) as today, count(*) filter (where plan_until > now()) as subscribers from teachers`);
     const lessons = await sql.one<Record<string, string>>(`select count(*) as all, count(*) filter (where status = 'ready') as ready,
         count(*) filter (where status = 'error') as failed, count(*) filter (where created_at >= ${TODAY}) as today from lessons`);
+    const blockedItems = await sql.query(`select to_char(l.created_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, r->>'template' as template, code, count(*)::int as n
+        from lessons l, jsonb_array_elements(l.rejected) r, jsonb_array_elements_text(r->'codes') code group by 1, 2, 3 order by 1 desc, 4 desc limit 200`);
     return c.json({
+      blockedItems,
       money: { total: usdOut(m?.total), today: usdOut(m?.today), totalCapUsd: config.guard.totalUsd, dayCapUsd: config.guard.dayUsd, creditUsd: 0.01, signupCredits: config.guard.signupCredits, subscriberDayCredits: config.guard.subscriberDayCredits, disabled: config.guard.disabled },
       calls: num(m?.calls), blocked: num(m?.blocked),
       people: { demo: num(people?.demo), accounts: num(people?.accounts), today: num(people?.today), subscribers: num(people?.subscribers) },

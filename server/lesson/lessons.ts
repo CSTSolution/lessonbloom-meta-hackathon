@@ -1,12 +1,14 @@
 // The lessons table, and the background job that builds one.
 import { newId } from '../auth/accounts.ts';
 import type { AI } from '../ai/types.ts';
+import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import type { Files } from '../files.ts';
 import { TODAY, type Budget } from '../guard/guard.ts';
-import { buildLesson } from './agent.ts';
+import { buildLesson, grounded } from './agent.ts';
+import { makeVideo } from './video.ts';
 import { drawPictures } from './pictures.ts';
-import type { Lesson, Setup } from './types.ts';
+import type { Item, Lesson, Setup } from './types.ts';
 
 const J = (v: unknown) => JSON.stringify(v);
 
@@ -22,8 +24,8 @@ export class Lessons {
   get(teacherId: string, id: string) { return this.sql.one<Lesson>('select * from lessons where id = $1 and teacher_id = $2', [id, teacherId]); }
   list(teacherId: string) {
     // with where it was given: "assigned" while any assignment is open, "done" once all are past due, else a draft
-    return this.sql.query<Pick<Lesson, 'id' | 'status' | 'setup' | 'created_at'> & { slides: number; items: number; cards: number; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }>(
-      `select l.id, l.status, l.setup, l.created_at, jsonb_array_length(l.slides) as slides, jsonb_array_length(l.items) as items, jsonb_array_length(l.cards) as cards,
+    return this.sql.query<Pick<Lesson, 'id' | 'status' | 'setup' | 'created_at'> & { slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }>(
+      `select l.id, l.status, l.setup, l.created_at, l.video_status = 'ready' as video, jsonb_array_length(l.slides) as slides, jsonb_array_length(l.items) as items, jsonb_array_length(l.cards) as cards,
          (select x->>'example' from jsonb_array_elements(l.slides) x where coalesce(x->>'example', '') <> '' limit 1) as example,
          coalesce((select json_agg(distinct jsonb_build_object('id', k.id, 'name', k.name)) from assignments a join classes k on k.id = a.class_id where a.lesson_id = l.id), '[]') as classes,
          exists (select 1 from assignments a where a.lesson_id = l.id and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date)) as open,
@@ -64,13 +66,37 @@ export function pageOf(quote: string, passages: { page: number; text: string }[]
   return best[1] >= 0.8 ? best[0] : undefined;
 }
 
-export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; passages?: { page: number; text: string }[] }) {
+// The page each item comes from (Chi: every item carries its source page): the passage that shares the
+// most words and numbers with it, else the section's first page (the section is its only source).
+export function itemPage(it: Item, passages: { page: number; text: string }[]): number | undefined {
+  if (!passages.length) return undefined;
+  const x = it as Item & { story?: string; sentence?: string; say?: string; words?: string[]; pairs?: { word: string }[] };
+  const words = fold([x.prompt, x.story, x.sentence, x.say, (x.words || []).join(' '), (x.pairs || []).map((p) => p.word).join(' '), x.explain].filter(Boolean).join(' '));
+  let best: [number, number] = [passages[0].page, 0];
+  for (const p of passages) { const w = new Set(fold(p.text)), hit = words.filter((x) => w.has(x)).length; if (hit > best[1]) best = [p.page, hit]; }
+  return best[0];
+}
+
+export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; passages?: { page: number; text: string }[]; sql?: Sql }) {
   try {
     const b = await buildLesson(ai, setup, source, (vi, en) => lessons.step(id, vi, en));
     if (pics?.passages) for (const s of b.slides) { const p = pageOf(s.source, pics.passages); if (p) s.page = p; }
+    if (pics?.passages) for (const it of b.items) it.page = itemPage(it, pics.passages);
+    // a teaching slide whose words are not in the book section is left out, while enough slides remain
+    const loose = b.slides.filter((s) => !['title', 'summary'].includes(s.kind) && !grounded(s.source, source));
+    if (loose.length && b.slides.length - loose.length >= 5) {
+      b.slides = b.slides.filter((s) => !loose.includes(s));
+      b.agent.changes.push(...loose.map((s) => `${s.id}: left out, its words are not in the book section`));
+    }
     await lessons.step(id, 'Xong! Cô xem bài giảng và ghi chú của trợ lý nhé. Hình minh họa đang được vẽ thêm.', 'Done! Have a look at the lesson and the agent\'s note. Pictures are on their way.');
+    if (setup.make && !setup.make.cards) b.cards = [];   // she asked for no flashcards
     await lessons.finish(id, b);
     if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides);
+    // the video, made after the pictures (local voices, free) unless she asked for none
+    if (pics?.sql && config.autoVideo && setup.make?.video !== false) {
+      const l = await pics.sql.one<Lesson>('select * from lessons where id = $1', [id]);
+      if (l && l.status === 'ready') { await pics.sql.query(`update lessons set video_status = 'working:0' where id = $1`, [id]); await makeVideo({ sql: pics.sql, ai, files: pics.files }, l, { subtitles: true, voice: 0 }); }
+    }
   } catch (e) {
     // the teacher sees a plain message; details stay in the server log
     console.error(`[lesson] ${id} failed: ${String((e as Error)?.stack || e).slice(0, 1500)}`);

@@ -154,7 +154,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .pupil h1 { font-size: 28px; margin: 4px 0; } .pupil h2 { font-size: 24px; margin: 4px 0; }
 .p-btn { min-height: 56px; border-radius: 16px; border: 2px solid var(--line); background: var(--card); font: inherit; font-size: 20px; font-weight: 700; padding: 10px 16px; cursor: pointer; color: var(--ink); }
 .p-btn.main { background: var(--leaf); border-color: var(--leaf); color: #fff; } .p-btn:disabled { opacity: .45; }
-.p-link { background: none; border: 0; color: var(--ink-2); font: inherit; font-size: 16px; cursor: pointer; padding: 8px; } .p-link.big { font-size: 26px; padding: 4px 10px; }
+.p-link { background: none; border: 0; color: var(--ink-2); font: inherit; font-size: 16px; cursor: pointer; padding: 8px 10px; min-height: 44px; min-width: 44px; } .p-link.big { font-size: 26px; padding: 4px 10px; }
 .p-input { min-height: 60px; border-radius: 16px; border: 2px solid var(--line); font: inherit; font-size: 26px; padding: 8px 16px; text-align: center; background: var(--card); color: var(--ink); width: 100%; }
 .p-input.code { letter-spacing: 6px; text-transform: uppercase; } .p-input.p-num { flex: 0 0 170px; width: 170px; max-width: 100%; }
 .p-names { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -241,3 +241,9 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
   .grid2 { grid-template-columns: 1fr; } .me .small:not(.btn) { display: none; } .top .brand { font-size: 14px; }
   .stepper span { font-size: 11px; padding: 3px 6px; }
 }
+
+/* pupils: "Lật thẻ tìm cặp" */
+.p-memory { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.p-tile { aspect-ratio: 1; border-radius: 16px; border: 2px solid var(--line); background: var(--leaf); color: #fff; font: inherit; font-size: 20px; font-weight: 700; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px; text-align: center; word-break: break-word; }
+.p-tile.up { background: var(--card); color: var(--ink); } .p-tile.got { background: var(--ok-2); border-color: var(--ok); }
+.p-emo.small { font-size: 30px; }

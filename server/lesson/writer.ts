@@ -23,7 +23,9 @@ export function cleanSetup(x: unknown): Setup | null {
   const minutes = [15, 25, 35].reduce((b, m) => (Math.abs(m - (Number(s.minutes) || 25)) < Math.abs(b - (Number(s.minutes) || 25)) ? m : b), 25) as Setup['minutes'];
   const objectives = (Array.isArray(s.objectives) ? s.objectives : []).map((o) => clip(o, 200)).filter(Boolean).slice(0, 3);
   const note = clip(s.note, 300);
-  return { subject: s.subject, grade: Math.min(5, Math.max(1, Math.round(Number(s.grade)) || 2)) as Setup['grade'], title, objectives, minutes, lang: s.lang === 'en' ? 'en' : 'vi', ...(note ? { note } : {}) };
+  const level = (['mixed', 'basic', 'advanced'] as const).find((x) => x === s.level), mk = (s.make && typeof s.make === 'object' ? s.make : {}) as Record<string, unknown>;
+  const make = { video: mk.video !== false, cards: mk.cards !== false };
+  return { subject: s.subject, grade: Math.min(5, Math.max(1, Math.round(Number(s.grade)) || 2)) as Setup['grade'], title, objectives, minutes, lang: s.lang === 'en' ? 'en' : 'vi', ...(note ? { note } : {}), ...(level && level !== 'mixed' ? { level } : {}), make };
 }
 
 const material = (setup: Setup, source: string) => wrapUser(`SETUP: ${JSON.stringify(setup)}\n\nBOOK SECTION (the only source):\n${source}`);

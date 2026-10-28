@@ -95,7 +95,9 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (!a || !m) return fail(c, 'notFound', 404);
     const setup0 = cleanSetup(b.setup), request = String(b.request ?? '').trim().slice(0, 2000);
     if (!setup0) return fail(c, 'setup');
-    const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'] };
+    // her request steers the lesson inside the section (Chi: only what the material points to); the section stays the only source
+    const ask = request && request.toLowerCase() !== m.section.title.toLowerCase() && request.length > m.section.title.length + 10 ? request.slice(0, 200) : '';
+    const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
     if ((await d.budget.credits(t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
@@ -104,7 +106,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
     const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
-    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages }), id);
+    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages, sql: d.sql }), id);
     return c.json({ id });
   });
 

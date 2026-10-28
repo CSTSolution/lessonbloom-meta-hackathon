@@ -13,6 +13,8 @@ export interface Setup {
   minutes: 15 | 25 | 35;
   lang: Lang;                     // language of the slides, narration and pupils' instructions
   note?: string;                  // her wishes for this lesson ("use market examples")
+  level?: 'mixed' | 'basic' | 'advanced';   // the class's level (Chi's step 2): how the practice leans
+  make?: { video: boolean; cards: boolean }; // what to make besides slides and practice (Chi's step 2)
 }
 
 // A skill ("dạng bài") with a kind from a fixed list, so code can check items against it (Chi's rule Q).
@@ -36,7 +38,7 @@ export interface Slide {
 }
 
 export type Op = '+' | '-' | '×' | ':';
-interface ItemBase { id: string; skill: string; level: Level; prompt: string; explain: string }
+interface ItemBase { id: string; skill: string; level: Level; prompt: string; explain: string; page?: number }   // page: the book page it comes from
 
 // Maths: the model gives a, op, b (and distractors, a story); code writes prompt, options and answer.
 export interface MathItem extends ItemBase {

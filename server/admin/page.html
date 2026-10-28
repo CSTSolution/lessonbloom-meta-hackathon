@@ -122,6 +122,8 @@ async function overview() {
       { h: 'Note', wide: 1, f: (r) => esc(r.note) }, { h: 'Made', f: (r) => when(r.created_at) },
       { h: '', f: (r) => `<button class="ghost" data-code="${esc(r.code)}" data-on="${r.active ? '' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>` },
     ], p.codes)}
+    <h2>Items the code checks blocked (by day, type and reason)</h2>
+    ${table([{ h: 'Day', f: (r) => esc(r.day) }, { h: 'Item type', f: (r) => esc(r.template) }, { h: 'Reason code', f: (r) => esc(r.code) }, { h: 'Items', r: 1, f: (r) => n(r.n) }], o.blockedItems || [])}
     <h2>By day (Vietnam time)</h2>
     ${table([{ h: 'Day', f: (r) => esc(r.day) }, { h: 'People', r: 1, f: (r) => n(r.people) }, { h: 'Calls', r: 1, f: (r) => n(r.n) }, { h: 'Refused', r: 1, f: (r) => n(r.blocked) }, { h: 'Credits', r: 1, f: cr }], o.days)}
     <h2>By model and step</h2>

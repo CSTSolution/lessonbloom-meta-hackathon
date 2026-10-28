@@ -73,7 +73,9 @@ export function Classes({ parent = false }: { parent?: boolean }) {
 function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'] & Partial<(typeof P)['vi']>; onChange: () => void; parent: boolean }) {
   const lang = useLang();
   const [v, setV] = useState<ClassView | null>(null), [names, setNames] = useState<string | null>(null), [copied, setCopied] = useState(''), [showAll, setShowAll] = useState(false);
+  const [mist, setMist] = useState<{ what: string; skill: string }[]>([]);
   const load = () => api.classView(id).then(setV).catch(() => {});
+  useEffect(() => { api.summary({ classId: id }).then((r) => setMist(r.classes.find((x) => x.id === id)?.mistakes ?? [])).catch(() => {}); }, [id]);
   useEffect(() => { void load(); }, [id]);
   if (!v) return null;
   const copy = async (s: string, k: string) => { if (await copyText(s)) { setCopied(k); setTimeout(() => setCopied(''), 1500); } };
@@ -90,13 +92,15 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
           <div className="row small"><button className="btn ghost small" onClick={() => copy(v.class.url, 'url')}>{copied === 'url' ? t.copied : t.copy}</button><button className="btn ghost small" onClick={() => printCode(v.class.name, v.class.code, v.class.url, id)}>{t.print}</button></div>
         </div>
       </div>}
-      <h3>{t.assigned}</h3>
+      {mist.length > 0 && <div className="banner warn row"><span className="grow"><b>{lang === 'en' ? 'Mistake that keeps coming back' : 'Dạng đang lặp lỗi'}:</b> {mist.map((m) => m.what).join(' · ')}</span><button className="link small" onClick={() => go(`/insight?class=${id}`)}>{lang === 'en' ? 'See the summary ›' : 'Xem tóm tắt ›'}</button></div>}
+      <div className="row"><h3 className="grow">{t.assigned}</h3><AssignMore classId={id} /></div>
       {v.assignments.length ? (
-        <table className="tbl"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th /></tr></thead><tbody>
+        <table className="tbl"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th>{lang === 'en' ? 'Status' : 'Trạng thái'}</th><th /></tr></thead><tbody>
           {v.assignments.map((a) => (
             <tr key={a.id}><td>{a.title}</td><td>{a.due ? day(a.due, lang) : t.noDue}</td>
               <td><span className="meter"><i style={{ width: `${v.pupils.length ? (100 * a.done) / v.pupils.length : 0}%` }} /></span> {a.done}/{v.pupils.length}</td>
-              <td><button className="link small" onClick={() => go(`/lesson/${a.lesson_id}`)}>{t.open}</button></td></tr>
+              <td>{(() => { const st = statusOf(a); return <span className={`tag ${st === 'expired' ? 'later' : st === 'new' ? 'solid' : 'ai'}`}>{STATUS[lang][st]}</span>; })()}</td>
+              <td><button className="link small" onClick={() => go(`/lesson/${a.lesson_id}`)}>{t.open}</button> · <button className="link small" onClick={() => go(`/insight?class=${id}&lesson=${a.lesson_id}`)}>{lang === 'en' ? 'Summary' : 'Xem tóm tắt'}</button></td></tr>
           ))}
         </tbody></table>
       ) : <p className="small muted">{t.none}</p>}
@@ -133,4 +137,19 @@ function printCode(name: string, code: string, url: string, id: string) {
     <p style="font-size:20px">LessonBloom · ${esc(url.replace(/^https?:\/\//, ''))}</p><p style="font-size:64px;letter-spacing:8px;font-weight:700;margin:0">${esc(code)}</p>
     <script>document.querySelector('img').onload=()=>setTimeout(()=>print(),200)</script></body>`);
   w.document.close();
+}
+
+// Mới giao (the last two days) · Đang mở · Đã hết hạn (past its due date), as in Chi's design
+const STATUS = { vi: { new: 'Mới giao', open: 'Đang mở', expired: 'Đã hết hạn' }, en: { new: 'Just assigned', open: 'Open', expired: 'Past due' } };
+function statusOf(a: { due: string | null; created_at: string }): 'new' | 'open' | 'expired' {
+  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  if (a.due && String(a.due).slice(0, 10) < today) return 'expired';
+  return Date.now() - Date.parse(a.created_at) < 2 * 864e5 ? 'new' : 'open';
+}
+
+// "+ Giao thêm bài": pick a ready lesson, then its Assign step opens
+function AssignMore({ classId: _classId }: { classId: string }) {
+  const lang = useLang(), [list, setList] = useState<{ id: string; title: string }[] | null>(null);
+  if (!list) return <button className="btn primary small" onClick={() => api.lessons().then((r) => setList(r.lessons.filter((l) => l.status === 'ready').map((l) => ({ id: l.id, title: l.setup.title })))).catch(() => setList([]))}>{lang === 'en' ? '+ Assign another lesson' : '+ Giao thêm bài'}</button>;
+  return <select autoFocus defaultValue="" onChange={(e) => e.target.value && go(`/lesson/${e.target.value}?step=6`)}><option value="" disabled>{lang === 'en' ? 'Choose a lesson…' : 'Chọn bài giảng…'}</option>{list.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}</select>;
 }

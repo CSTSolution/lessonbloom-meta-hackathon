@@ -4,14 +4,14 @@ export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; e
 // daily allowance (Vietnam days), used first.
 export interface Credits { balance: number; subscriber: boolean; planUntil: string | null; daily: { perDay: number; used: number; left: number } | null; left: number }
 export type Level = 'basic' | 'good' | 'advanced';
-export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string }
+export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string; level?: 'mixed' | 'basic' | 'advanced'; make?: { video: boolean; cards: boolean } }
 export interface Skill { tag: string; name: string; kind: string }
 export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number }
-export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
+export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
 export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
-export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
+export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
 export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number }
@@ -25,12 +25,12 @@ export type Label = 'solid' | 'practising' | 'repeat';
 export interface PathStep { sectionId: string; title: string; pages: string; weeks: number; start: string; end: string; status: 'done' | 'current' | 'next' | 'later'; topic: string }
 export interface Reminder { date: string; who: 'pupils' | 'assigner'; kind: string; vi: string; en: string }
 export interface PathView { path: { id: string; start: string }; steps: PathStep[]; progress: { sectionId: string; done: number; pupils: number } | null; lessons: { id: string; title: string; section: string }[]; reminders: Reminder[] }
-export interface Criteria { recent: number; min: number; solid: number; repeat: number; same: number; sessions: number; classRepeat: number; classSolid: number }
+export interface Criteria { recent: number; min: number; solid: number; repeat: number; same: number; sessions: number; classRepeat: number; classSolid: number; practice: boolean; time: boolean; next: boolean }
 export interface SummaryClass { id: string; name: string; kind: string; skills: { skill: string; name: string; label: Label; counts: Record<Label, number> }[]; pupils: { id: string; name: string; skills: Record<string, Label> }[]; mistakes: { skill: string; what: string; pupils: number }[] }
 export interface Summary { criteria: Criteria; classes: SummaryClass[]; total: Record<Label, number>; learners: number }
 export interface Advice { kind: 'practice' | 'next' | 'time'; skill: string; text: string; why: string; applied: string | null; kept: boolean }
 export interface LearnerView { pupil: { id: string; name: string; classId: string; className: string; kind: string }; skills: { skill: string; name: string; label: Label; right: number; of: number; mistake: string | null }[]; sessions: { day: string; answers: number; minutes: number }[];
-  current: (PathStep & { week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean }) | null; advice: Advice[]; reminders: Reminder[]; mates: { id: string; name: string }[] }
+  current: (PathStep & { week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean; videoSeen: boolean }) | null; advice: Advice[]; reminders: Reminder[]; mates: { id: string; name: string }[] }
 export interface ReminderSettings { pupilSession: boolean; pupilCards: boolean; time: string; assignerTwoDays: boolean; assignerEnd: boolean; assignerStart: boolean }
 export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }
 
@@ -57,7 +57,7 @@ export const api = {
   removePupil: (id: string, pid: string) => call<{ ok: boolean }>('DELETE', `/t/classes/${id}/pupils/${pid}`),
   assign: (lessonId: string, a: { classId: string; confirmed: boolean; due?: string; retry: boolean; hints: boolean }) => call<{ assignment: { id: string; className: string } }>('POST', `/t/lessons/${lessonId}/assign`, a),
   lessonAssignments: (lessonId: string) => call<{ assignments: LessonAssignment[] }>('GET', `/t/lessons/${lessonId}/assignments`),
-  setRole: (r: { role: 'teacher' | 'parent'; name: string; subject?: string; children?: { name: string; grade: number }[] }) => call<{ teacher: Teacher }>('POST', '/t/role', r),
+  setRole: (r: { role: 'teacher' | 'parent'; name: string; subject?: string; classes?: string[]; children?: { name: string; grade: number }[] }) => call<{ teacher: Teacher }>('POST', '/t/role', r),
   work: (images: { data: string; type: string }[]) => call<{ request: string; focus: string }>('POST', '/t/notes/work', { images }),
   renameSection: (id: string, title: string) => call<{ ok: boolean }>('PUT', `/t/sections/${id}`, { title }),
   splitSection: (id: string, page: number, title: string) => call<{ id: string }>('POST', `/t/sections/${id}/split`, { page, title }),
@@ -67,7 +67,7 @@ export const api = {
   editItem: (id: string, itemId: string, f: Record<string, unknown>) => call<{ item: Item }>('PUT', `/t/lessons/${id}/items/${itemId}`, f),
   similarItem: (id: string, itemId: string) => call<{ items: Item[]; added: Item[] }>('POST', `/t/lessons/${id}/items/${itemId}/similar`),
   addItems: (id: string, f: { skill: string; template: string; level: string }) => call<{ items: Item[]; added: Item[] }>('POST', `/t/lessons/${id}/items`, f),
-  makeVideo: (id: string, o: { subtitles: boolean; voice: number }) => call<{ ok: boolean }>('POST', `/t/lessons/${id}/video`, o),
+  makeVideo: (id: string, o: { subtitles: boolean; voice: number; speed: number }) => call<{ ok: boolean }>('POST', `/t/lessons/${id}/video`, o),
   deleteItem: (lessonId: string, itemId: string) => call<{ ok: boolean }>('DELETE', `/t/lessons/${lessonId}/items/${itemId}`),
   deleteArea: (id: string) => call<{ ok: boolean }>('DELETE', `/t/areas/${id}`),
   deleteBook: (id: string) => call<{ ok: boolean }>('DELETE', `/t/books/${id}`),
@@ -76,6 +76,7 @@ export const api = {
   summary: (q: { classId?: string; lessonId?: string } = {}) => call<Summary>('GET', `/t/summary?${new URLSearchParams(q as Record<string, string>)}`),
   comments: (classId: string) => call<{ comments: { pupilId: string; name: string; text: string }[] }>('POST', '/t/summary/comments', { classId }),
   criteria: () => call<{ criteria: Criteria }>('GET', '/t/criteria'),
+  previewCriteria: (c: Criteria) => call<{ class: string | null; skill?: string; pupils?: { name: string; right: number; of: number; mistake: string | null; label: Label }[]; classLabel?: Label; share?: { repeat: number; of: number } }>('POST', '/t/criteria/preview', c),
   saveCriteria: (c: Criteria) => call<{ criteria: Criteria }>('PUT', '/t/criteria', c),
   reminders: () => call<{ reminders: ReminderSettings }>('GET', '/t/reminders'),
   saveReminders: (r: ReminderSettings) => call<{ reminders: ReminderSettings }>('PUT', '/t/reminders', r),

@@ -14,7 +14,7 @@ import { guardedJson, type Budget, wrapUser } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import type { Item, Lesson, Skill } from '../lesson/types.ts';
 import { writeItems } from '../lesson/writer.ts';
-import { addDays, type Answer, classLabel, cleanCriteria, type Criteria, daysBetween, labelOf, type Label, mondayOf, schoolDay, vnToday } from './labels.ts';
+import { addDays, type Answer, classLabel, clock, cleanCriteria, type Criteria, daysBetween, labelOf, type Label, mondayOf, schoolDay, vnToday } from './labels.ts';
 
 const J = (x: unknown) => JSON.stringify(x);
 export interface ReminderSettings { pupilSession: boolean; pupilCards: boolean; time: string; assignerTwoDays: boolean; assignerEnd: boolean; assignerStart: boolean }
@@ -216,6 +216,17 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     } catch { return fail(c, 'aiBusy', 503); }
   });
 
+  app.post('/api/t/criteria/preview', async (c) => {
+    const t = c.get('teacher'), cr = cleanCriteria(await c.req.json().catch(() => ({})));
+    for (const k of await sql.query<{ id: string; name: string }>('select id, name from classes where teacher_id = $1 order by created_at', [t.id])) {
+      const data = await classData(k.id), labels = labelsFor(data, cr);
+      const [sk, m] = [...labels.entries()].sort((a, b) => b[1].size - a[1].size)[0] ?? [];
+      if (!sk || !m) continue;
+      const pupils = [...m.entries()].slice(0, 4).map(([pid, l]) => ({ name: data.pupils.find((p) => p.id === pid)?.name ?? '', right: l.right, of: l.of, mistake: l.mistake, label: l.label }));
+      return c.json({ class: k.name, skill: data.skills.get(sk) || sk, pupils, classLabel: classLabel([...m.values()].map((x) => x.label), cr), share: { repeat: [...m.values()].filter((x) => x.label === 'repeat').length, of: m.size } });
+    }
+    return c.json({ class: null });
+  });
   app.get('/api/t/criteria', async (c) => c.json({ criteria: await criteriaOf(c.get('teacher').id) }));
   app.put('/api/t/criteria', async (c) => {
     const cr = cleanCriteria(await c.req.json().catch(() => ({})));
@@ -262,7 +273,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     });
     // where she is on the path (the first path of her class with a current part)
     const paths = await sql.query<{ id: string; start: string; area_id: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start, area_id from paths where class_id = $1`, [p.class_id]);
-    let current: (ReturnType<typeof layout>[number] & { pathId: string; week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean; assignmentId: string | null }) | null = null;
+    let current: (ReturnType<typeof layout>[number] & { pathId: string; week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean; videoSeen: boolean; assignmentId: string | null }) | null = null;
     for (const pa of paths) {
       const steps = await sql.query<StepRow>(`select ps.section_id, s.title, s.page_from, s.page_to, s.topic, ps.weeks, ps.ord from path_steps ps join sections s on s.id = ps.section_id where ps.path_id = $1 order by ps.ord`, [pa.id]);
       const extra = Object.fromEntries((await sql.query<{ section_id: string; weeks: number }>('select section_id, weeks from pupil_weeks where path_id = $1 and pupil_id = $2', [pa.id, p.id])).map((x) => [x.section_id, x.weeks]));
@@ -270,8 +281,9 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       if (!cur) continue;
       const asg = await sql.one<{ id: string; content: { items: Item[] } }>(`select a.id, a.content from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [p.class_id, cur.sectionId]);
       const tried = asg ? Number((await sql.one<{ n: string }>('select count(distinct item_id) as n from answers where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]))?.n) : 0;
-      const g = asg ? await sql.one<{ slides: boolean }>('select slides_at is not null as slides from pupil_progress where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]) : undefined;
-      current = { ...cur, pathId: pa.id, week: Math.min(cur.weeks, Math.floor(daysBetween(cur.start, vnToday()) / 7) + 1), daysLeft: daysBetween(vnToday(), cur.end), itemsLeft: asg ? Math.max(0, asg.content.items.length - tried) : 0, slidesSeen: !!g?.slides, assignmentId: asg?.id ?? null };
+      const g = asg ? await sql.one<{ slides: boolean; video: boolean }>('select slides_at is not null as slides, video_at is not null as video from pupil_progress where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]) : undefined;
+      const extraItems = asg ? Number((await sql.one<{ n: string }>('select coalesce(sum(jsonb_array_length(items)), 0) as n from pupil_extra where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]))?.n) : 0;
+      current = { ...cur, pathId: pa.id, week: Math.min(cur.weeks, Math.floor(daysBetween(cur.start, vnToday()) / 7) + 1), daysLeft: daysBetween(vnToday(), cur.end), itemsLeft: asg ? Math.max(0, asg.content.items.length + extraItems - tried) : 0, slidesSeen: !!g?.slides, videoSeen: !!g?.video, assignmentId: asg?.id ?? null };
       break;
     }
     // advice, by code (the sentence is a template; Chi: "code works it out, the AI only words it")
@@ -279,13 +291,13 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     const isDone = (kind: string, skill = '') => done.find((a) => a.kind === kind && a.skill === skill && a.status !== 'undone');
     const vi = lang === 'vi', cards: { kind: 'practice' | 'next' | 'time'; skill: string; text: string; why: string; applied: string | null; kept: boolean }[] = [];
     const weak = skills.find((s) => s.label !== 'solid'), strong = skills.find((s) => s.label === 'solid');
-    if (weak) { const a = isDone('practice', weak.skill); cards.push({ kind: 'practice', skill: weak.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
+    if (weak && cr.practice) { const a = isDone('practice', weak.skill); cards.push({ kind: 'practice', skill: weak.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
       text: vi ? `Dạng ${weak.name}${weak.mistake ? ` (${weak.mistake.toLowerCase()})` : ''} ${p.name} đang luyện. Nên thêm 5 câu cùng dạng vào bài đang học.` : `${p.name} is practising ${weak.name}${weak.mistake ? ` (${weak.mistake.toLowerCase()})` : ''}. Add 5 more items of this kind to the current lesson.`,
       why: vi ? `${weak.right}/${weak.of} câu gần nhất đúng. Đã vững khi từ ${cr.solid}%.` : `${weak.right}/${weak.of} recent answers right. Mastered from ${cr.solid}%.` }); }
-    if (strong) { const a = isDone('next', strong.skill); cards.push({ kind: 'next', skill: strong.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
+    if (strong && cr.next) { const a = isDone('next', strong.skill); cards.push({ kind: 'next', skill: strong.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
       text: vi ? `${p.name} đã vững dạng ${strong.name}. Có thể làm thêm bài nâng cao.` : `${p.name} has mastered ${strong.name}. Ready for harder items.`,
       why: vi ? `${strong.right}/${strong.of} câu gần nhất đúng (từ ${cr.solid}% là đã vững).` : `${strong.right}/${strong.of} recent answers right (mastered from ${cr.solid}%).` }); }
-    if (current && current.daysLeft <= 2 && current.itemsLeft > 0) { const a = isDone('time', current.sectionId); cards.push({ kind: 'time', skill: current.sectionId, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
+    if (cr.time && current && current.daysLeft <= 2 && current.itemsLeft > 0) { const a = isDone('time', current.sectionId); cards.push({ kind: 'time', skill: current.sectionId, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
       text: vi ? `Còn ${Math.max(0, current.daysLeft)} ngày, ${p.name} còn ${current.itemsLeft} câu bài tập. Nên kéo dài bài này thêm 1 tuần.` : `${Math.max(0, current.daysLeft)} days left and ${current.itemsLeft} items to go. Give this lesson one more week.`,
       why: vi ? `Bài “${current.title}” hết ngày ${current.end.slice(8, 10)}/${current.end.slice(5, 7)}.` : `“${current.title}” ends on ${current.end}.` }); }
     return { skills, sessions, current, advice: await wordAdvice(tid, p.name, lang, cards), lang };
@@ -296,8 +308,13 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     if (!p) return fail(c, 'notFound', 404);
     const L = await learner(c.get('teacher').id, p);
     const s = await remindersOf(c.get('teacher').id);
-    const sent = L.current ? remindersFor(layout(L.current.start, [{ section_id: L.current.sectionId, title: L.current.title, page_from: 0, page_to: 0, topic: '', weeks: L.current.weeks }], vnToday()).map((x) => ({ ...x, status: 'current' as const })), s, undefined, L.current.start).filter((r) => r.who === 'pupils' && r.date <= vnToday()) : [];
-    const mates = await sql.query<{ id: string; name: string }>('select id, name from pupils where class_id = $1 order by created_at, name', [p.class_id]);
+    const logged = await sql.query<{ day: string; kind: string; text: string }>(`select to_char(day, 'YYYY-MM-DD') as day, kind, text from pupil_reminders where pupil_id = $1 order by day desc limit 20`, [p.id]);
+    const sent = logged.map((r) => ({ date: r.day, who: 'pupils' as const, kind: r.kind, vi: r.text.split('\n')[0], en: r.text.split('\n')[1] || r.text }));
+    void (L.current ? remindersFor(layout(L.current.start, [{ section_id: L.current.sectionId, title: L.current.title, page_from: 0, page_to: 0, topic: '', weeks: L.current.weeks }], vnToday()).map((x) => ({ ...x, status: 'current' as const })), s, undefined, L.current.start).filter((r) => r.who === 'pupils' && r.date <= vnToday()) : []);
+    // a parent moves between her children (each is a class of one); a teacher between the pupils of the class
+    const mates = p.kind === 'child'
+      ? await sql.query<{ id: string; name: string }>(`select p.id, p.name from pupils p join classes k on k.id = p.class_id where k.teacher_id = $1 and k.kind = 'child' order by k.created_at`, [c.get('teacher').id])
+      : await sql.query<{ id: string; name: string }>('select id, name from pupils where class_id = $1 order by created_at, name', [p.class_id]);
     return c.json({ pupil: { id: p.id, name: p.name, classId: p.class_id, className: p.class_name, kind: p.kind }, ...L, reminders: sent, mates });
   });
 
@@ -335,6 +352,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const r = await d.as(t.id, () => writeItems(d.ai, l.setup, l.source, l.skills, { skill, template: like.template, level: kind === 'next' ? 'advanced' : like.level === 'advanced' ? 'good' : like.level, count: 5 }, () => `${p.id.slice(0, 4)}x${Date.now().toString(36)}${n++}`), asg.lesson_id);
       if (!r.kept.length) return fail(c, 'aiBusy', 503);
       const a = await sql.one<{ id: string }>(`insert into advice (teacher_id, pupil_id, kind, skill, data) values ($1, $2, $3, $4, $5::jsonb) returning id::text`, [t.id, p.id, kind, skill, J({ assignmentId: asg.id })]);
+      for (const it of r.kept) it.page = like.page;
       await sql.query('insert into pupil_extra (assignment_id, pupil_id, advice_id, items) values ($1, $2, $3, $4::jsonb)', [asg.id, p.id, Number(a!.id), J(r.kept.slice(0, 5))]);
       return c.json({ ok: true, adviceId: a!.id, added: r.kept.slice(0, 5).length });
     } catch { return fail(c, 'aiBusy', 503); }
@@ -346,11 +364,21 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const k = await sql.one<{ teacher_id: string }>('select teacher_id from classes where id = $1', [classId]);
       if (!k) return null;
       const s = await remindersOf(k.teacher_id), today = vnToday();
+      // already shown today: the same one again (at most one a day)
+      const shown = await sql.one<{ text: string; kind: string }>('select text, kind from pupil_reminders where pupil_id = $1 and day = $2', [pupilId, today]);
+      if (shown) { const [vi, en] = shown.text.split('\n'); return { vi, en: en || vi }; }
+      // only from the time the assigner chose until 20:00 (Vietnam time)
+      const hm = new Date(clock.now() + 7 * 3600e3).toISOString().slice(11, 16);
+      if (hm < s.time || hm >= '20:00') return null;
       for (const pa of await sql.query<{ id: string; start: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start from paths where class_id = $1`, [classId])) {
         const steps = await sql.query<StepRow>(`select ps.section_id, s.title, s.page_from, s.page_to, s.topic, ps.weeks, ps.ord from path_steps ps join sections s on s.id = ps.section_id where ps.path_id = $1 order by ps.ord`, [pa.id]);
         const extra = Object.fromEntries((await sql.query<{ section_id: string; weeks: number }>('select section_id, weeks from pupil_weeks where path_id = $1 and pupil_id = $2', [pa.id, pupilId])).map((x) => [x.section_id, x.weeks]));
-        const r = remindersFor(layout(pa.start, steps, today, extra), s, undefined, today).find((x) => x.who === 'pupils' && x.date === today);
-        if (r) return { vi: r.vi, en: r.en };
+        const laid = layout(pa.start, steps, today, extra), cur = laid.find((x) => x.status === 'current');
+        const done = cur ? !!(await sql.one(`select 1 from pupil_progress g join assignments a on a.id = g.assignment_id join lessons l on l.id = a.lesson_id
+          where g.pupil_id = $1 and l.refs->0->>'sectionId' = $2 and g.done_at is not null`, [pupilId, cur.sectionId])) : false;
+        // Chi: the mid-lesson reminder only for a learner who has not done the practice yet
+        const r = remindersFor(laid, s, undefined, today).find((x) => x.who === 'pupils' && x.date === today && !(x.kind === 'mid' && done));
+        if (r) { await sql.query('insert into pupil_reminders (pupil_id, day, kind, text) values ($1, $2, $3, $4) on conflict do nothing', [pupilId, today, r.kind, `${r.vi}\n${r.en}`]); return { vi: r.vi, en: r.en }; }
       }
       return null;
     },

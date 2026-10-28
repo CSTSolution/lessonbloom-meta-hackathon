@@ -11,13 +11,13 @@ type L = 'vi' | 'en';
 const S = {
   vi: {
     enter: 'Vào học', codePh: 'Mã lớp', next: 'Tiếp', who: 'Con là ai?', notMe: 'Đổi lớp', hello: (n: string) => `Chào ${n}!`, today: 'Hôm nay con học gì', nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!',
-    watch: 'Xem bài', practise: 'Làm bài', cards: 'Thẻ nhớ', back: '←', done: 'Xong', finish: 'Con làm xong rồi! Giỏi lắm 🌟', again: 'Chưa đúng, con thử lại nhé', retry: 'Thử lại', right: 'Đúng rồi! 🎉', tip: 'Gợi ý',
+    watch: 'Xem bài', video: 'Xem video', match: 'Lật thẻ tìm cặp', matchHint: 'Lật hai thẻ giống nhau nhé', matchDone: 'Con tìm đủ các cặp rồi! 🎉', again2: 'Chơi lại', practise: 'Làm bài', cards: 'Thẻ nhớ', back: '←', done: 'Xong', finish: 'Con làm xong rồi! Giỏi lắm 🌟', again: 'Chưa đúng, con thử lại nhé', retry: 'Thử lại', right: 'Đúng rồi! 🎉', tip: 'Gợi ý',
     check: 'Kiểm tra', home: 'Về trang chính', nextCard: 'Thẻ tiếp', flip: 'Chạm để lật thẻ', listen: '🔊 Nghe', tr: 'Đúng', fa: 'Sai', clear: 'Xoá', type: 'Con viết số vào đây', suggest: 'Gợi ý tiếp theo',
     sCards: 'Con ôn lại thẻ nhớ nhé', sWatch: 'Con xem lại bài giảng nhé', sHome: 'Con nghỉ một chút rồi học bài khác nhé', left: (n: number) => `Còn ${n} câu`, leave: 'Thoát',
   },
   en: {
     enter: 'Join your class', codePh: 'Class code', next: 'Next', who: 'Who are you?', notMe: 'Change class', hello: (n: string) => `Hi ${n}!`, today: 'Today', nothing: 'Nothing for today yet. Come back later!',
-    watch: 'Watch', practise: 'Practise', cards: 'Cards', back: '←', done: 'Done', finish: 'All done! Well done 🌟', again: 'Not quite, try again', retry: 'Try again', right: 'That\'s right! 🎉', tip: 'Hint',
+    watch: 'Slides', video: 'Watch the video', match: 'Find the pairs', matchHint: 'Turn over two cards that go together', matchDone: 'You found all the pairs! 🎉', again2: 'Play again', practise: 'Practise', cards: 'Cards', back: '←', done: 'Done', finish: 'All done! Well done 🌟', again: 'Not quite, try again', retry: 'Try again', right: 'That\'s right! 🎉', tip: 'Hint',
     check: 'Check', home: 'Home', nextCard: 'Next card', flip: 'Tap to flip', listen: '🔊 Listen', tr: 'True', fa: 'False', clear: 'Clear', type: 'Write the number here', suggest: 'What next',
     sCards: 'Go over the flashcards', sWatch: 'Watch the lesson again', sHome: 'Take a break, then try another lesson', left: (n: number) => `${n} to go`, leave: 'Leave',
   },
@@ -29,9 +29,9 @@ async function p<T>(method: string, path: string, body?: unknown): Promise<T> {
   if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi', j.errorEn || 'Error', r.status);
   return j as T;
 }
-interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; slides_seen: boolean; cards_seen: boolean; done: boolean; answered: number }
+interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; done: boolean; answered: number }
 interface PItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean }
-interface PLesson { id: string; title: string; lang: L; retry: boolean; hints: boolean; slides: { id: string; heading: string; bullets: string[]; example?: string; image?: string }[]; items: PItem[]; cards: { id: string; front: string; back: string; emoji?: string }[]; tried: Record<string, boolean> }
+interface PLesson { id: string; title: string; lang: L; retry: boolean; hints: boolean; video: string | null; slides: { id: string; heading: string; bullets: string[]; example?: string; image?: string }[]; items: PItem[]; cards: { id: string; front: string; back: string; emoji?: string }[]; tried: Record<string, boolean> }
 
 export function Pupil() {
   const path = usePath();
@@ -43,12 +43,12 @@ export function Pupil() {
     if (link) { p('POST', '/link', { link }).then(() => { go('/hoc'); void load(); }).catch(() => { go('/hoc'); setToday(null); }); return; }
     void load();
   }, []);
-  const m = /^\/hoc\/a\/(\w+)\/(slides|practice|cards)$/.exec(path);
+  const m = /^\/hoc\/a\/(\w+)\/(slides|video|practice|cards|match)$/.exec(path);
   if (today === undefined) return <div className="pupil" />;
   if (!today) return <div className="pupil"><Join code={/^\/hoc\/(\w{4,12})$/.exec(path)?.[1] || ''} onIn={load} /></div>;
   return (
     <div className="pupil">
-      {m ? <LessonPart id={m[1]} part={m[2] as 'slides' | 'practice' | 'cards'} onBack={() => { go('/hoc'); void load(); }} /> : (
+      {m ? <LessonPart id={m[1]} part={m[2] as Part} onBack={() => { go('/hoc'); void load(); }} /> : (
         <div className="p-stack">
           <div className="p-top"><b className="grow">{t.hello(today.pupil.name)}</b><button className="p-link" onClick={async () => { await p('POST', '/leave').catch(() => {}); setToday(null); go('/hoc'); }}>{t.leave}</button></div>
           <h1>{t.today}</h1>
@@ -58,9 +58,11 @@ export function Pupil() {
             <div key={l.id} className="p-lesson">
               <b className="p-title">{l.title}</b>
               <div className="p-actions">
-                {l.slides > 0 && <button className="p-btn" onClick={() => go(`/hoc/a/${l.id}/slides`)}>📖 {s.watch}{l.slides_seen ? ' ✓' : ''}</button>}
+                {l.video && <button className="p-btn" onClick={() => go(`/hoc/a/${l.id}/video`)}>🎬 {s.video}{l.video_seen ? ' ✓' : ''}</button>}
+                {l.slides > 0 && <button className="p-btn" onClick={() => go(`/hoc/a/${l.id}/slides`)}>📖 {s.watch}{l.slides_seen && !l.video ? ' ✓' : ''}</button>}
                 {l.items > 0 && <button className="p-btn main" onClick={() => go(`/hoc/a/${l.id}/practice`)}>✏️ {s.practise}{l.done ? ' ✓' : ''}</button>}
                 {l.cards > 0 && <button className="p-btn" onClick={() => go(`/hoc/a/${l.id}/cards`)}>🃏 {s.cards}{l.cards_seen ? ' ✓' : ''}</button>}
+                {l.cards >= 3 && <button className="p-btn" onClick={() => go(`/hoc/a/${l.id}/match`)}>🧩 {s.match}</button>}
               </div>
             </div>
           ); })}
@@ -93,7 +95,8 @@ function Join({ code: start, onIn }: { code: string; onIn: () => void }) {
   );
 }
 
-function LessonPart({ id, part, onBack }: { id: string; part: 'slides' | 'practice' | 'cards'; onBack: () => void }) {
+type Part = 'slides' | 'video' | 'practice' | 'cards' | 'match';
+function LessonPart({ id, part, onBack }: { id: string; part: Part; onBack: () => void }) {
   const [l, setL] = useState<PLesson | null>(null);
   useEffect(() => { p<{ lesson: PLesson }>('GET', `/a/${id}`).then((r) => setL(r.lesson)).catch(onBack); }, [id]);
   if (!l) return null;
@@ -102,6 +105,8 @@ function LessonPart({ id, part, onBack }: { id: string; part: 'slides' | 'practi
     <div className="p-stack">
       <div className="p-top"><button className="p-link big" onClick={onBack} aria-label={t.home}>{t.back}</button><b className="grow p-ell">{l.title}</b></div>
       {part === 'slides' && <Slides l={l} t={t} onEnd={() => { void p('POST', `/a/${id}/seen`, { what: 'slides' }); onBack(); }} />}
+      {part === 'video' && <Video l={l} t={t} onEnd={() => { void p('POST', `/a/${id}/seen`, { what: 'video' }); }} onBack={onBack} />}
+      {part === 'match' && <Match l={l} t={t} onEnd={onBack} />}
       {part === 'cards' && <Cards l={l} t={t} onEnd={() => { void p('POST', `/a/${id}/seen`, { what: 'cards' }); onBack(); }} />}
       {part === 'practice' && <Practice l={l} t={t} onHome={onBack} onCards={() => go(`/hoc/a/${id}/cards`)} onSlides={() => go(`/hoc/a/${id}/slides`)} />}
     </div>
@@ -210,6 +215,44 @@ function Practice({ l, t, onHome, onCards, onSlides }: { l: PLesson; t: (typeof 
       )}
       {res && !res.correct && res.again && <button className="p-btn" onClick={() => { setRes(null); setGiven(''); setOrder([]); setPairs({}); }}>{t.retry}</button>}
       {answered && <button className="p-btn main" onClick={go2}>{t.next} →</button>}
+    </>
+  );
+}
+
+// The lesson video (made by the teacher, or for a parent's child when assigned).
+function Video({ l, t, onEnd, onBack }: { l: PLesson; t: (typeof S)['vi']; onEnd: () => void; onBack: () => void }) {
+  if (!l.video) return <p className="p-soft">…</p>;
+  return (
+    <>
+      <video src={l.video} controls playsInline autoPlay style={{ width: '100%', borderRadius: 16, background: '#000' }} onEnded={onEnd} />
+      <button className="p-btn main" onClick={() => { onEnd(); onBack(); }}>{t.done} ✓</button>
+    </>
+  );
+}
+
+// "Lật thẻ tìm cặp": each flashcard becomes two face-down cards (its front and its back); turn two over,
+// a pair stays open. No timer, no score.
+function Match({ l, t, onEnd }: { l: PLesson; t: (typeof S)['vi']; onEnd: () => void }) {
+  const make = () => {
+    const tiles = l.cards.slice(0, 6).flatMap((c) => [{ k: c.id, text: c.front, emo: c.emoji }, { k: c.id, text: c.back, emo: '' }]);
+    for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
+    return tiles;
+  };
+  const [tiles, setTiles] = useState(make), [open, setOpen] = useState<number[]>([]), [found, setFound] = useState<string[]>([]);
+  const turn = (i: number) => {
+    if (open.includes(i) || found.includes(tiles[i].k) || open.length === 2) return;
+    const next = [...open, i];
+    setOpen(next);
+    if (next.length === 2) setTimeout(() => { if (tiles[next[0]].k === tiles[next[1]].k) setFound((f) => [...f, tiles[next[0]].k]); setOpen([]); }, 800);
+  };
+  const all = found.length === tiles.length / 2;
+  return (
+    <>
+      <p className="p-soft">{all ? t.matchDone : t.matchHint}</p>
+      <div className="p-memory">{tiles.map((x, i) => { const up = open.includes(i) || found.includes(x.k); return (
+        <button key={i} className={`p-tile ${up ? 'up' : ''} ${found.includes(x.k) ? 'got' : ''}`} onClick={() => turn(i)} aria-label={up ? x.text : '?'}>{up ? <>{x.emo && <span className="p-emo small">{x.emo}</span>}{x.text}</> : '?'}</button>
+      ); })}</div>
+      {all && <div className="p-actions row2"><button className="p-btn" onClick={() => { setTiles(make()); setFound([]); }}>{t.again2}</button><button className="p-btn main" onClick={onEnd}>{t.done} ✓</button></div>}
     </>
   );
 }

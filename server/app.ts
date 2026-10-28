@@ -12,7 +12,7 @@ import { Budget, clientIp, Limiter } from './guard/guard.ts';
 import { cleanCode, CODE, redeem } from './credits.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
-import { addChild, classRoutes } from './classes/routes.ts';
+import { addChild, addClass, classRoutes } from './classes/routes.ts';
 import { knowledgeRoutes } from './knowledge/routes.ts';
 import { editRoutes } from './lesson/edit.ts';
 import { lessonRoutes } from './lesson/routes.ts';
@@ -113,7 +113,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
   // Sign-up step 2: who she is. A teacher gives her subject; a parent her children (first names, up to 4,
   // each with a grade), who become her "Con của tôi". The role is set once (changed later in the profile).
   app.post('/api/t/role', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ role?: string; name?: string; subject?: string; children?: { name?: string; grade?: number }[] }>().catch(() => ({} as Record<string, never>));
+    const t = c.get('teacher'), b = await c.req.json<{ role?: string; name?: string; subject?: string; classes?: string[]; children?: { name?: string; grade?: number }[] }>().catch(() => ({} as Record<string, never>));
     if (b.role !== 'teacher' && b.role !== 'parent') return fail(c, 'bad');
     const name = String(b.name ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
     const subject = ['math', 'english', 'both'].includes(String(b.subject)) ? String(b.subject) : '';
@@ -121,6 +121,8 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     if (b.role === 'parent' && !kids.length) return fail(c, 'children');
     await sql.query('update teachers set role = $2, name = coalesce(nullif($3, \'\'), name), subject = $4 where id = $1', [t.id, b.role, name, subject]);
     if (b.role === 'parent') for (const k of kids) await addChild(sql, t.id, k.name, k.grade);
+    // a teacher's classes, as typed (Chi: "giáo viên nhập môn và lớp")
+    if (b.role === 'teacher') for (const n of [...new Set((Array.isArray(b.classes) ? b.classes : []).map((x) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 10)) await addClass(sql, t.id, n);
     return c.json({ teacher: publicTeacher((await sql.one<Teacher>('select * from teachers where id = $1', [t.id]))!) });
   });
   app.post('/api/t/logout', async (c) => {
@@ -146,6 +148,6 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
   lessonRoutes(app, { sql, ai, budget, files, as });
   editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });
-  classRoutes(app, { sql, ai, reminder: path.pupilReminder });
+  classRoutes(app, { sql, ai, files, reminder: path.pupilReminder });
   return app;
 }

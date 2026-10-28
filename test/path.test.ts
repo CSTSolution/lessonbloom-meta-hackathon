@@ -1,7 +1,7 @@
 // Tasks 3 and 4: the parent role, the learning path, labels by code, advice for one learner, reminders.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { classLabel, DEFAULT_CRITERIA, labelOf, mistakeOf, schoolDay } from '../server/path/labels.ts';
+import { classLabel, clock, DEFAULT_CRITERIA, labelOf, mistakeOf, schoolDay } from '../server/path/labels.ts';
 import { layout } from '../server/path/routes.ts';
 import type { Item } from '../server/lesson/types.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
@@ -58,7 +58,12 @@ test('path, summary, advice for one learner, and her reminder', async () => {
     return c2;
   };
   const an = await kid('198.51.100.80', 'An'), binh = await kid('198.51.100.81', 'Bình');
-  assert.match((await an('GET', '/api/p/today')).json.reminder.vi, /Bắt đầu bài/, 'her reminder for today, in the app');
+  // reminders show from the chosen time (18:00 by default) until 20:00, Vietnam time
+  const at = (hm: string) => { const [h, m] = hm.split(':').map(Number); clock.now = () => Date.parse(`${today}T00:00:00Z`) + ((h - 7) * 60 + m) * 60e3; };
+  at('15:00'); assert.equal((await an('GET', '/api/p/today')).json.reminder, null, 'not before the chosen time');
+  at('18:30'); assert.match((await an('GET', '/api/p/today')).json.reminder.vi, /Bắt đầu bài/, 'her reminder for today, in the app');
+  at('21:00'); assert.match((await an('GET', '/api/p/today')).json.reminder.vi, /Bắt đầu bài/, 'once shown, the same one all day');
+  clock.now = () => Date.now();
   const add = lesson.items.find((i: any) => i.op === '+' && i.template === 'fill' && i.blank === 'result') ?? lesson.items.find((i: any) => i.op === '+' && i.template !== 'truefalse');
   for (let i = 0; i < 3; i++) await an('POST', `/api/p/a/${a.id}/answer`, { itemId: add.id, answer: String(Number(add.answer) - 10) });
   for (const it of lesson.items) { await an('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer }); await binh('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer }); }

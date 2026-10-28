@@ -21,7 +21,7 @@ export function speaker(o: Voices): ((r: SpeechRequest) => Promise<Buffer>) | un
     if (!text) throw new Error('nothing to say');
     const r = await f(`${base.replace(/\/+$/, '')}/tts`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text, voice: VOICE[req.lang](req.voice ?? 0), speed: 1 }),
+      body: JSON.stringify({ text, voice: VOICE[req.lang](req.voice ?? 0), speed: Math.min(1.3, Math.max(0.7, req.speed ?? 1)) }),
       signal: AbortSignal.timeout(o.timeoutMs ?? 5 * 60e3),
     });
     if (!r.ok) throw new Error(`voice engine ${r.status}: ${(await r.text()).slice(0, 200)}`);

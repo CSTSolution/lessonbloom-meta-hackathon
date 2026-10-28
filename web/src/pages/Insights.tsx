@@ -11,6 +11,7 @@ const T = {
   vi: {
     title: 'Tóm tắt học tập', advice: 'Tư vấn riêng cho từng em', adviceSub: (n: number) => `${n} em có kết quả để tư vấn.`, seeEach: 'Xem chi tiết từng em ›', lesson: 'Bài học', allLessons: 'Tất cả bài', cls: 'Lớp', child: 'Con',
     tt27: 'Hỗ trợ đánh giá thường xuyên theo Thông tư 27/2020/TT-BGDĐT: nhận xét, không chấm điểm, không so sánh học sinh. Mức Hoàn thành tốt / Hoàn thành / Chưa hoàn thành vẫn do cô quyết định; LessonBloom không dùng cho kiểm tra, đánh giá định kỳ.',
+    clsRepeat: (n: number) => `${n} dạng bài cả lớp lặp lỗi`, kidsRepeat: (n: number) => `${n} lượt em lặp lỗi`,
     overview: 'Tổng quan các lớp', overviewP: 'Tổng quan các con', ratio: 'Tỉ lệ dạng bài · tất cả các lớp', byClass: 'Theo từng lớp', byChild: 'Theo từng con', detail: 'Xem chi tiết ›', labels: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' },
     legend: 'Lỗi lặp lại: cần luyện thêm cùng dạng · Đang luyện: chưa đủ lượt làm để kết luận · Đã vững: có thể chuyển bài nâng cao', edit: 'Chỉnh tiêu chí ›', count: (n: number) => `${n} lượt dạng bài`,
     one: (n: string) => `Chi tiết lớp · ${n}`, oneP: (n: string) => `Chi tiết · ${n}`, mist: (n: string) => `Dạng lỗi đang lặp lại · ${n}`, solid: (n: string) => `Đã vững và buổi sau · ${n}`, comments: (n: string) => `Gợi ý lời nhận xét · ${n}`,
@@ -19,6 +20,7 @@ const T = {
   en: {
     title: 'Learning summary', advice: 'Advice for each learner', adviceSub: (n: number) => `${n} learners have results to advise on.`, seeEach: 'See each learner ›', lesson: 'Lesson', allLessons: 'All lessons', cls: 'Class', child: 'Child',
     tt27: 'Supports regular assessment under Circular 27/2020: comments, no marks, no comparing pupils. Final levels stay the teacher\'s decision; LessonBloom is not used for tests or end-of-term assessment.',
+    clsRepeat: (n: number) => `${n} class skill${n === 1 ? '' : 's'} with a repeated mistake`, kidsRepeat: (n: number) => `${n} learner${n === 1 ? '' : 's'} repeating it`,
     overview: 'All classes', overviewP: 'All children', ratio: 'Skills · all classes', byClass: 'By class', byChild: 'By child', detail: 'Details ›', labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
     legend: 'Repeated mistake: practise more of the same · Practising: not enough answers yet · Mastered: ready for harder items', edit: 'Edit criteria ›', count: (n: number) => `${n} class skills`,
     one: (n: string) => `Class detail · ${n}`, oneP: (n: string) => `Detail · ${n}`, mist: (n: string) => `Repeated mistakes · ${n}`, solid: (n: string) => `Mastered and next · ${n}`, comments: (n: string) => `Suggested comments · ${n}`,
@@ -40,7 +42,8 @@ function Donut({ v }: { v: Record<Label, number> }) {
 
 export function Insights({ parent }: { parent: boolean }) {
   const t = useT(T), lang = useLang();
-  const [s, setS] = useState<Summary | null>(null), [lessons, setLessons] = useState<LessonRow[]>([]), [lessonId, setLessonId] = useState(''), [k, setK] = useState(''), [open, setOpen] = useState('overview');
+  const q = new URLSearchParams(location.search);
+  const [s, setS] = useState<Summary | null>(null), [lessons, setLessons] = useState<LessonRow[]>([]), [lessonId, setLessonId] = useState(q.get('lesson') || ''), [k, setK] = useState(q.get('class') || ''), [open, setOpen] = useState(q.get('class') ? 'one' : 'overview');
   const [comments, setComments] = useState<{ pupilId: string; name: string; text: string }[] | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState('');
   useEffect(() => { api.lessons().then((r) => setLessons(r.lessons.filter((l) => l.given))).catch(() => {}); }, []);
   useEffect(() => { api.summary(lessonId ? { lessonId } : {}).then((x) => { setS(x); setK((p) => p || x.classes[0]?.id || ''); }).catch(() => setS(null)); setComments(null); }, [lessonId]);
@@ -60,7 +63,7 @@ export function Insights({ parent }: { parent: boolean }) {
       </div>
       {!parent && <p className="banner blue small" style={{ marginBottom: 10 }}>ⓘ {t.tt27}</p>}
       {!s.classes.some((x) => x.skills.length) ? <div className="card"><p className="muted">{t.none}</p></div> : <div className="stack">
-        {section('overview', parent ? t.overviewP : t.overview, t.count(s.total.solid + s.total.practising + s.total.repeat), s.total.repeat ? <span className="tag repeat">{s.total.repeat} {t.labels.repeat}</span> : null, <>
+        {section('overview', parent ? t.overviewP : t.overview, t.count(s.total.solid + s.total.practising + s.total.repeat), s.total.repeat ? <span className="tag repeat">{t.clsRepeat(s.total.repeat)}</span> : null, <>
           <div className="grid2">
             <div className="card row"><Donut v={s.total} /><div className="stack" style={{ gap: 4 }}>{(['solid', 'practising', 'repeat'] as Label[]).map((l) => <span key={l} className="small"><b style={{ color: COLOR[l] }}>●</b> {t.labels[l]} · {s.total[l]} · {pct(s.total[l])}</span>)}</div></div>
             <div className="card stack" style={{ gap: 6 }}><b className="small">{parent ? t.byChild : t.byClass}</b>{s.classes.map((x) => { const c = x.skills.reduce((a, sk) => ({ solid: a.solid + (sk.label === 'solid' ? 1 : 0), practising: a.practising + (sk.label === 'practising' ? 1 : 0), repeat: a.repeat + (sk.label === 'repeat' ? 1 : 0) }), { solid: 0, practising: 0, repeat: 0 }); const n = c.solid + c.practising + c.repeat || 1; return (
@@ -74,7 +77,7 @@ export function Insights({ parent }: { parent: boolean }) {
             {cls.pupils.map((p) => <tr key={p.id}><td><button className="link" onClick={() => go(`/learner/${p.id}`)}>{p.name}</button></td>{cls.skills.map((x) => <td key={x.skill}>{p.skills[x.skill] ? <span className={`tag ${p.skills[x.skill]}`}>{t.labels[p.skills[x.skill]]}</span> : '·'}</td>)}</tr>)}
           </tbody></table>
         ))}
-        {cls && section('mist', t.mist(cls.name), cls.mistakes.length ? cls.mistakes.map((m) => m.what).join(' · ') : t.noMist, cls.mistakes.length ? <span className="tag repeat">{cls.mistakes.length} {t.labels.repeat}</span> : null, (
+        {cls && section('mist', t.mist(cls.name), cls.mistakes.length ? cls.mistakes.map((m) => m.what).join(' · ') : t.noMist, cls.mistakes.length ? <span className="tag repeat">{t.kidsRepeat(cls.mistakes.reduce((a, m) => a + m.pupils, 0))}</span> : null, (
           cls.mistakes.length ? <div className="stack" style={{ gap: 6 }}>{cls.mistakes.map((m, i) => <div key={i} className="list-row small"><span className="grow"><b>{m.what}</b> · {m.skill}</span><span className="muted">{t.pupils(m.pupils)}</span></div>)}</div> : <p className="small muted">{t.noMist}</p>
         ))}
         {cls && section('solid', t.solid(cls.name), cls.skills.filter((x) => x.label === 'solid').map((x) => x.name).join(' · ') || '—', <span className="tag ai">AI</span>, (
@@ -99,6 +102,8 @@ const C = {
     one: 'Từng em · một dạng bài', oneSub: (c: Crit) => `${c.recent} câu gần nhất · tối thiểu ${c.min} · Đã vững ≥ ${c.solid}% · Lỗi lặp lại < ${c.repeat}% hoặc ${c.same} lần/${c.sessions} buổi`,
     rule: 'Quy tắc', value: 'Giá trị', recent: 'Xét trên số câu gần nhất', min: 'Chỉ gắn nhãn khi em đã làm ít nhất', solid: 'khi em đúng từ', repeat: 'khi em đúng dưới', same: 'hoặc cùng một kiểu sai xuất hiện từ', times: 'lần, trong ít nhất', sessions: 'buổi', practising: 'khi không rơi vào hai mức trên, hoặc chưa đủ số câu', rest: 'Các trường hợp còn lại', q: 'câu',
     cls: 'Cả lớp · một dạng bài', clsSub: (c: Crit) => `Lỗi lặp lại ≥ ${c.classRepeat}% số em · Đã vững ≥ ${c.classSolid}% số em`, clsRepeat: 'Lớp có Lỗi lặp lại khi từ', clsSolid: 'Lớp Đã vững khi từ', ofPupils: '% số em',
+    nextT: 'Gợi ý bài tiếp theo', nextSub: (n: number) => `3 nhãn → 3 gợi ý · ${n}/3 đang bật`, sPractice: 'Luyện thêm cùng dạng', sTime: 'Thêm thời gian cho bài', sNext: 'Bài nâng cao hoặc bài tiếp', lbl: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' },
+    preview: 'Xem thử với tiêu chí hiện tại', right: (r: number, o: number) => `${r}/${o} câu đúng`, clsLevel: 'Mức của lớp', share: (r: number, o: number) => `${r}/${o} em đang lặp lỗi`,
     note: 'Mặc định 80 / 50 / 3 lần·2 buổi / 30% / 70%. Áp dụng cho mọi lớp cô dạy.', tt27: 'Hỗ trợ đánh giá thường xuyên theo Thông tư 27/2020/TT-BGDĐT: không chấm điểm, không so sánh học sinh, học sinh không thấy nhãn.',
   },
   en: {
@@ -106,16 +111,22 @@ const C = {
     one: 'One learner · one skill', oneSub: (c: Crit) => `last ${c.recent} answers · at least ${c.min} · Mastered ≥ ${c.solid}% · Repeated mistake < ${c.repeat}% or ${c.same} times in ${c.sessions} sessions`,
     rule: 'Rule', value: 'Value', recent: 'Look at the most recent answers', min: 'Label only after at least', solid: 'when at least this many are right', repeat: 'when fewer than this are right', same: 'or the same kind of mistake at least', times: 'times, within', sessions: 'sessions', practising: 'when neither of the above, or not enough answers', rest: 'Everything else', q: 'answers',
     cls: 'The class · one skill', clsSub: (c: Crit) => `Repeated mistake ≥ ${c.classRepeat}% of learners · Mastered ≥ ${c.classSolid}%`, clsRepeat: 'The class has a repeated mistake from', clsSolid: 'The class has mastered it from', ofPupils: '% of learners',
+    nextT: 'Suggesting what next', nextSub: (n: number) => `3 labels → 3 suggestions · ${n}/3 on`, sPractice: 'More practice of the same kind', sTime: 'More time for the lesson', sNext: 'Harder items or the next lesson', lbl: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
+    preview: 'Try it with these criteria', right: (r: number, o: number) => `${r}/${o} right`, clsLevel: 'Class level', share: (r: number, o: number) => `${r}/${o} learners with a repeated mistake`,
     note: 'Defaults 80 / 50 / 3 times in 2 sessions / 30% / 70%. Applies to all your classes.', tt27: 'Supports regular assessment under Circular 27/2020: no marks, no comparing learners; learners never see labels.',
   },
 };
-const DEF: Crit = { recent: 10, min: 5, solid: 80, repeat: 50, same: 3, sessions: 2, classRepeat: 30, classSolid: 70 };
+const DEF: Crit = { recent: 10, min: 5, solid: 80, repeat: 50, same: 3, sessions: 2, classRepeat: 30, classSolid: 70, practice: true, time: true, next: true };
+type NumKey = 'recent' | 'min' | 'solid' | 'repeat' | 'same' | 'sessions' | 'classRepeat' | 'classSolid';
 
 export function Criteria() {
   const t = useT(C), [c, setC] = useState<Crit | null>(null), [msg, setMsg] = useState(''), [open, setOpen] = useState('one');
+  const [prev, setPrev] = useState<Awaited<ReturnType<typeof api.previewCriteria>> | null>(null);
   useEffect(() => { api.criteria().then((r) => setC(r.criteria)).catch(() => setC(DEF)); }, []);
+  // try the thresholds on her own class, as she changes them (Chi: "Xem thử với tiêu chí hiện tại")
+  useEffect(() => { if (!c) return; const id = setTimeout(() => api.previewCriteria(c).then(setPrev).catch(() => {}), 300); return () => clearTimeout(id); }, [c]);
   if (!c) return null;
-  const num = (k: keyof Crit, unit: string) => <span className="row" style={{ gap: 4 }}><input type="number" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) })} style={{ width: 64 }} /> <span className="small muted">{unit}</span></span>;
+  const num = (k: NumKey, unit: string) => <span className="row" style={{ gap: 4 }}><input type="number" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) })} style={{ width: 64 }} /> <span className="small muted">{unit}</span></span>;
   const isDef = (keys: (keyof Crit)[]) => keys.every((k) => c[k] === DEF[k]);
   return (
     <div className="page" style={{ maxWidth: 820 }}>
@@ -125,13 +136,23 @@ export function Criteria() {
         <div className={`group card ${open === 'one' ? 'on' : ''}`}><button className="group-head" onClick={() => setOpen(open === 'one' ? '' : 'one')}><span className="caret">{open === 'one' ? '▾' : '▸'}</span><span className="grow"><b className="small">{t.one}</b><span className="small muted" style={{ display: 'block' }}>{t.oneSub(c)}</span></span>{isDef(['recent', 'min', 'solid', 'repeat', 'same', 'sessions']) && <span className="tag">{t.def}</span>}</button>
           {open === 'one' && <table className="tbl" style={{ marginTop: 8 }}><thead><tr><th>{t.rule}</th><th>{t.value}</th></tr></thead><tbody>
             <tr><td>{t.recent}</td><td>{num('recent', t.q)}</td></tr><tr><td>{t.min}</td><td>{num('min', t.q)}</td></tr>
-            <tr><td><span className="tag solid">Đã vững</span> {t.solid}</td><td>{num('solid', '%')}</td></tr>
-            <tr><td><span className="tag repeat">Lỗi lặp lại</span> {t.repeat}</td><td>{num('repeat', '%')}</td></tr>
-            <tr><td><span className="tag repeat">Lỗi lặp lại</span> {t.same} {num('same', t.times)}</td><td>{num('sessions', t.sessions)}</td></tr>
-            <tr><td><span className="tag practising">Đang luyện</span> {t.practising}</td><td className="small muted">{t.rest}</td></tr>
+            <tr><td><span className="tag solid">{t.lbl.solid}</span> {t.solid}</td><td>{num('solid', '%')}</td></tr>
+            <tr><td><span className="tag repeat">{t.lbl.repeat}</span> {t.repeat}</td><td>{num('repeat', '%')}</td></tr>
+            <tr><td><span className="tag repeat">{t.lbl.repeat}</span> {t.same} {num('same', t.times)}</td><td>{num('sessions', t.sessions)}</td></tr>
+            <tr><td><span className="tag practising">{t.lbl.practising}</span> {t.practising}</td><td className="small muted">{t.rest}</td></tr>
           </tbody></table>}</div>
         <div className={`group card ${open === 'cls' ? 'on' : ''}`}><button className="group-head" onClick={() => setOpen(open === 'cls' ? '' : 'cls')}><span className="caret">{open === 'cls' ? '▾' : '▸'}</span><span className="grow"><b className="small">{t.cls}</b><span className="small muted" style={{ display: 'block' }}>{t.clsSub(c)}</span></span>{isDef(['classRepeat', 'classSolid']) && <span className="tag">{t.def}</span>}</button>
           {open === 'cls' && <table className="tbl" style={{ marginTop: 8 }}><tbody><tr><td>{t.clsRepeat}</td><td>{num('classRepeat', t.ofPupils)}</td></tr><tr><td>{t.clsSolid}</td><td>{num('classSolid', t.ofPupils)}</td></tr></tbody></table>}</div>
+        <div className={`group card ${open === 'next' ? 'on' : ''}`}><button className="group-head" onClick={() => setOpen(open === 'next' ? '' : 'next')}><span className="caret">{open === 'next' ? '▾' : '▸'}</span><span className="grow"><b className="small">{t.nextT}</b><span className="small muted" style={{ display: 'block' }}>{t.nextSub(+c.practice + +c.time + +c.next)}</span></span>{c.practice && c.time && c.next && <span className="tag">{t.def}</span>}</button>
+          {open === 'next' && <table className="tbl" style={{ marginTop: 8 }}><tbody>{([['practice', 'repeat', t.sPractice], ['time', 'practising', t.sTime], ['next', 'solid', t.sNext]] as const).map(([k, l, txt]) => (
+            <tr key={k}><td><span className={`tag ${l}`}>{t.lbl[l]}</span> → {txt}</td><td><button className={`switch ${c[k] ? 'on' : ''}`} aria-pressed={c[k]} onClick={() => setC({ ...c, [k]: !c[k] })} /></td></tr>
+          ))}</tbody></table>}</div>
+        {prev?.class && <div className="card stack" style={{ gap: 6, background: 'var(--leaf-2)' }}>
+          <b className="small">{t.preview}</b><span className="small muted">{prev.class} · {prev.skill}</span>
+          {prev.pupils!.map((p) => <div key={p.name} className="row small"><span className="grow">{p.name} · {t.right(p.right, p.of)}{p.mistake ? ` · ${p.mistake}` : ''}</span><span className={`tag ${p.label}`}>{t.lbl[p.label]}</span></div>)}
+          <div className="row small"><b className="grow">{t.clsLevel}</b><span className={`tag ${prev.classLabel}`}>{t.lbl[prev.classLabel!]}</span></div>
+          <span className="small muted">{t.share(prev.share!.repeat, prev.share!.of)}</span>
+        </div>}
         <p className="small muted">{t.note}</p><p className="banner blue small">ⓘ {t.tt27}</p>
       </div>
     </div>

@@ -12,9 +12,12 @@ import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
 
 export const STEPS = { vi: ['Tài liệu', 'Câu hỏi', 'Slide', 'Video', 'Bài tập', 'Giao bài'], en: ['Material', 'Questions', 'Slides', 'Video', 'Practice', 'Assign'] };
-export function Stepper({ at, onStep, done = at - 1 }: { at: number; onStep?: (i: number) => void; done?: number }) {
+// Chi's role table: Questions (2) and Video (4) are the teacher's steps; a parent's run 1, 3, 5, 6, shown as 1-4.
+export const PARENT_STEPS = [1, 3, 5, 6];
+export function Stepper({ at, onStep, done = at - 1, parent = false }: { at: number; onStep?: (i: number) => void; done?: number; parent?: boolean }) {
   const lang = useLang();
-  return <div className="stepper noprint">{STEPS[lang].map((s, i) => { const n = i + 1, cls = n === at ? 'on' : n <= done ? 'done' : ''; const body = <span className={cls}><i>{n <= done && n !== at ? '✓' : n}</i>{s}</span>; return onStep && n >= 3 ? <button key={s} onClick={() => onStep(n)}>{body}</button> : <span key={s} style={{ display: 'contents' }}>{body}</span>; })}</div>;
+  const steps = STEPS[lang].map((s, i) => ({ s, n: i + 1 })).filter((x) => !parent || PARENT_STEPS.includes(x.n));
+  return <div className="stepper noprint">{steps.map(({ s, n }, i) => { const cls = n === at ? 'on' : n <= done ? 'done' : ''; const body = <span className={cls}><i>{n <= done && n !== at ? '✓' : i + 1}</i>{s}</span>; return onStep && n >= 3 ? <button key={s} onClick={() => onStep(n)}>{body}</button> : <span key={s} style={{ display: 'contents' }}>{body}</span>; })}</div>;
 }
 
 const T = {
@@ -27,7 +30,7 @@ const T = {
     scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Cô cần một nguồn có sách trước. Bài giảng chỉ lấy nội dung từ sách của cô.', sample: '📘 Dùng sách mẫu',
     h2: 'Một vài câu hỏi về bài học', lead2: 'AI đã điền sẵn. Cô xem và sửa nếu cần.', fromAi: 'Gợi ý từ AI', optional: 'Không bắt buộc',
     q: { goal: 'Mục tiêu', title: 'Tên bài', minutes: 'Thời lượng', level: 'Mức của lớp', make: 'Cần tạo', lang: 'Ngôn ngữ', note: 'Ghi chú cho AI' },
-    min: (n: number) => `${n} phút`, levels: 'Nhiều mức (3 mức bài tập)', makes: 'Slide bài giảng, Video có giọng đọc, Bài tập theo mẫu, Thẻ nhớ', vi: 'Tiếng Việt', en: 'Tiếng Anh', none: 'Chưa có', notePh: 'Ví dụ: dùng tình huống ở chợ',
+    min: (n: number) => `${n} phút`, lv: { mixed: 'Nhiều mức (3 mức bài tập)', basic: 'Phần lớn cơ bản', advanced: 'Phần lớn nâng cao' }, mk: { slides: 'Slide bài giảng', items: 'Bài tập theo mẫu', video: 'Video có giọng đọc', cards: 'Thẻ nhớ' }, vi: 'Tiếng Việt', en: 'Tiếng Anh', none: 'Chưa có', notePh: 'Ví dụ: dùng tình huống ở chợ',
     back: 'Quay lại', create: 'Tạo bài giảng', thinking: 'Đang đọc phạm vi…', page: 'tr.',
   },
   en: {
@@ -39,13 +42,13 @@ const T = {
     scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You need a source with a book first. Lessons come only from your books.', sample: '📘 Use a sample book',
     h2: 'A few questions about the lesson', lead2: 'The AI filled these in. Check and change them if needed.', fromAi: 'Suggested by AI', optional: 'Optional',
     q: { goal: 'Objectives', title: 'Title', minutes: 'Length', level: 'Class level', make: 'To make', lang: 'Language', note: 'Note for the AI' },
-    min: (n: number) => `${n} min`, levels: 'Mixed (3 practice levels)', makes: 'Slides, narrated video, practice from templates, flashcards', vi: 'Vietnamese', en: 'English', none: 'None', notePh: 'e.g. use market examples',
+    min: (n: number) => `${n} min`, lv: { mixed: 'Mixed (3 practice levels)', basic: 'Mostly basic', advanced: 'Mostly advanced' }, mk: { slides: 'Slides', items: 'Practice from templates', video: 'Narrated video', cards: 'Flashcards' }, vi: 'Vietnamese', en: 'English', none: 'None', notePh: 'e.g. use market examples',
     back: 'Back', create: 'Make the lesson', thinking: 'Reading the part…', page: 'p.',
   },
 };
 type Kind = 'one' | 'lesson' | 'work' | 'paste';
 
-export function Create({ parent: _parent }: { parent: boolean }) {
+export function Create({ parent }: { parent: boolean }) {
   const t = useT(T), lang = useLang();
   const q = new URLSearchParams(location.search);
   const [areas, setAreas] = useState<AreaRow[] | null>(null), [areaId, setAreaId] = useState(q.get('area') || ''), [sections, setSections] = useState<SectionRow[]>([]), [sectionId, setSectionId] = useState(q.get('section') || '');
@@ -74,19 +77,24 @@ export function Create({ parent: _parent }: { parent: boolean }) {
   });
   const chosen = sections.find((s) => s.id === sectionId), a = areas?.find((x) => x.id === areaId);
   const scopeText = chosen ? `${a?.name} · ${t.page} ${chosen.page_from}${chosen.page_to > chosen.page_from ? `–${chosen.page_to}` : ''}` : match ? `${match.book} · ${t.page} ${match.pageFrom}${match.pageTo > match.pageFrom ? `–${match.pageTo}` : ''}` : '';
-  const toStep2 = () => run('intake', async () => { const s = (await api.intake(areaId, chosen?.id || match!.sectionId)).setup; setSetup({ ...s, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s.note }); });
+  const toStep2 = () => run('intake', async () => {
+    const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note };
+    // a parent has no Questions step: the lesson is made straight from the setup the book gave
+    if (parent) { go(`/lesson/${(await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: s })).id}`); return; }
+    setSetup(s);
+  });
   const set = <K extends keyof Setup>(k: K, v: Setup[K]) => setSetup((s) => (s ? { ...s, [k]: v } : s));
   if (!areas) return null;
 
   const top = <div className="row noprint" style={{ justifyContent: 'flex-end' }}><button className="link small" onClick={() => go('/')}>{t.save}</button></div>;
   if (!areas.length) return (
-    <div className="page narrow">{top}<Stepper at={1} />
+    <div className="page narrow">{top}<Stepper at={1} parent={parent} />
       <div className="card stack"><p>{t.noArea}</p><div className="row"><button className="btn primary" onClick={() => go('/knowledge')}>{t.openKnowledge}</button>
         <button className="btn" disabled={!!busy} onClick={() => run('sample', async () => { await api.sampleArea(lang === 'en' ? 'maths2' : 'toan2'); await loadAreas(); })}>{t.sample}</button></div>{err && <p className="note">{err}</p>}</div></div>
   );
 
   if (!setup) return (
-    <div className="page narrow">{top}<Stepper at={1} />
+    <div className="page narrow">{top}<Stepper at={1} parent={parent} />
       <div className="stack" style={{ gap: 14 }}>
         <div><h1>{t.h1}</h1><p className="small muted">{t.lead}</p></div>
         <div className="card stack">
@@ -135,8 +143,11 @@ export function Create({ parent: _parent }: { parent: boolean }) {
           {[0, 1, 2].map((i) => <input key={i} value={setup.objectives[i] || ''} maxLength={200} onChange={(e) => { const o = [...setup.objectives]; o[i] = e.target.value; set('objectives', o.filter((x, j) => x || j < i)); }} />)}
         </div>, t.fromAi)}
         {row('min', t.q.minutes, t.min(setup.minutes), <div className="row">{([15, 25, 35] as const).map((m) => <button key={m} className={`pill ${setup.minutes === m ? 'on' : ''}`} onClick={() => set('minutes', m)}>{t.min(m)}</button>)}</div>)}
-        {row('level', t.q.level, t.levels, <p className="small muted">{t.levels}</p>)}
-        {row('make', t.q.make, t.makes, <p className="small muted">{t.makes}</p>)}
+        {row('level', t.q.level, t.lv[setup.level || 'mixed'], <div className="row">{(['mixed', 'basic', 'advanced'] as const).map((v) => <button key={v} className={`pill ${(setup.level || 'mixed') === v ? 'on' : ''}`} onClick={() => set('level', v)}>{t.lv[v]}</button>)}</div>)}
+        {row('make', t.q.make, [t.mk.slides, t.mk.items, setup.make?.video !== false && t.mk.video, setup.make?.cards !== false && t.mk.cards].filter(Boolean).join(', '), <div className="stack" style={{ gap: 6 }}>
+          <label className="check"><input type="checkbox" checked disabled /> {t.mk.slides}</label><label className="check"><input type="checkbox" checked disabled /> {t.mk.items}</label>
+          {(['video', 'cards'] as const).map((k) => <label key={k} className="check"><input type="checkbox" checked={setup.make?.[k] !== false} onChange={(e) => set('make', { video: setup.make?.video !== false, cards: setup.make?.cards !== false, [k]: e.target.checked })} /> {t.mk[k]}</label>)}
+        </div>)}
         {row('lang', t.q.lang, setup.lang === 'en' ? t.en : t.vi, <div className="row">{(['vi', 'en'] as const).map((l) => <button key={l} className={`pill ${setup.lang === l ? 'on' : ''}`} onClick={() => set('lang', l)}>{l === 'vi' ? t.vi : t.en}</button>)}</div>)}
         {row('note', t.q.note, setup.note || t.none, <input value={setup.note || ''} maxLength={300} placeholder={t.notePh} onChange={(e) => set('note', e.target.value)} style={{ width: '100%' }} />, t.optional)}
         {err && <p className="note">{err}</p>}
