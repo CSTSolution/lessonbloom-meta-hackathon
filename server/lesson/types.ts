@@ -38,7 +38,7 @@ export interface Slide {
 }
 
 export type Op = '+' | '-' | '×' | ':';
-interface ItemBase { id: string; skill: string; level: Level; prompt: string; explain: string; page?: number }   // page: the book page it comes from
+interface ItemBase { id: string; skill: string; level: Level; prompt: string; explain: string; page?: number; redone?: string[] }   // redone: why the checker had it written again   // page: the book page it comes from
 
 // Maths: the model gives a, op, b (and distractors, a story); code writes prompt, options and answer.
 export interface MathItem extends ItemBase {

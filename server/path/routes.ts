@@ -117,6 +117,16 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const steps = layout(pa.start, await sql.query<StepRow>(`select ps.section_id, s.title, s.page_from, s.page_to, s.topic, ps.weeks, ps.ord from path_steps ps join sections s on s.id = ps.section_id where ps.path_id = $1 order by ps.ord`, [pa.id]), today);
       for (const st of steps.filter((x) => x.end >= from && x.start <= to)) {
         const one = remindersFor([{ ...st, status: 'current' }], s, await progressOf(pa.class_id, st.sectionId), from);
+        // "Hết thời gian" carries the summary (Chi): how many skills are mastered, practised, or repeating a mistake
+        const end = one.find((r) => r.kind === 'end' && r.date >= from && r.date <= to);
+        if (end) {
+          const asg = await sql.one<{ id: string }>(`select a.id from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [pa.class_id, st.sectionId]);
+          if (asg) {
+            const data = await classData(pa.class_id, asg.id), ls = [...labelsFor(data, await criteriaOf(t.id)).values()].flatMap((m) => [...m.values()].map((x) => x.label));
+            const n = (l: Label) => ls.filter((x) => x === l).length;
+            if (ls.length) { end.vi += ` Đã vững ${n('solid')} · đang luyện ${n('practising')} · lặp lỗi ${n('repeat')} (lượt em × dạng bài).`; end.en += ` Mastered ${n('solid')} · practising ${n('practising')} · repeated mistake ${n('repeat')} (learner × skill).`; }
+          }
+        }
         out.push(...one.filter((r) => r.date >= from && r.date <= to).map((r) => ({ ...r, className: pa.class_name, classId: pa.class_id })));
       }
     }

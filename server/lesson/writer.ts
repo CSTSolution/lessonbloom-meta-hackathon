@@ -96,17 +96,17 @@ export async function writeItems(ai: AI, setup: Setup, source: string, skills: S
   const math = setup.subject === 'math', template = (math ? MATH_T : ENG_T).includes(req.template) ? req.template : null;
   if (!skill || !template) return { kept: [], rejected: [{ skill: req.skill, template: req.template, level: req.level, codes: ['shape'], issues: ['unknown skill or template'] }] };
   const ctx = contextOf(setup, skills, source), kept: Item[] = [], rejected: Rejected[] = [];
-  let want = Math.min(6, Math.max(1, Math.round(req.count) || 3)), avoid: string[] = [];
+  let want = Math.min(6, Math.max(1, Math.round(req.count) || 3)), avoid: string[] = [], before: string[] = [];
   for (let round = 0; round < 3 && want > 0; round++) {
     const sys = fill(math ? MATH_ITEMS_SYSTEM : ENG_ITEMS_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), skill: `${skill.tag} "${skill.name}"`, kind: skill.kind, template, level: req.level, count: want,
       avoid: avoid.length ? `\nThe last ones were refused by the checker; avoid: ${avoid.slice(0, 6).join('; ')}` : '' });
     const r = await guardedJson<{ items: (RawMath | RawEnglish)[] }>(ai, { endpoint: 'items', creative: true, system: sys, prompt: material(setup, source), schema: math ? MATH_ITEMS_SCHEMA : ENG_ITEMS_SCHEMA, fixture: { setup, source, skill, template, level: req.level, count: want, round } });
-    avoid = [];
+    before = avoid; avoid = [];
     for (const raw of (r.items || []).slice(0, want)) {
       const id = nextId(), base = { ...raw, template, skill: skill.tag, level: req.level } as never;
       const item = math ? buildMath(base as RawMath, id, setup.lang) : buildEnglish(base as RawEnglish, id);
       const issues = checkItem(item, ctx);
-      if (!issues.length) { kept.push(item); want--; continue; }
+      if (!issues.length) { if (round > 0 && before.length) item.redone = [...new Set(before)].slice(0, 3); kept.push(item); want--; continue; }
       avoid.push(...issues.map((i) => `[${i.code}] ${i.msg}`));
       rejected.push({ skill: skill.tag, template, level: req.level, codes: [...new Set(issues.map((i) => i.code))], issues: issues.map((i) => `[${i.code}] ${i.msg}`) });
     }

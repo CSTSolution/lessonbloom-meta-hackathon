@@ -12,6 +12,7 @@ test('items carry their page; a teacher types her classes at sign-up', async () 
   const { areaId } = await areaWithBook(call, 'maths2');
   const { lesson } = await lessonFrom(call, areaId, 'Lesson 21 adding with regrouping');
   assert.ok(lesson.items.every((i: any) => i.page === 3), 'the section is on page 3');
+  assert.ok(lesson.items.some((i: any) => i.redone?.some((r: string) => r.startsWith('[Q]'))), 'the item written again says why');
 });
 
 test('criteria: a live preview on her own class, and the three suggestions can be switched off', async () => {
