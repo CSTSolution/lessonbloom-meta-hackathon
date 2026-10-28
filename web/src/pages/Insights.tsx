@@ -43,7 +43,7 @@ function Donut({ v }: { v: Record<Label, number> }) {
 export function Insights({ parent }: { parent: boolean }) {
   const t = useT(T), lang = useLang();
   const q = new URLSearchParams(location.search);
-  const [s, setS] = useState<Summary | null>(null), [lessons, setLessons] = useState<LessonRow[]>([]), [lessonId, setLessonId] = useState(q.get('lesson') || ''), [k, setK] = useState(q.get('class') || ''), [open, setOpen] = useState(q.get('class') ? 'one' : 'overview');
+  const [s, setS] = useState<Summary | null>(null), [lessons, setLessons] = useState<LessonRow[]>([]), [lessonId, setLessonId] = useState(q.get('lesson') || ''), [k, setK] = useState(q.get('class') || ''), [open, setOpen] = useState(q.get('class') ? 'one' : 'overview'); const [grid, setGrid] = useState(false);
   const [comments, setComments] = useState<{ pupilId: string; name: string; text: string }[] | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState('');
   useEffect(() => { api.lessons().then((r) => setLessons(r.lessons.filter((l) => l.given))).catch(() => {}); }, []);
   useEffect(() => { api.summary(lessonId ? { lessonId } : {}).then((x) => { setS(x); setK((p) => p || x.classes[0]?.id || ''); }).catch(() => setS(null)); setComments(null); }, [lessonId]);
@@ -67,14 +67,14 @@ export function Insights({ parent }: { parent: boolean }) {
           <div className="grid2">
             <div className="card row"><Donut v={s.total} /><div className="stack" style={{ gap: 4 }}>{(['solid', 'practising', 'repeat'] as Label[]).map((l) => <span key={l} className="small"><b style={{ color: COLOR[l] }}>●</b> {t.labels[l]} · {s.total[l]} · {pct(s.total[l])}</span>)}</div></div>
             <div className="card stack" style={{ gap: 6 }}><b className="small">{parent ? t.byChild : t.byClass}</b>{s.classes.map((x) => { const c = x.skills.reduce((a, sk) => ({ solid: a.solid + (sk.label === 'solid' ? 1 : 0), practising: a.practising + (sk.label === 'practising' ? 1 : 0), repeat: a.repeat + (sk.label === 'repeat' ? 1 : 0) }), { solid: 0, practising: 0, repeat: 0 }); const n = c.solid + c.practising + c.repeat || 1; return (
-              <div key={x.id} className="row small"><b style={{ width: 40 }}>{x.name}</b><div className="hbar">{c.solid > 0 && <i className="s" style={{ width: `${(100 * c.solid) / n}%` }}>{c.solid}</i>}{c.practising > 0 && <i className="p" style={{ width: `${(100 * c.practising) / n}%` }}>{c.practising}</i>}{c.repeat > 0 && <i className="r" style={{ width: `${(100 * c.repeat) / n}%` }}>{c.repeat}</i>}</div><button className="btn small" onClick={() => { setK(x.id); setOpen('one'); }}>{t.detail}</button></div>
+              <div key={x.id} className="row small"><b style={{ minWidth: 40, whiteSpace: 'nowrap' }}>{x.name}</b><div className="hbar">{c.solid > 0 && <i className="s" style={{ width: `${(100 * c.solid) / n}%` }}>{c.solid}</i>}{c.practising > 0 && <i className="p" style={{ width: `${(100 * c.practising) / n}%` }}>{c.practising}</i>}{c.repeat > 0 && <i className="r" style={{ width: `${(100 * c.repeat) / n}%` }}>{c.repeat}</i>}</div><button className="btn small" onClick={() => { setK(x.id); setOpen('one'); }}>{t.detail}</button></div>
             ); })}</div>
           </div>
-          <div className="row small" style={{ marginTop: 8 }}><span className="muted grow">{t.legend}</span><button className="link small" onClick={() => setOpen('grid')}>{t.grid}</button>{!parent && <button className="link small" onClick={() => go('/insight/criteria')}>{t.edit}</button>}</div>
-        </>)}
-        {open === 'grid' && <div className="card"><b className="small">{t.grid}</b><table className="tbl" style={{ marginTop: 6 }}><thead><tr><th />{s.classes.map((x) => <th key={x.id}>{x.name}</th>)}</tr></thead><tbody>
+          <div className="row small" style={{ marginTop: 8 }}><span className="muted grow">{t.legend}</span><button className="link small" onClick={() => setGrid(!grid)}>{t.grid}</button>{!parent && <button className="link small" onClick={() => go('/insight/criteria')}>{t.edit}</button>}</div>
+          {grid && <div style={{ marginTop: 10, overflowX: 'auto' }}><table className="tbl"><thead><tr><th />{s.classes.map((x) => <th key={x.id}>{x.name}</th>)}</tr></thead><tbody>
           {[...new Set(s.classes.flatMap((x) => x.skills.map((k) => k.name)))].map((name) => <tr key={name}><td>{name}</td>{s.classes.map((x) => { const k = x.skills.find((y) => y.name === name); return <td key={x.id}>{k ? <span className={`tag ${k.label}`}>{t.labels[k.label]}</span> : '·'}</td>; })}</tr>)}
         </tbody></table></div>}
+        </>)}
         {cls && section('one', parent ? t.oneP(cls.name) : t.one(cls.name), cls.skills.map((x) => `${x.name}: ${t.labels[x.label]}`).join(' · '), null, (
           <table className="tbl"><thead><tr><th>{parent ? '' : t.pupils(cls.pupils.length)}</th>{cls.skills.map((x) => <th key={x.skill}>{x.name}</th>)}</tr></thead><tbody>
             {cls.pupils.map((p) => <tr key={p.id}><td><button className="link" onClick={() => go(`/learner/${p.id}`)}>{p.name}</button></td>{cls.skills.map((x) => <td key={x.skill}>{p.skills[x.skill] ? <span className={`tag ${p.skills[x.skill]}`}>{t.labels[p.skills[x.skill]]}</span> : '·'}</td>)}</tr>)}
@@ -155,7 +155,7 @@ export function Criteria() {
         <aside className="stack">
         {prev?.class && <div className="card stack" style={{ gap: 6, background: 'var(--leaf-2)' }}>
           <b className="small">{t.preview}</b><span className="small muted">{prev.class} · {prev.skill}</span>
-          {prev.pupils!.map((p) => <div key={p.name} className="row small"><span className="grow">{p.name} · {t.right(p.right, p.of)}{p.mistake ? ` · ${p.mistake}` : ''}</span><span className={`tag ${p.label}`}>{t.lbl[p.label]}</span></div>)}
+          {prev.pupils!.map((p) => <div key={p.name} className="small" style={{ display: 'grid', gap: 2 }}><div className="row"><b className="grow">{p.name}</b><span className={`tag ${p.label}`}>{t.lbl[p.label]}</span></div><span className="muted">{t.right(p.right, p.of)}{p.mistake ? ` · ${p.mistake}` : ''}</span></div>)}
           <div className="row small"><b className="grow">{t.clsLevel}</b><span className={`tag ${prev.classLabel}`}>{t.lbl[prev.classLabel!]}</span></div>
           <span className="small muted">{t.share(prev.share!.repeat, prev.share!.of)}</span>
         </div>}
