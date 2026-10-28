@@ -4,6 +4,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pickProvider } from './ai/pick.ts';
+import { createAdmin } from './admin/admin.ts';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { migrate } from './db/migrate.ts';
@@ -27,3 +28,6 @@ app.use('/favicon.svg', serveStatic({ root: './web/dist' }));
 app.get('*', async (c, next) => { await next(); c.header('Cache-Control', 'no-cache'); }, serveStatic({ path: './web/dist/index.html' }));
 
 serve({ fetch: app.fetch, port: config.port }, () => console.log(`LessonBloom Meta on :${config.port} (AI: ${ai.name}, db: ${config.databaseUrl ? 'postgres' : 'pglite'})`));
+
+// the admin view, on its own port (never routed by Caddy); off when no admin key is set
+if (config.adminKey) serve({ fetch: createAdmin(sql).fetch, port: config.adminPort }, () => console.log(`Admin view on :${config.adminPort}`));

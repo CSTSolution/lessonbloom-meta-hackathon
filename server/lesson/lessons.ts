@@ -3,7 +3,7 @@ import { newId } from '../auth/accounts.ts';
 import type { AI } from '../ai/types.ts';
 import type { Sql } from '../db/sql.ts';
 import type { Files } from '../files.ts';
-import type { Budget } from '../guard/guard.ts';
+import { TODAY, type Budget } from '../guard/guard.ts';
 import { buildLesson } from './agent.ts';
 import { drawPictures } from './pictures.ts';
 import type { Lesson, Setup } from './types.ts';
@@ -25,7 +25,7 @@ export class Lessons {
       `select id, status, setup, created_at, jsonb_array_length(slides) as slides, jsonb_array_length(items) as items from lessons where teacher_id = $1 order by created_at desc limit 100`, [teacherId]);
   }
   async madeToday(teacherId: string) {
-    return Number((await this.sql.one<{ n: string }>(`select count(*) as n from lessons where teacher_id = $1 and created_at >= date_trunc('day', now())`, [teacherId]))?.n || 0);
+    return Number((await this.sql.one<{ n: string }>(`select count(*) as n from lessons where teacher_id = $1 and created_at >= ${TODAY}`, [teacherId]))?.n || 0);
   }
   async step(id: string, vi: string, en: string) {
     await this.sql.query(`update lessons set steps = steps || $2::jsonb, updated_at = now() where id = $1`, [id, J([{ at: new Date().toISOString(), vi, en }])]);

@@ -54,7 +54,7 @@ test('layer 1: spending is logged at Meta\'s prices, and the teacher cap, app bu
   await s.sql.query(`insert into teachers (id, kind) values ('t1', 'demo'), ('t2', 'demo')`);
   const b = new Budget(s.sql);
   assert.equal(await b.check('t1'), null);
-  await b.record({ endpoint: 'image', model: 'muse-image-1.0', images: Math.ceil(config.guard.teacherDayUsd / 0.01) + 1 }, 't1');
+  await b.record({ endpoint: 'image', model: 'muse-image-1.0', images: config.guard.teacherDayCredits }, 't1');
   assert.equal(await b.check('t1'), 'teacher_day');
   assert.equal(await b.check('t2'), null);
   await b.record({ endpoint: 'write', model: 'muse-spark-1.3', outTokens: (config.guard.dayUsd / 4.25) * 1e6 + 1 }, 't2');

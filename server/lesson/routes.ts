@@ -6,7 +6,7 @@ import type { AI } from '../ai/types.ts';
 import type { Env } from '../app.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
-import { Blocked, type Budget, Limiter, requireOnTask } from '../guard/guard.ts';
+import { Blocked, type Budget, credits, Limiter, requireOnTask } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import type { Files } from '../files.ts';
 import { CutoutError, cutOut, cleanName, decodePhoto } from './cutout.ts';
@@ -21,7 +21,7 @@ const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
 const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
 const lessonsPerDay = (kind: string) => (kind === 'demo' ? config.guard.lessonsDemoDay : config.guard.lessonsDay);
 
-export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T) => T }) {
+export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T }) {
   const lessons = new Lessons(d.sql);
   const perTeacher = new Limiter(10, 200);           // AI requests per teacher (per minute, per day)
 
@@ -30,7 +30,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const t = c.get('teacher');
     if (!perTeacher.take(t.id)) return fail(c, 'aiBusy', 429);
     const b = await d.budget.check(t.id);
-    return b ? fail(c, b === 'total' ? 'credit' : 'budget', 429) : null;
+    return b ? fail(c, b === 'total' ? 'credit' : b === 'teacher_day' ? 'credits' : 'budget', 429) : null;
   };
   const aiError = (c: Context<Env>, e: unknown) => {
     if (e instanceof NotLesson) return fail(c, 'notLesson');
@@ -84,12 +84,13 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'] };
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
+    if ((await d.budget.credits(t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
     const source = sourceOf(m);
     // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
     const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
-    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages }));
+    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages }), id);
     return c.json({ id });
   });
 
@@ -103,7 +104,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const f = await slideOf(c); if (!f) return fail(c, 'notFound', 404);
     const g = await gate(c); if (g) return g;
     try {
-      const img = await d.as(c.get('teacher').id, () => illustrate(d.ai, f.s, '(a different composition)'));
+      const img = await d.as(c.get('teacher').id, () => illustrate(d.ai, f.s, '(a different composition)'), f.l.id);
       if (!img) return fail(c, 'pictureFailed', 503);
       const url = await d.files.put(f.l.id, img[0] === 0x89 ? 'png' : 'jpg', img);
       await lessons.setSlideImage(f.l.id, f.s.id, url);
@@ -117,7 +118,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     try { cleanName(b.name); decodePhoto(photo); } catch (e) { if (e instanceof CutoutError) return fail(c, e.code); throw e; }
     const g = await gate(c); if (g) return g;
     try {
-      const cut = await d.as(c.get('teacher').id, () => cutOut(d.ai, photo, String(b.name)));
+      const cut = await d.as(c.get('teacher').id, () => cutOut(d.ai, photo, String(b.name)), f.l.id);
       const url = await d.files.put(f.l.id, 'png', cut.png);
       await lessons.setSlideImage(f.l.id, f.s.id, url);
       return c.json({ slide: { ...f.s, image: url }, matches: cut.matches });
@@ -129,6 +130,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const l = await lessons.get(c.get('teacher').id, c.req.param('id'));
     if (!l) return fail(c, 'notFound', 404);
     const { teacher_id: _t, ...rest } = l;
-    return c.json({ lesson: rest });
+    const u = await d.sql.one<{ usd: string }>('select coalesce(sum(usd), 0) as usd from ai_usage where lesson_id = $1', [l.id]);
+    return c.json({ lesson: { ...rest, credits: credits(Number(u?.usd)) } });
   });
 }

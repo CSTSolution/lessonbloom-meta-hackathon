@@ -29,7 +29,7 @@ export interface ChatTurn { model: string; text: string; toolCalls: ToolCall[] }
 // SAM 3.1: every match of a short noun phrase. The mask is row-major 0/1 over `box` (source pixels, half-open).
 export interface SegmentMatch { box: { left: number; top: number; right: number; bottom: number }; confidence?: number; mask: Uint8Array; maskWidth: number; maskHeight: number }
 
-export interface Usage { endpoint: Endpoint; model: string; inTokens?: number; outTokens?: number; images?: number; ms?: number }
+export interface Usage { endpoint: Endpoint; model: string; inTokens?: number; outTokens?: number; images?: number; ms?: number; verdict?: string }
 
 export interface AI {
   name: string;

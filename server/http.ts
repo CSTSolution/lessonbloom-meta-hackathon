@@ -20,6 +20,7 @@ export const MSG = {
   setup: { vi: 'Cô kiểm tra lại môn, lớp và tên bài nhé.', en: 'Please check the subject, grade and title.' },
   lessonLimit: { vi: 'Hôm nay cô đã soạn đủ số bài cho phép. Cô quay lại vào ngày mai nhé.', en: 'You have made today\'s lessons. Please come back tomorrow.' },
   budget: { vi: 'Hôm nay LessonBloom đã dùng hết hạn mức AI. Cô thử lại vào ngày mai nhé.', en: 'LessonBloom has used today\'s AI allowance. Please try again tomorrow.' },
+  credits: { vi: 'Hôm nay cô đã dùng gần hết 200 tín dụng (một bài cần khoảng 60). Tín dụng mới có lúc 0 giờ đêm nay.', en: 'You have used almost all of today\'s 200 credits (a lesson needs about 60). New credits come at midnight (Vietnam time).' },
   credit: { vi: 'Bản thử nghiệm LessonBloom đã dùng hết hạn mức AI. Cô vẫn xem được các bài đã soạn.', en: 'This LessonBloom trial has used its AI allowance. Your lessons are still here to view.' },
   aiBlocked: { vi: 'LessonBloom chỉ soạn bài giảng và bài luyện tập từ ghi chú bài học. Cô kiểm tra lại nội dung nhé.', en: 'LessonBloom only makes lessons and practice from lesson notes. Please check the text.' },
   aiBusy: { vi: 'AI đang bận, cô thử lại sau ít phút nhé.', en: 'The AI is busy. Please try again in a few minutes.' },

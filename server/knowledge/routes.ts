@@ -32,7 +32,7 @@ export async function sectionOf(sql: Sql, teacherId: string, areaId: string, sec
   return { section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to }, passages };
 }
 
-export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T) => T }) {
+export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T }) {
   const { sql } = d;
 
   app.get('/api/t/areas', async (c) => {
@@ -117,7 +117,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const request = String(b.request ?? '').trim().slice(0, 2000);
     if (request.length < 3) return fail(c, 'requestShort');
     const spent = await d.budget.check(t.id);
-    if (spent) return fail(c, spent === 'total' ? 'credit' : 'budget', 429);
+    if (spent) return fail(c, spent === 'total' ? 'credit' : spent === 'teacher_day' ? 'credits' : 'budget', 429);
     try {
       const m = await d.as(t.id, async () => { await requireOnTask(d.ai, request); return findSection(sql, d.ai, a.id, request); });
       return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, cited: m.cited,

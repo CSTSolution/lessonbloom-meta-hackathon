@@ -23,8 +23,9 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
   const demoPerIp = new Limiter(3, config.guard.demoPerIpDay), codePerIp = new Limiter(5, config.guard.codesPerIpDay), codePerEmail = new Limiter(2, config.guard.codesPerEmailDay);
   const verifyPerIp = new Limiter(10, 100);
   // every model call is logged against the teacher whose request (or background job) made it
-  const who = new AsyncLocalStorage<string>();
-  ai.onUsage = (u) => { void budget.record(u, who.getStore() ?? null).catch((e) => console.error(`[usage] ${(e as Error).message}`)); };
+  const who = new AsyncLocalStorage<{ teacher: string; lesson?: string }>();
+  ai.onUsage = (u) => { const w = who.getStore(); void budget.record(u, w?.teacher ?? null, w?.lesson ?? null).catch((e) => console.error(`[usage] ${(e as Error).message}`)); };
+  const as = <T>(teacher: string, fn: () => T, lesson?: string) => who.run({ teacher, lesson }, fn);
 
   const app = new Hono<Env>();
   app.onError((e, c) => { console.error(`[error] ${c.req.method} ${c.req.path}: ${(e as Error).stack || e}`); return fail(c, 'server', 500); });
@@ -81,7 +82,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     c.set('teacher', t); c.set('token', token);
     await next();
   });
-  app.get('/api/t/me', async (c) => c.json({ teacher: publicTeacher(c.get('teacher')), budget: await budget.check(c.get('teacher').id) }));
+  app.get('/api/t/me', async (c) => c.json({ teacher: publicTeacher(c.get('teacher')), budget: await budget.check(c.get('teacher').id), credits: await budget.credits(c.get('teacher').id) }));
   app.put('/api/t/me', async (c) => {
     const b = await c.req.json<{ name?: string; lang?: string }>().catch(() => ({} as { name?: string; lang?: string }));
     const name = b.name === undefined ? undefined : String(b.name).replace(/\s+/g, ' ').trim().slice(0, 60);
@@ -98,7 +99,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     const f = await files.get(c.req.param('lesson'), c.req.param('name'));
     return f ? c.body(new Uint8Array(f.data), 200, { 'content-type': f.type, 'cache-control': 'public, max-age=31536000, immutable' }) : c.notFound();
   });
-  knowledgeRoutes(app, { sql, ai, budget, as: (teacherId, fn) => who.run(teacherId, fn) });
-  lessonRoutes(app, { sql, ai, budget, files, as: (teacherId, fn) => who.run(teacherId, fn) });
+  knowledgeRoutes(app, { sql, ai, budget, as });
+  lessonRoutes(app, { sql, ai, budget, files, as });
   return app;
 }

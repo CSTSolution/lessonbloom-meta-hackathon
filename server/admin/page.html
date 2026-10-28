@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>LessonBloom Admin</title>
+<style>
+  :root { --bg: #f7f6f2; --card: #fff; --ink: #1d2320; --muted: #66706b; --line: #e3e1da; --green: #2f7a55; --coral: #d4583f; --amber: #b7791f; --bar: #e9e6dd; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #141716; --card: #1c201e; --ink: #e8ebe9; --muted: #98a29d; --line: #2c3230; --green: #5cc08d; --coral: #ef8a73; --amber: #e0a94a; --bar: #2a2f2d; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--card); position: sticky; top: 0; z-index: 2; }
+  header b { font-size: 16px; } header a { color: var(--muted); text-decoration: none; } header .grow { flex: 1; }
+  main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 22px; margin: 4px 0 4px; } h2 { font-size: 16px; margin: 28px 0 10px; }
+  .muted { color: var(--muted); } .small { font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card .big { font-size: 24px; font-weight: 650; margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; border-radius: 4px; background: var(--bar); overflow: hidden; margin-top: 8px; } .bar i { display: block; height: 100%; background: var(--green); }
+  .bar.warn i { background: var(--amber); } .bar.over i { background: var(--coral); }
+  .wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--card); position: sticky; top: 0; }
+  td.wide { white-space: normal; min-width: 220px; max-width: 420px; } td.r, th.r { text-align: right; }
+  tr.click { cursor: pointer; } tr.click:hover td { background: color-mix(in srgb, var(--green) 8%, transparent); }
+  tr:last-child td { border-bottom: 0; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); }
+  .chip.demo { color: var(--amber); } .chip.account { color: var(--green); } .chip.ready { color: var(--green); } .chip.error, .chip.bad { color: var(--coral); } .chip.working { color: var(--amber); }
+  form.key { max-width: 420px; margin: 60px auto; display: grid; gap: 10px; }
+  input { font: inherit; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: var(--green); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .slides { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .slides img { width: 100%; border-radius: 8px; aspect-ratio: 4 / 3; object-fit: cover; background: var(--bar); }
+  .slides ul { margin: 6px 0 0; padding-left: 18px; }
+  .note { white-space: pre-wrap; } .err { color: var(--coral); }
+</style>
+</head>
+<body>
+<header><b>LessonBloom Meta · Admin</b><a href="#/">Overview</a><span class="grow"></span><span id="when" class="muted small"></span><button class="ghost" id="out" hidden>Forget key</button></header>
+<main id="view"></main>
+<script>
+const KEY = 'lbm-admin-key';
+const view = document.getElementById('view');
+let key = ''; try { key = sessionStorage.getItem(KEY) || ''; } catch {}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const tz = { timeZone: 'Asia/Ho_Chi_Minh' };
+const when = (t) => t ? new Date(t).toLocaleString('en-GB', { ...tz, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '–';
+const n = (x) => Number(x || 0).toLocaleString('en-US');
+const usd = (x) => '$' + Number(x || 0).toFixed(Number(x) < 1 ? 4 : 2);
+const cr = (o) => `${n(o.credits)} <span class="muted small">${usd(o.usd)}</span>`;
+const pct = (a, b) => Math.min(100, b ? (a / b) * 100 : 0);
+const bar = (a, b) => { const p = pct(a, b); return `<div class="bar ${p >= 90 ? 'over' : p >= 70 ? 'warn' : ''}"><i style="width:${p.toFixed(1)}%"></i></div>`; };
+const chip = (s, cls = s) => `<span class="chip ${esc(cls)}">${esc(s)}</span>`;
+const table = (cols, rows, onRow) => `<div class="wrap"><table><thead><tr>${cols.map((c) => `<th class="${c.r ? 'r' : ''}">${esc(c.h)}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.map((r) => `<tr ${onRow ? `class="click" data-go="${esc(onRow(r))}"` : ''}>${cols.map((c) => `<td class="${c.r ? 'r' : ''} ${c.wide ? 'wide' : ''}">${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td class="muted" colspan="${cols.length}">Nothing yet.</td></tr>`}</tbody></table></div>`;
+
+async function get(path) {
+  const r = await fetch('/api' + path, { headers: { authorization: 'Bearer ' + key } });
+  if (r.status === 401) { askKey('That key was not accepted.'); throw new Error('key'); }
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+
+function askKey(msg = '') {
+  document.getElementById('out').hidden = true;
+  view.innerHTML = `<form class="key"><h1>Admin key</h1><p class="muted">deploy/vps/admin.sh put it on your clipboard. It stays in this tab only.</p><input type="password" autocomplete="off" required placeholder="LB_ADMIN_KEY"><button>Open</button><p class="err">${esc(msg)}</p></form>`;
+  view.querySelector('form').onsubmit = (e) => { e.preventDefault(); key = view.querySelector('input').value.trim(); try { sessionStorage.setItem(KEY, key); } catch {} route(); };
+}
+
+async function overview() {
+  const [o, u] = await Promise.all([get('/overview'), get('/users')]);
+  const m = o.money;
+  view.innerHTML = `
+    <h1>Overview</h1><p class="muted">1 credit = ${usd(m.creditUsd)} of Meta list price. Each assigner has ${n(m.teacherDayCredits)} credits a day (Vietnam days). ${m.disabled ? '<b class="err">AI is switched off (AI_DISABLED=1).</b>' : ''}</p>
+    <div class="cards">
+      <div class="card"><div class="muted small">Meta credit used (all time)</div><div class="big">${usd(m.total.usd)}</div><div class="small muted">AI stops at ${usd(m.totalCapUsd)} · Meta credit $150</div>${bar(m.total.usd, m.totalCapUsd)}</div>
+      <div class="card"><div class="muted small">Today</div><div class="big">${usd(m.today.usd)}</div><div class="small muted">${n(m.today.credits)} credits · app stops at ${usd(m.dayCapUsd)} a day</div>${bar(m.today.usd, m.dayCapUsd)}</div>
+      <div class="card"><div class="muted small">People</div><div class="big">${n(o.people.demo + o.people.accounts)}</div><div class="small muted">${n(o.people.accounts)} email accounts · ${n(o.people.demo)} demos · ${n(o.people.today)} active today</div></div>
+      <div class="card"><div class="muted small">Lessons</div><div class="big">${n(o.lessons.all)}</div><div class="small muted">${n(o.lessons.ready)} ready · ${n(o.lessons.failed)} failed · ${n(o.lessons.today)} today</div></div>
+      <div class="card"><div class="muted small">Model calls</div><div class="big">${n(o.calls)}</div><div class="small muted">${n(o.blocked)} refused by the guard</div></div>
+    </div>
+    <h2>People</h2>
+    ${table([
+      { h: 'Who', f: (r) => `${chip(r.kind === 'demo' ? 'demo' : 'account', r.kind)} ${esc(r.email || r.name || r.id)}` },
+      { h: 'Joined', f: (r) => when(r.created_at) }, { h: 'Last seen', f: (r) => when(r.seen_at) },
+      { h: 'Credits today', r: 1, f: (r) => `${n(r.todayCredits)} / ${n(m.teacherDayCredits)}` },
+      { h: 'Credits in all', r: 1, f: (r) => cr(r.spent) },
+      { h: 'Lessons', r: 1, f: (r) => n(r.lessons) }, { h: 'Books', r: 1, f: (r) => n(r.books) },
+      { h: 'Calls', r: 1, f: (r) => n(r.calls) }, { h: 'Refused', r: 1, f: (r) => r.blocked ? `<b class="err">${n(r.blocked)}</b>` : '0' },
+      { h: 'Last AI call', f: (r) => when(r.last_call) },
+    ], u.users, (r) => '#/u/' + r.id)}
+    <h2>By day (Vietnam time)</h2>
+    ${table([{ h: 'Day', f: (r) => esc(r.day) }, { h: 'People', r: 1, f: (r) => n(r.people) }, { h: 'Calls', r: 1, f: (r) => n(r.n) }, { h: 'Refused', r: 1, f: (r) => n(r.blocked) }, { h: 'Credits', r: 1, f: cr }], o.days)}
+    <h2>By model and step</h2>
+    ${table([{ h: 'Step', f: (r) => esc(r.endpoint) }, { h: 'Model', f: (r) => esc(r.model) }, { h: 'Calls', r: 1, f: (r) => n(r.n) }, { h: 'Tokens in', r: 1, f: (r) => n(r.tin) }, { h: 'Tokens out', r: 1, f: (r) => n(r.tout) }, { h: 'Images', r: 1, f: (r) => n(r.images) }, { h: 'Avg ms', r: 1, f: (r) => n(r.ms) }, { h: 'Credits', r: 1, f: cr }], o.models)}`;
+}
+
+async function user(id) {
+  const d = await get('/users/' + encodeURIComponent(id)), u = d.user;
+  view.innerHTML = `
+    <p><a href="#/">← Overview</a></p>
+    <h1>${chip(u.kind === 'demo' ? 'demo' : 'account', u.kind)} ${esc(u.email || u.name || u.id)}</h1>
+    <p class="muted">${esc(u.name || '')} · id ${esc(u.id)} · language ${esc(u.lang)} · joined ${when(u.created_at)} · last seen ${when(u.seen_at)}</p>
+    <div class="cards">
+      <div class="card"><div class="muted small">Credits today</div><div class="big">${n(d.credits.used)} / ${n(d.credits.perDay)}</div><div class="small muted">${n(d.credits.left)} left, new at midnight (Vietnam)</div>${bar(d.credits.used, d.credits.perDay)}</div>
+      <div class="card"><div class="muted small">Credits in all</div><div class="big">${n(d.byEndpoint.reduce((a, r) => a + r.credits, 0))}</div><div class="small muted">${usd(d.byEndpoint.reduce((a, r) => a + r.usd, 0))}</div></div>
+      <div class="card"><div class="muted small">Lessons</div><div class="big">${n(d.lessons.length)}</div><div class="small muted">${n(d.lessons.filter((l) => l.status === 'ready').length)} ready · ${n(d.lessons.filter((l) => l.status === 'error').length)} failed</div></div>
+      <div class="card"><div class="muted small">Refused by the guard</div><div class="big">${n(d.calls.filter((c) => c.verdict !== 'ok').length)}</div><div class="small muted">in the last ${n(d.calls.length)} calls</div></div>
+    </div>
+    <h2>Lessons</h2>
+    ${table([
+      { h: 'Created', f: (r) => when(r.created_at) }, { h: 'Status', f: (r) => chip(r.status) },
+      { h: 'Lesson', wide: 1, f: (r) => `<b>${esc(r.title)}</b><div class="small muted">${esc(r.citation || '')}</div>${r.error ? `<div class="small err">${esc(r.error)}</div>` : ''}` },
+      { h: 'Request', wide: 1, f: (r) => esc(r.request) },
+      { h: 'Slides', r: 1, f: (r) => n(r.slides) }, { h: 'Pictures', r: 1, f: (r) => n(r.pictures) }, { h: 'Items', r: 1, f: (r) => n(r.items) }, { h: 'Cards', r: 1, f: (r) => n(r.cards) },
+      { h: 'Credits', r: 1, f: cr },
+    ], d.lessons, (r) => '#/l/' + r.id)}
+    <h2>Knowledge areas and books</h2>
+    ${table([{ h: 'Area', f: (r) => esc(r.area) }, { h: 'Subject', f: (r) => `${esc(r.subject)} ${esc(r.grade)}` }, { h: 'Book', wide: 1, f: (r) => esc(r.title || '–') }, { h: 'Status', f: (r) => r.status ? chip(r.status, r.status === 'ready' ? 'ready' : r.status === 'error' ? 'error' : 'working') : '' }, { h: 'Pages', r: 1, f: (r) => n(r.pages) }, { h: 'Sections', r: 1, f: (r) => n(r.sections) }, { h: 'Added', f: (r) => when(r.created_at) }], d.books)}
+    <h2>By step</h2>
+    ${table([{ h: 'Step', f: (r) => esc(r.endpoint) }, { h: 'Model', f: (r) => esc(r.model) }, { h: 'Calls', r: 1, f: (r) => n(r.n) }, { h: 'Tokens in', r: 1, f: (r) => n(r.tin) }, { h: 'Tokens out', r: 1, f: (r) => n(r.tout) }, { h: 'Images', r: 1, f: (r) => n(r.images) }, { h: 'Credits', r: 1, f: cr }], d.byEndpoint)}
+    <h2>Every call (latest ${n(d.calls.length)})</h2>
+    ${table([{ h: 'When', f: (r) => when(r.at) }, { h: 'Step', f: (r) => esc(r.endpoint) }, { h: 'Model', f: (r) => esc(r.model) }, { h: 'Result', f: (r) => r.verdict === 'ok' ? 'ok' : chip(r.verdict, 'bad') }, { h: 'Lesson', f: (r) => r.lesson_id ? `<a href="#/l/${esc(r.lesson_id)}">${esc(r.lesson_id)}</a>` : '' }, { h: 'In', r: 1, f: (r) => n(r.tin) }, { h: 'Out', r: 1, f: (r) => n(r.tout) }, { h: 'Img', r: 1, f: (r) => n(r.images) }, { h: 'ms', r: 1, f: (r) => n(r.ms) }, { h: 'Credits', r: 1, f: cr }], d.calls)}`;
+}
+
+async function lesson(id) {
+  const d = await get('/lessons/' + encodeURIComponent(id)), l = d.lesson, s = l.setup || {}, a = l.agent || {};
+  const img = (u) => u ? `<img loading="lazy" alt="" src="${esc(/^https?:/.test(u) ? u : d.publicUrl + u)}">` : '';
+  view.innerHTML = `
+    <p><a href="#/u/${esc(l.teacher_id)}">← The assigner</a></p>
+    <h1>${esc(s.title)}</h1>
+    <p class="muted">${chip(l.status)} ${esc(s.subject)} · grade ${esc(s.grade)} · ${esc(s.minutes)} min · ${when(l.created_at)} · ${esc((l.refs || [])[0]?.vi || '')}</p>
+    ${l.request ? `<p><b>Request:</b> ${esc(l.request)}</p>` : ''}${l.error ? `<p class="err">${esc(l.error)}</p>` : ''}
+    <h2>Cost</h2>
+    ${table([{ h: 'Step', f: (r) => esc(r.endpoint) }, { h: 'Model', f: (r) => esc(r.model) }, { h: 'Calls', r: 1, f: (r) => n(r.n) }, { h: 'Credits', r: 1, f: cr }], d.cost)}
+    <h2>Agent</h2><div class="card"><p class="note">${esc(a.note || '–')}</p>${(a.changes || []).length ? `<p class="small muted">Changes: ${esc(a.changes.join('; '))}</p>` : ''}<p class="small muted">${n(a.turns)} turns · ${a.finished ? 'finished' : 'completed by code'} · ${n((l.rejected || []).length)} items rejected</p></div>
+    <h2>Steps</h2>${table([{ h: 'When', f: (r) => when(r.at) }, { h: 'Step', wide: 1, f: (r) => esc(r.en) }], l.steps || [])}
+    <h2>Slides (${n((l.slides || []).length)})</h2>
+    <div class="slides">${(l.slides || []).map((x) => `<div class="card">${img(x.image)}<div class="small muted">${esc(x.id)} · ${esc(x.kind)}${x.page ? ' · p. ' + esc(x.page) : ''}</div><b>${esc(x.heading)}</b><ul>${(x.bullets || []).map((b) => `<li>${esc(b)}</li>`).join('')}</ul></div>`).join('')}</div>
+    <h2>Practice items (${n((l.items || []).length)})</h2>
+    ${table([{ h: 'Id', f: (r) => esc(r.id) }, { h: 'Skill', f: (r) => esc(r.skill) }, { h: 'Level', f: (r) => esc(r.level) }, { h: 'Item', wide: 1, f: (r) => esc(r.prompt) + (r.options ? `<div class="small muted">${esc(r.options.join(' · '))}</div>` : '') }, { h: 'Answer', f: (r) => esc(r.answer) }], l.items || [])}
+    <h2>Flashcards (${n((l.cards || []).length)})</h2>
+    ${table([{ h: 'Front', wide: 1, f: (r) => esc((r.emoji ? r.emoji + ' ' : '') + r.front) }, { h: 'Back', wide: 1, f: (r) => esc(r.back) }], l.cards || [])}
+    ${(l.rejected || []).length ? `<h2>Rejected by the checks</h2>${table([{ h: 'Codes', f: (r) => esc((r.codes || []).join(' ')) }, { h: 'Issues', wide: 1, f: (r) => esc((r.issues || []).join('; ')) }], l.rejected)}` : ''}`;
+}
+
+async function route() {
+  if (!key) return askKey();
+  document.getElementById('out').hidden = false;
+  document.getElementById('when').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', tz) + ' (Hanoi)';
+  const h = location.hash.slice(1) || '/', [, kind, id] = h.split('/');
+  view.innerHTML = '<p class="muted">Loading…</p>';
+  try { kind === 'u' ? await user(decodeURIComponent(id)) : kind === 'l' ? await lesson(decodeURIComponent(id)) : await overview(); }
+  catch (e) { if (e.message !== 'key') view.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+view.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-go]'); if (tr && !e.target.closest('a')) location.hash = tr.dataset.go; });
+document.getElementById('out').onclick = () => { key = ''; try { sessionStorage.removeItem(KEY); } catch {} askKey(); };
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

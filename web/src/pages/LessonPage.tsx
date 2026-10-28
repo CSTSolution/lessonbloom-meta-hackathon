@@ -8,7 +8,7 @@ import { go } from '../router.ts';
 
 const T = {
   vi: {
-    back: '← Bài giảng', working: 'Trợ lý đang soạn bài…', failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa',
+    back: '← Bài giảng', working: 'Trợ lý đang soạn bài…', failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} tín dụng.`,
     tabs: { slides: 'Slide', practice: 'Bài luyện tập', cards: 'Thẻ nhớ' }, teacherSays: 'Lời giảng', source: 'Từ ghi chú của cô',
     levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, answer: 'Đáp án', checked: (n: number, r: number) => `${n} câu, tất cả đã qua bộ kiểm tra bằng code${r ? ` (đã loại ${r} câu chưa đạt)` : ''}.`,
     tf: { true: 'Đúng', false: 'Sai' }, unit: 'Đơn vị',
@@ -16,7 +16,7 @@ const T = {
     cutHint: 'Chụp đồ vật thật; AI cắt nền và đặt vào slide. Không dùng ảnh có người. Ảnh gốc không được lưu.', cutDone: (n: number) => `Đã cắt ${n} đồ vật.`,
   },
   en: {
-    back: '← Lessons', working: 'The agent is making your lesson…', failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes',
+    back: '← Lessons', working: 'The agent is making your lesson…', failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${n} credits.`,
     tabs: { slides: 'Slides', practice: 'Practice', cards: 'Flashcards' }, teacherSays: 'You say', source: 'From your notes',
     levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, answer: 'Answer', checked: (n: number, r: number) => `${n} items, every one passed the code checks${r ? ` (${r} rejected items left out)` : ''}.`,
     tf: { true: 'True', false: 'False' }, unit: 'Unit',
@@ -99,7 +99,7 @@ export function LessonPage({ id }: { id: string }) {
         </div>
       )}
       {l.status === 'ready' && <>
-        {l.agent?.note && <div className="card agent"><strong>◆ {t.note}</strong><p>{l.agent.note}</p>{!!l.agent.changes.length && <p className="small muted">{t.changes}: {l.agent.changes.join(' · ')}</p>}</div>}
+        {l.agent?.note && <div className="card agent"><strong>◆ {t.note}</strong><p>{l.agent.note}</p>{!!l.agent.changes.length && <p className="small muted">{t.changes}: {l.agent.changes.join(' · ')}</p>}{!l.pictures_pending && !!l.credits && <p className="small muted">{t.cost(l.credits)}</p>}</div>}
         <div className="seg" role="tablist">{(['slides', 'practice', 'cards'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t.tabs[k]} <span className="muted">{k === 'slides' ? l.slides.length : k === 'practice' ? l.items.length : l.cards.length}</span></button>)}</div>
         {tab === 'slides' && <div className="slides">{l.slides.map((s, i) => (
           <SlideCard key={s.id} s={s} i={i} total={l.slides.length} lessonId={l.id} pending={l.pictures_pending} t={t} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} />
