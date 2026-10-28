@@ -18,6 +18,11 @@ const sql = config.databaseUrl ? pgSql(config.databaseUrl) : await (async () => 
   return pgliteSql(dir);
 })();
 await migrate(sql, console.log);
+// background work does not survive a restart: anything left half-made is marked so it can be made again
+const stuck = await sql.query<{ id: string }>(`update lessons set status = 'error', error = 'interrupted', updated_at = now() where status = 'working' returning id`);
+await sql.query(`update lessons set video_status = 'error' where video_status like 'working%'`);
+await sql.query(`update lessons set pictures_pending = false where pictures_pending`);
+if (stuck.length) console.log(`[start] ${stuck.length} lesson(s) were interrupted by the restart`);
 
 const ai = pickProvider();
 const app = createApp({ sql, ai, mail: smtpMailer() });
