@@ -32,8 +32,9 @@ export class Lessons {
          exists (select 1 from assignments a where a.lesson_id = l.id) as given
        from lessons l where l.teacher_id = $1 order by l.created_at desc limit 100`, [teacherId]);
   }
+  // lessons that could not be made do not use up the day's lessons
   async madeToday(teacherId: string) {
-    return Number((await this.sql.one<{ n: string }>(`select count(*) as n from lessons where teacher_id = $1 and created_at >= ${TODAY}`, [teacherId]))?.n || 0);
+    return Number((await this.sql.one<{ n: string }>(`select count(*) as n from lessons where teacher_id = $1 and created_at >= ${TODAY} and status <> 'error'`, [teacherId]))?.n || 0);
   }
   async step(id: string, vi: string, en: string) {
     await this.sql.query(`update lessons set steps = steps || $2::jsonb, updated_at = now() where id = $1`, [id, J([{ at: new Date().toISOString(), vi, en }])]);
