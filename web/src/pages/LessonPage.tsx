@@ -14,8 +14,11 @@ const T = {
   vi: {
     working: 'Trợ lý đang soạn bài…', failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} tín dụng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', drawing: 'Đang vẽ hình minh hoạ…',
+    rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
+    makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', preview: 'Nghe thử từng đoạn',
+    edit: 'Sửa', qText: 'Câu hỏi', save: 'Lưu', cancel: 'Huỷ', similar: 'Tạo câu tương tự', addTpl: '+ Thêm mẫu', tplKind: 'Dạng câu', skill: 'Dạng bài', level: 'Mức', create: 'Tạo 2 câu', working2: 'Đang viết…', story: 'Đề bài', unit: 'Đơn vị', wrongs: 'Đáp án sai (cách nhau bằng dấu phẩy)', shown: 'Kết quả ghi trong câu', opts: 'Lựa chọn (cách nhau bằng dấu phẩy)', ans: 'Đáp án', sentence: 'Câu có chỗ trống ___', sayIt: 'Từ được đọc to', words: 'Các từ (cách nhau bằng dấu phẩy)', codeAns: 'Đáp án do code tính.',
     newPic: 'Đổi hình minh họa', cut: 'Cắt từ ảnh của cô', cutHint: 'Chọn ảnh đồ vật (không có người) và gõ tên đồ vật cần cắt.', cutName: 'Ví dụ: quả táo', cutGo: 'Cắt bằng SAM 3.1', cutDone: (n: number) => `Đã cắt ${n} vật.`, busy: 'Đang làm…',
-    video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', voiceVi: 'Nữ · miền Bắc', voiceEn: 'Female · English', parts: 'Các đoạn', subs: 'Phụ đề', play: '▶', toItems: 'Tiếp: bài tập', mp4: 'Tải video MP4: sắp có',
+    video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', parts: 'Các đoạn', subs: 'Phụ đề', toItems: 'Tiếp: bài tập',
     items: 'Bài tập', itemsLead: 'Đọc kỹ từng câu trước khi giao bài.', checked: (n: number, r: number) => `Đã kiểm tra ${n + r} câu · ${r} câu tạo lại`, details: 'Chi tiết', why: 'Lý do tạo lại',
     levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, allLevels: 'Tất cả', kind: 'Dạng', explain: 'Lời giải', page: 'Nguồn', remove: 'Xóa', removeAsk: 'Xoá câu này khỏi bài?', seeAll: (n: number) => `Xem cả ${n} câu`, n: (n: number) => `${n} câu`, q: (i: number) => `Câu ${i}.`, tf: { true: 'Đúng', false: 'Sai' }, answer: 'Đáp án',
     groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ' }, toAssign: 'Duyệt xong, sang giao bài',
@@ -23,8 +26,11 @@ const T = {
   en: {
     working: 'The agent is making your lesson…', failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${n} credits.`, pdf: 'Export PDF', printItems: 'Print worksheet',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', drawing: 'Drawing the picture…',
+    rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
+    makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', preview: 'Listen to each part',
+    edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
     newPic: 'New picture', cut: 'Cut out from your photo', cutHint: 'Choose a photo of objects (no people) and type what to cut out.', cutName: 'e.g. apples', cutGo: 'Cut out with SAM 3.1', cutDone: (n: number) => `Cut out ${n}.`, busy: 'Working…',
-    video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', voiceVi: 'Female · Northern Vietnamese', voiceEn: 'Female · English', parts: 'Parts', subs: 'Subtitles', play: '▶', toItems: 'Next: practice', mp4: 'MP4 download: coming soon',
+    video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
     items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number) => `Checked ${n + r} items · ${r} written again`, details: 'Details', why: 'Why they were written again',
     levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, allLevels: 'All', kind: 'Skill', explain: 'Explanation', page: 'Source', remove: 'Delete', removeAsk: 'Remove this item from the lesson?', seeAll: (n: number) => `See all ${n}`, n: (n: number) => `${n} items`, q: (i: number) => `${i}.`, tf: { true: 'True', false: 'False' }, answer: 'Answer',
     groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards' }, toAssign: 'Reviewed: go to assigning',
@@ -34,17 +40,17 @@ type Dict = (typeof T)['vi'];
 
 export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
   const t = useT(T), lang = useLang();
-  const [l, setL] = useState<Lesson | null>(null), [step, setStep0] = useState(3), [seen, setSeen] = useState(3);
+  const [tick, setTick] = useState(0), [l, setL] = useState<Lesson | null>(null), [step, setStep0] = useState(3), [seen, setSeen] = useState(3);
   const setStep = (n: number) => { setStep0(n); setSeen((s) => Math.max(s, n)); };
   useEffect(() => {
     let alive = true, timer: ReturnType<typeof setTimeout>;
     const load = async () => {
-      try { const { lesson } = await api.lesson(id); if (!alive) return; setL(lesson); if (lesson.status === 'working' || lesson.pictures_pending) timer = setTimeout(load, 1500); }
+      try { const { lesson } = await api.lesson(id); if (!alive) return; setL(lesson); if (lesson.status === 'working' || lesson.pictures_pending || String(lesson.video_status).startsWith('working')) timer = setTimeout(load, 1500); }
       catch { if (alive) timer = setTimeout(load, 4000); }
     };
     void load();
     return () => { alive = false; clearTimeout(timer); };
-  }, [id]);
+  }, [id, tick]);
   if (!l) return null;
   const ref = l.refs?.[0], refText = ref ? (lang === 'en' ? ref.en : ref.vi) : '';
   return (
@@ -56,18 +62,18 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
           <ol className="steps">{l.steps.map((s, i) => <li key={i} className={i === l.steps.length - 1 && l.status === 'working' ? 'now' : ''}>{lang === 'en' ? s.en : s.vi}</li>)}</ol>
         </div>
       )}
-      {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onNext={() => setStep(4)} />}
-      {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} />}
+      {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(4)} />}
+      {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
       {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} /></div>}
     </div>
   );
 }
 
-function Slides({ l, t, parent, refText, onSlide, onNext }: { l: Lesson; t: Dict; parent: boolean; refText: string; onSlide: (s: Slide) => void; onNext: () => void }) {
+function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesson; t: Dict; parent: boolean; refText: string; onSlide: (s: Slide) => void; onSlides: (s: Slide[]) => void; onNext: () => void }) {
   const lang = useLang(), [i, setI] = useState(0), s = l.slides[i];
-  const [busy, setBusy] = useState(false), [cut, setCut] = useState<{ file: File | null; name: string } | null>(null), [msg, setMsg] = useState('');
-  const run = async (fn: () => Promise<void>) => { setBusy(true); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); } };
+  const [busy, setBusy] = useState(false), [cut, setCut] = useState<{ file: File | null; name: string } | null>(null), [msg, setMsg] = useState(''), [adding, setAdding] = useState<string | null>(null), [what, setWhat] = useState('');
+  const run = async (fn: () => Promise<void>, label = 'x') => { setWhat(label); setBusy(true); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); } };
   useEffect(() => { setCut(null); setMsg(''); }, [i]);
   if (!s) return null;
   return (
@@ -85,9 +91,14 @@ function Slides({ l, t, parent, refText, onSlide, onNext }: { l: Lesson; t: Dict
             </div>
           </div>
           <div className="row">
-            <button className="btn small" disabled={busy} onClick={() => run(async () => onSlide((await api.newPicture(l.id, s.id)).slide))}>{busy && !cut ? t.busy : t.newPic}</button>
+            <button className="btn small" disabled={busy} onClick={() => run(async () => onSlide((await api.rewriteSlide(l.id, s.id, 'rewrite')).slide), 'rw')}>{busy && what === 'rw' ? t.busy : t.rewrite}</button>
+            <button className="btn small" disabled={busy} onClick={() => run(async () => onSlide((await api.rewriteSlide(l.id, s.id, 'simpler')).slide), 'si')}>{busy && what === 'si' ? t.busy : t.simpler}</button>
+            <button className="btn small" disabled={busy} onClick={() => run(async () => onSlide((await api.newPicture(l.id, s.id)).slide), 'pic')}>{busy && what === 'pic' ? t.busy : t.newPic}</button>
             <button className="btn small" disabled={busy} onClick={() => setCut(cut ? null : { file: null, name: '' })}>{t.cut}</button>
+            <button className="btn small" disabled={busy} onClick={() => setAdding(adding === null ? '' : null)}>{t.addSlide}</button>
           </div>
+          {adding !== null && <form className="row" onSubmit={(e) => { e.preventDefault(); void run(async () => { const r = await api.addSlide(l.id, s.id, adding); onSlides(r.slides); setAdding(null); setI(i + 1); }, 'add'); }}>
+            <input className="grow" maxLength={120} placeholder={t.topicPh} value={adding} onChange={(e) => setAdding(e.target.value)} /><button className="btn primary small" disabled={busy}>{busy && what === 'add' ? t.busy : t.add}</button></form>}
           {cut && <div className="card stack small" style={{ gap: 6 }}>
             <p className="muted">{t.cutHint}</p>
             <input type="file" accept="image/*" onChange={(e) => setCut({ ...cut, file: e.target.files?.[0] || null })} />
@@ -110,8 +121,11 @@ function Slides({ l, t, parent, refText, onSlide, onNext }: { l: Lesson; t: Dict
 }
 const ref = (refText: string, page?: number) => (page ? refText.replace(/(tr\.|p\.)\s*[\d–-]+$/, `$1 ${page}`) : refText).replace(/^(Theo|From):\s*/, '');
 
-function Video({ l, t, onNext }: { l: Lesson; t: Dict; onNext: () => void }) {
-  const [i, setI] = useState(0), [playing, setPlaying] = useState(false), audio = useRef<HTMLAudioElement | null>(null), s = l.slides[i];
+function Video({ l, t, onNext, onStarted }: { l: Lesson; t: Dict; onNext: () => void; onStarted: () => void }) {
+  const [i, setI] = useState(0), [playing, setPlaying] = useState(false), audio = useRef<HTMLAudioElement | null>(null), video = useRef<HTMLVideoElement | null>(null), s = l.slides[i];
+  const [subs, setSubs] = useState(l.video?.subtitles ?? true), [voice, setVoice] = useState(0), [err, setErr] = useState('');
+  const status = String(l.video_status || 'none'), working = status.startsWith('working'), v = status === 'ready' ? l.video : null;
+  const voices = l.setup.lang === 'en' ? t.voicesEn : t.voices;
   const play = (j: number) => {
     audio.current?.pause();
     setI(j); setPlaying(true);
@@ -121,20 +135,33 @@ function Video({ l, t, onNext }: { l: Lesson; t: Dict; onNext: () => void }) {
     audio.current = a; void a.play().catch(() => setPlaying(false));
   };
   useEffect(() => () => audio.current?.pause(), []);
+  const make = async () => { setErr(''); try { await api.makeVideo(l.id, { subtitles: subs, voice }); onStarted(); } catch (e) { setErr(e instanceof ApiError ? e.vi : String(e)); } };
+  const mmss = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
   return (
     <div className="cols">
       <div className="stack">
-        <div><h1>{t.video}</h1><p className="small muted">{t.videoLead}</p></div>
-        <div className="slide-big" style={{ display: 'grid', placeItems: 'center', textAlign: 'center', minHeight: 300, position: 'relative' }}>
-          {s.image && <img src={s.image} alt="" style={{ maxHeight: 140, borderRadius: 10 }} />}
-          <h2>{s.heading}</h2>{s.example && <div className="ex">{s.example}</div>}
-          <button className="btn primary" style={{ borderRadius: 99, width: 56, height: 56 }} onClick={() => (playing ? (audio.current?.pause(), setPlaying(false)) : play(i))} aria-label="play">{playing ? '❚❚' : '▶'}</button>
-        </div>
+        <div className="row"><div className="grow"><h1>{t.video}</h1><p className="small muted">{t.videoLead}{v ? ` · ${mmss(v.seconds)}` : ''}</p></div>{v && <a className="btn small" href={v.url} download={`${l.setup.title}.mp4`}>{t.download}</a>}</div>
+        {v ? <video ref={video} src={v.url} controls style={{ width: '100%', borderRadius: 14, background: '#000' }} /> : (
+          <div className="slide-big" style={{ display: 'grid', placeItems: 'center', textAlign: 'center', minHeight: 300 }}>
+            {s.image && <img src={s.image} alt="" style={{ maxHeight: 140, borderRadius: 10 }} />}
+            <h2>{s.heading}</h2>{s.example && <div className="ex">{s.example}</div>}
+            {working ? <b className="small">{t.making(status.split(':')[1] || '')}</b> : <button className="btn primary" style={{ borderRadius: 99, width: 56, height: 56 }} onClick={() => (playing ? (audio.current?.pause(), setPlaying(false)) : play(i))} aria-label={t.preview}>{playing ? '❚❚' : '▶'}</button>}
+          </div>
+        )}
+        {status === 'error' && <p className="note">{t.videoErr}</p>}{err && <p className="note">{err}</p>}
         <details className="card small"><summary><b>{t.subs}</b></summary><p>{s.narration || s.notes}</p></details>
       </div>
       <div className="stack">
-        <div className="card small"><b>{t.voice}</b><p className="muted">{l.setup.lang === 'en' ? t.voiceEn : t.voiceVi}</p><p className="muted">{t.mp4}</p></div>
-        <div className="card stack" style={{ gap: 4 }}><b className="small">{t.parts}</b>{l.slides.map((x, j) => <button key={x.id} className={`list-row small ${j === i ? 'sel' : ''}`} style={{ cursor: 'pointer', padding: '4px 8px' }} onClick={() => play(j)}><span className="grow" style={{ textAlign: 'left' }}>{x.heading}</span>▶</button>)}</div>
+        <div className="card stack small" style={{ gap: 6 }}>
+          <b>{t.voice}</b>
+          <select value={voice} onChange={(e) => setVoice(Number(e.target.value))}>{voices.map((x, j) => <option key={x} value={j}>{x}</option>)}</select>
+          <label className="check"><input type="checkbox" checked={subs} onChange={(e) => setSubs(e.target.checked)} /> {t.subsOn}</label>
+          <button className="btn small" disabled={working} onClick={make}>{working ? t.making(status.split(':')[1] || '') : v ? t.remake : t.makeVideo}</button>
+        </div>
+        <div className="card stack" style={{ gap: 4 }}><b className="small">{v ? t.parts : t.preview}</b>{(v ? v.chapters : l.slides.map((x) => ({ heading: x.heading, start: -1 }))).map((x, j) => (
+          <button key={j} className={`list-row small ${j === i ? 'sel' : ''}`} style={{ cursor: 'pointer', padding: '4px 8px' }} onClick={() => { setI(j); if (v && video.current) { video.current.currentTime = x.start; void video.current.play(); } else play(j); }}>
+            <span className="grow" style={{ textAlign: 'left' }}>{x.heading}</span><span className="muted">{x.start >= 0 ? mmss(x.start) : '▶'}</span></button>
+        ))}</div>
         <button className="btn primary" onClick={onNext}>{t.toItems}</button>
       </div>
     </div>
@@ -142,7 +169,10 @@ function Video({ l, t, onNext }: { l: Lesson; t: Dict; onNext: () => void }) {
 }
 
 function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; refText: string; onChange: (items: Item[]) => void; onNext: () => void }) {
-  const [level, setLevel] = useState<'' | Item['level']>(''), [open, setOpen] = useState(''), [all, setAll] = useState<Record<string, boolean>>({});
+  const lang = useLang(), [level, setLevel] = useState<'' | Item['level']>(''), [open, setOpen] = useState(''), [all, setAll] = useState<Record<string, boolean>>({});
+  const [editing, setEditing] = useState(''), [busy, setBusy] = useState(''), [msg, setMsg] = useState(''), [tpl, setTpl] = useState<{ skill: string; template: string; level: string } | null>(null);
+  const run = async (key: string, fn: () => Promise<void>) => { setBusy(key); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(''); } };
+  const templates = l.setup.subject === 'math' ? ['mcq', 'fill', 'truefalse', 'word'] : ['match', 'fill', 'listen', 'order'];
   const items = l.items.filter((i) => !level || i.level === level), skillName = (tag: string) => l.skills.find((k) => k.tag === tag)?.name || tag;
   const kinds = [...new Set(l.items.map((i) => i.template))] as (keyof Dict['groups'])[];
   const first = open || kinds[0];
@@ -151,7 +181,15 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
     <div className="stack" style={{ maxWidth: 820, margin: '0 auto' }}>
       <div className="row"><div className="grow"><h1>{t.items}</h1><p className="small muted">{t.itemsLead}</p></div>
         <div className="weeks">{(['', 'basic', 'good', 'advanced'] as const).map((v) => <button key={v} className={level === v ? 'on' : ''} onClick={() => setLevel(v)}>{v ? t.levels[v] : t.allLevels}</button>)}</div>
+        <button className="btn small noprint" onClick={() => setTpl(tpl ? null : { skill: l.skills[0]?.tag || '', template: templates[0], level: 'good' })}>{t.addTpl}</button>
         <button className="btn small noprint" onClick={() => window.print()}>{t.printItems}</button></div>
+      {tpl && <div className="card row noprint">
+        <label className="small">{t.tplKind} <select value={tpl.template} onChange={(e) => setTpl({ ...tpl, template: e.target.value })}>{templates.map((k) => <option key={k} value={k}>{t.groups[k as keyof Dict['groups']]}</option>)}</select></label>
+        <label className="small">{t.skill} <select value={tpl.skill} onChange={(e) => setTpl({ ...tpl, skill: e.target.value })}>{l.skills.map((k) => <option key={k.tag} value={k.tag}>{k.name}</option>)}</select></label>
+        <label className="small">{t.level} <select value={tpl.level} onChange={(e) => setTpl({ ...tpl, level: e.target.value })}>{(['basic', 'good', 'advanced'] as const).map((v) => <option key={v} value={v}>{t.levels[v]}</option>)}</select></label>
+        <button className="btn primary small" disabled={!!busy} onClick={() => run('tpl', async () => { const r = await api.addItems(l.id, tpl); onChange(r.items); setOpen(tpl.template); setTpl(null); })}>{busy === 'tpl' ? t.working2 : t.create}</button>
+        <button className="btn ghost small" onClick={() => setTpl(null)}>{t.cancel}</button></div>}
+      {msg && <p className="note noprint">{msg}</p>}
       <div className="banner row"><b className="grow">✓ {t.checked(l.items.length, l.rejected.length)}</b>{!!l.rejected.length && <details className="small"><summary>{t.details}</summary><b>{t.why}</b><ul>{l.rejected.map((r, i) => <li key={i}>{r.issues.join('; ')}</li>)}</ul></details>}</div>
       {kinds.map((k) => { const list = items.filter((i) => i.template === k), shown = all[k] ? list : list.slice(0, 3); if (!list.length) return null; return (
         <div key={k} className={`group card ${first === k ? 'on' : ''}`}>
@@ -168,7 +206,10 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
                 {it.words && <div className="opts">{it.words.map((w, x) => <span key={x} className="opt">{w}</span>)}</div>}
                 {(it.template === 'word' || it.template === 'fill' || it.template === 'order') && <p className="small"><b>{t.answer}:</b> {it.answer}{it.unit ? ` ${it.unit}` : ''}</p>}
                 <div className="row small"><details className="grow"><summary className="link">{t.details}</summary><p>💡 <b>{t.explain}:</b> {it.explain}</p>{refText && <p className="muted">{t.page}: {refText.replace(/^(Theo|From):\s*/, '')}</p>}</details>
+                  <button className="btn small noprint" onClick={() => setEditing(editing === it.id ? '' : it.id)}>{t.edit}</button>
+                  <button className="btn small noprint" disabled={!!busy} onClick={() => run(it.id, async () => onChange((await api.similarItem(l.id, it.id)).items))}>{busy === it.id ? t.working2 : t.similar}</button>
                   <button className="btn small danger noprint" onClick={async () => { if (confirm(t.removeAsk)) { await api.deleteItem(l.id, it.id); onChange(l.items.filter((x) => x.id !== it.id)); } }}>{t.remove}</button></div>
+                {editing === it.id && <ItemEdit it={it} t={t} onSave={async (f) => run('edit', async () => { const r = await api.editItem(l.id, it.id, f); onChange(l.items.map((x) => (x.id === it.id ? r.item : x))); setEditing(''); })} onCancel={() => setEditing('')} />}
               </div>
             ))}
             {list.length > 3 && !all[k] && <button className="link small" style={{ alignSelf: 'start' }} onClick={() => setAll({ ...all, [k]: true })}>{t.seeAll(list.length)}</button>}
@@ -181,5 +222,26 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
       </div>}
       <div className="row noprint"><span className="grow" /><button className="btn primary" onClick={onNext}>{t.toAssign}</button></div>
     </div>
+  );
+}
+
+// Sửa: maths items take her numbers (the answer is always worked out by code); English items take
+// her words. The server rebuilds and checks the item before keeping it.
+function ItemEdit({ it, t, onSave, onCancel }: { it: Item; t: Dict; onSave: (f: Record<string, unknown>) => void; onCancel: () => void }) {
+  const [f, setF] = useState<Record<string, string>>((): Record<string, string> => it.subject === 'math'
+    ? { a: String(it.a ?? ''), b: String(it.b ?? ''), shown: String(it.shown ?? ''), wrongs: (it.distractors || []).join(', '), story: it.story || '', unit: it.unit || '', explain: it.explain }
+    : { prompt: it.prompt, sentence: it.sentence || '', say: it.say || '', opts: (it.options || []).join(', '), answer: it.answer, words: (it.words || []).join(', '), explain: it.explain });
+  const field = (k: string, label: string, wide = false) => <label className="field small" style={wide ? { gridColumn: '1 / -1' } : undefined}>{label}<input value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} /></label>;
+  const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
+  const save = () => onSave(it.subject === 'math'
+    ? { a: f.a, b: f.b, ...(it.template === 'truefalse' ? { shown: f.shown } : {}), ...(it.template === 'mcq' ? { distractors: list(f.wrongs).map(Number) } : {}), ...(it.template === 'word' ? { story: f.story, unit: f.unit } : {}), explain: f.explain }
+    : { prompt: f.prompt, ...(it.template === 'fill' ? { sentence: f.sentence, options: list(f.opts), answer: f.answer } : {}), ...(it.template === 'listen' ? { say: f.say, options: list(f.opts), answer: f.say } : {}), ...(it.template === 'order' ? { words: list(f.words), answer: f.answer } : {}), explain: f.explain });
+  return (
+    <form className="card noprint" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }} onSubmit={(e) => { e.preventDefault(); save(); }}>
+      {it.subject === 'math' ? <>{field('a', 'a')}{field('b', 'b')}{it.template === 'truefalse' && field('shown', t.shown)}{it.template === 'mcq' && field('wrongs', t.wrongs, true)}{it.template === 'word' && <>{field('story', t.story, true)}{field('unit', t.unit)}</>}<span className="small muted" style={{ gridColumn: '1 / -1' }}>{t.codeAns}</span></>
+        : <>{field('prompt', t.qText, true)}{it.template === 'fill' && <>{field('sentence', t.sentence, true)}{field('opts', t.opts, true)}{field('answer', t.ans)}</>}{it.template === 'listen' && <>{field('say', t.sayIt)}{field('opts', t.opts, true)}</>}{it.template === 'order' && <>{field('words', t.words, true)}{field('answer', t.ans, true)}</>}</>}
+      {field('explain', t.explain, true)}
+      <div className="row" style={{ gridColumn: '1 / -1' }}><button className="btn primary small">{t.save}</button><button type="button" className="btn ghost small" onClick={onCancel}>{t.cancel}</button></div>
+    </form>
   );
 }

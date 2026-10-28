@@ -7,10 +7,10 @@ export type Level = 'basic' | 'good' | 'advanced';
 export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string }
 export interface Skill { tag: string; name: string; kind: string }
 export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number }
-export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string }
+export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
-export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number }
+export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
 export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
@@ -62,6 +62,12 @@ export const api = {
   renameSection: (id: string, title: string) => call<{ ok: boolean }>('PUT', `/t/sections/${id}`, { title }),
   splitSection: (id: string, page: number, title: string) => call<{ id: string }>('POST', `/t/sections/${id}/split`, { page, title }),
   mergeSection: (id: string) => call<{ ok: boolean }>('POST', `/t/sections/${id}/merge`),
+  rewriteSlide: (id: string, sid: string, how: 'rewrite' | 'simpler') => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/rewrite`, { how }),
+  addSlide: (id: string, after: string, topic: string) => call<{ slide: Slide; slides: Slide[] }>('POST', `/t/lessons/${id}/slides`, { after, topic }),
+  editItem: (id: string, itemId: string, f: Record<string, unknown>) => call<{ item: Item }>('PUT', `/t/lessons/${id}/items/${itemId}`, f),
+  similarItem: (id: string, itemId: string) => call<{ items: Item[]; added: Item[] }>('POST', `/t/lessons/${id}/items/${itemId}/similar`),
+  addItems: (id: string, f: { skill: string; template: string; level: string }) => call<{ items: Item[]; added: Item[] }>('POST', `/t/lessons/${id}/items`, f),
+  makeVideo: (id: string, o: { subtitles: boolean; voice: number }) => call<{ ok: boolean }>('POST', `/t/lessons/${id}/video`, o),
   deleteItem: (lessonId: string, itemId: string) => call<{ ok: boolean }>('DELETE', `/t/lessons/${lessonId}/items/${itemId}`),
   deleteArea: (id: string) => call<{ ok: boolean }>('DELETE', `/t/areas/${id}`),
   deleteBook: (id: string) => call<{ ok: boolean }>('DELETE', `/t/books/${id}`),

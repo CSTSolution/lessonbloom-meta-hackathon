@@ -68,7 +68,7 @@ export function reviewLesson(setup: Setup, source: string, b: { skills: Skill[];
   return issues;
 }
 
-async function simplify(ai: AI, setup: Setup, slide: Slide, reason: string): Promise<Slide> {
+export async function simplify(ai: AI, setup: Setup, slide: Slide, reason: string): Promise<Slide> {
   const r = await guardedJson<{ slides: Omit<Slide, 'id'>[] }>(ai, { endpoint: 'slides', creative: true,
     system: `Rewrite ONE slide for grade ${setup.grade} pupils: shorter sentences (at most ${maxWords(setup.grade)} words), easier words, the same facts and the same slide kind, in ${langName(setup.lang)}. Keep its source quote.`,
     prompt: wrapUser(JSON.stringify({ slide, reason })), schema: SLIDES_SCHEMA, fixture: { simplify: slide } });

@@ -14,6 +14,7 @@ import { Files } from './files.ts';
 import { fail } from './http.ts';
 import { addChild, classRoutes } from './classes/routes.ts';
 import { knowledgeRoutes } from './knowledge/routes.ts';
+import { editRoutes } from './lesson/edit.ts';
 import { lessonRoutes } from './lesson/routes.ts';
 import { pathRoutes } from './path/routes.ts';
 import type { Mailer } from './mail.ts';
@@ -125,10 +126,19 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
   // pictures, cut-outs and videos: random names, so a file is reachable only through its lesson
   app.get('/media/:lesson/:name', async (c) => {
     const f = await files.get(c.req.param('lesson'), c.req.param('name'));
-    return f ? c.body(new Uint8Array(f.data), 200, { 'content-type': f.type, 'cache-control': 'public, max-age=31536000, immutable' }) : c.notFound();
+    if (!f) return c.notFound();
+    const head = { 'content-type': f.type, 'cache-control': 'public, max-age=31536000, immutable', 'accept-ranges': 'bytes' };
+    const r = /^bytes=(\d*)-(\d*)$/.exec(c.req.header('range') || '');
+    if (r && (r[1] || r[2])) {
+      const size = f.data.length, from = r[1] ? Number(r[1]) : Math.max(0, size - Number(r[2])), to = r[1] && r[2] ? Math.min(size - 1, Number(r[2])) : size - 1;
+      if (from >= size || from > to) return c.body(null, 416, { 'content-range': `bytes */${size}` });
+      return c.body(new Uint8Array(f.data.subarray(from, to + 1)), 206, { ...head, 'content-range': `bytes ${from}-${to}/${size}` });
+    }
+    return c.body(new Uint8Array(f.data), 200, head);
   });
   knowledgeRoutes(app, { sql, ai, budget, as });
   lessonRoutes(app, { sql, ai, budget, files, as });
+  editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });
   classRoutes(app, { sql, ai, reminder: path.pupilReminder });
   return app;
