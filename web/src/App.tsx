@@ -3,9 +3,17 @@ import { useEffect, useState } from 'react';
 import { api, type Teacher } from './api.ts';
 import { setLang } from './i18n.ts';
 import { Home } from './pages/Home.tsx';
+import { Pupil } from './pupil/Pupil.tsx';
 import { Welcome } from './pages/Welcome.tsx';
 
+// Pupils (/hoc, /p/<their link>) have their own small app and no teacher session.
+const PUPIL = /^\/(hoc(\/|$)|p\/)/;
 export function App() {
+  if (PUPIL.test(location.pathname)) return <Pupil />;
+  return <TeacherApp />;
+}
+
+function TeacherApp() {
   const [teacher, setTeacher] = useState<Teacher | null | undefined>(undefined);
   useEffect(() => { api.me().then((r) => setTeacher(r.teacher)).catch(() => setTeacher(null)); }, []);
   const signedIn = (t: Teacher) => { setLang(t.lang); setTeacher(t); };

@@ -5,20 +5,21 @@ import { api, ApiError, type Item, type Lesson, type Slide } from '../api.ts';
 import { shrink } from '../photo.ts';
 import { useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
+import { Assign } from './Assign.tsx';
 
 const T = {
   vi: {
     back: '← Bài giảng', working: 'Trợ lý đang soạn bài…', failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} tín dụng.`,
-    tabs: { slides: 'Slide', practice: 'Bài luyện tập', cards: 'Thẻ nhớ' }, teacherSays: 'Lời giảng', source: 'Từ ghi chú của cô',
-    levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, answer: 'Đáp án', checked: (n: number, r: number) => `${n} câu, tất cả đã qua bộ kiểm tra bằng code${r ? ` (đã loại ${r} câu chưa đạt)` : ''}.`,
+    tabs: { slides: 'Slide', practice: 'Bài luyện tập', cards: 'Thẻ nhớ', assign: 'Giao bài' }, teacherSays: 'Lời giảng', source: 'Từ ghi chú của cô',
+    levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, answer: 'Đáp án', checked: (n: number, r: number) => `Đã kiểm tra ${n + r} câu · ${r} câu tạo lại`, details: 'Chi tiết', why: 'Lý do tạo lại',
     tf: { true: 'Đúng', false: 'Sai' }, unit: 'Đơn vị',
     drawing: 'Đang vẽ hình…', newPic: 'Vẽ hình khác', cut: '✂️ Cắt từ ảnh của cô', cutName: 'Đồ vật trong ảnh (vd. quả táo)', cutGo: 'Cắt', busy: 'Đang làm…',
     cutHint: 'Chụp đồ vật thật; AI cắt nền và đặt vào slide. Không dùng ảnh có người. Ảnh gốc không được lưu.', cutDone: (n: number) => `Đã cắt ${n} đồ vật.`,
   },
   en: {
     back: '← Lessons', working: 'The agent is making your lesson…', failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${n} credits.`,
-    tabs: { slides: 'Slides', practice: 'Practice', cards: 'Flashcards' }, teacherSays: 'You say', source: 'From your notes',
-    levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, answer: 'Answer', checked: (n: number, r: number) => `${n} items, every one passed the code checks${r ? ` (${r} rejected items left out)` : ''}.`,
+    tabs: { slides: 'Slides', practice: 'Practice', cards: 'Flashcards', assign: 'Assign' }, teacherSays: 'You say', source: 'From your notes',
+    levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, answer: 'Answer', checked: (n: number, r: number) => `Checked ${n + r} items · ${r} written again`, details: 'Details', why: 'Why they were written again',
     tf: { true: 'True', false: 'False' }, unit: 'Unit',
     drawing: 'Drawing…', newPic: 'New picture', cut: '✂️ Cut from my photo', cutName: 'Object in the photo (e.g. apples)', cutGo: 'Cut out', busy: 'Working…',
     cutHint: 'Photograph a real object; the AI removes the background and puts it on the slide. No photos of people. The photo is not kept.', cutDone: (n: number) => `Cut out ${n} object(s).`,
@@ -75,7 +76,7 @@ function ItemView({ it, t }: { it: Item; t: (typeof T)['vi'] }) {
 
 export function LessonPage({ id }: { id: string }) {
   const t = useT(T), lang = useLang();
-  const [l, setL] = useState<Lesson | null>(null), [tab, setTab] = useState<'slides' | 'practice' | 'cards'>('slides');
+  const [l, setL] = useState<Lesson | null>(null), [tab, setTab] = useState<'slides' | 'practice' | 'cards' | 'assign'>('slides');
   useEffect(() => {
     let alive = true, timer: ReturnType<typeof setTimeout>;
     const load = async () => {
@@ -100,14 +101,15 @@ export function LessonPage({ id }: { id: string }) {
       )}
       {l.status === 'ready' && <>
         {l.agent?.note && <div className="card agent"><strong>◆ {t.note}</strong><p>{l.agent.note}</p>{!!l.agent.changes.length && <p className="small muted">{t.changes}: {l.agent.changes.join(' · ')}</p>}{!l.pictures_pending && !!l.credits && <p className="small muted">{t.cost(l.credits)}</p>}</div>}
-        <div className="seg" role="tablist">{(['slides', 'practice', 'cards'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t.tabs[k]} <span className="muted">{k === 'slides' ? l.slides.length : k === 'practice' ? l.items.length : l.cards.length}</span></button>)}</div>
+        <div className="seg" role="tablist">{(['slides', 'practice', 'cards', 'assign'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t.tabs[k]} {k !== 'assign' && <span className="muted">{k === 'slides' ? l.slides.length : k === 'practice' ? l.items.length : l.cards.length}</span>}</button>)}</div>
         {tab === 'slides' && <div className="slides">{l.slides.map((s, i) => (
           <SlideCard key={s.id} s={s} i={i} total={l.slides.length} lessonId={l.id} pending={l.pictures_pending} t={t} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} />
         ))}</div>}
         {tab === 'practice' && <div className="stack">
-          <p className="small muted">{t.checked(l.items.length, l.rejected.length)}</p>
+          <div className="note ok row"><span className="grow">✓ {t.checked(l.items.length, l.rejected.length)}</span>{!!l.rejected.length && <details className="small"><summary>{t.details}</summary><b>{t.why}</b><ul>{l.rejected.map((r, i) => <li key={i}>{r.issues.join('; ')}</li>)}</ul></details>}</div>
           {l.skills.map((k) => <section key={k.tag} className="stack"><h3>{k.name}</h3><div className="items">{l.items.filter((i) => i.skill === k.tag).map((it) => <ItemView key={it.id} it={it} t={t} />)}</div></section>)}
         </div>}
+        {tab === 'assign' && <Assign lessonId={l.id} />}
         {tab === 'cards' && <div className="cards">{l.cards.map((c) => <div key={c.id} className="fc"><span className="emo">{c.emoji}</span><b>{c.front}</b><span className="muted">{c.back}</span></div>)}</div>}
       </>}
     </div>

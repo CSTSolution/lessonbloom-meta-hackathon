@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, type Credits, type LessonRow, type Teacher } from '../api.ts';
 import { useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
+import { Classes } from './Classes.tsx';
 import { Create } from './Create.tsx';
 import { Knowledge } from './Knowledge.tsx';
 import { LangToggle } from './LangToggle.tsx';
@@ -54,7 +55,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
       <main className="main stack" style={{ gap: 24 }}>
         <Notice compact />
         {path === '/new' ? <Create onKnowledge={() => { setTab('knowledge'); go('/'); }} /> : lessonId ? <LessonPage id={lessonId} /> : <>
-          {tab !== 'knowledge' && <div className="row"><h1 className="grow">{t.hello(teacher.name)}</h1>{tab === 'lessons' && !!rows?.length && <button className="btn coral" onClick={() => go('/new')}>+ {t.make}</button>}</div>}
+          {tab !== 'knowledge' && tab !== 'classes' && <div className="row"><h1 className="grow">{t.hello(teacher.name)}</h1>{tab === 'lessons' && !!rows?.length && <button className="btn coral" onClick={() => go('/new')}>+ {t.make}</button>}</div>}
           {tab === 'lessons' && rows && (rows.length ? (
             <div className="lessons">{rows.map((r) => (
               <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
@@ -69,7 +70,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
             </div>
           ))}
           {tab === 'knowledge' && <Knowledge />}
-          {tab === 'classes' && <div className="empty"><p className="muted">{t.classesText}</p><span className="chip">{t.soon}</span></div>}
+          {tab === 'classes' && <Classes />}
           {tab === 'insight' && <div className="empty"><p className="muted">{t.insightText}</p><span className="chip">{t.soon}</span></div>}
         </>}
       </main>

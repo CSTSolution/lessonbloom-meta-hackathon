@@ -12,6 +12,7 @@ import { Budget, clientIp, Limiter } from './guard/guard.ts';
 import { cleanCode, CODE, redeem } from './credits.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
+import { classRoutes } from './classes/routes.ts';
 import { knowledgeRoutes } from './knowledge/routes.ts';
 import { lessonRoutes } from './lesson/routes.ts';
 import type { Mailer } from './mail.ts';
@@ -114,5 +115,6 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
   });
   knowledgeRoutes(app, { sql, ai, budget, as });
   lessonRoutes(app, { sql, ai, budget, files, as });
+  classRoutes(app, { sql, ai });
   return app;
 }

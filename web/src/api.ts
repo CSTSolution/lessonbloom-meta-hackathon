@@ -10,12 +10,17 @@ export interface Slide { id: string; kind: string; heading: string; bullets: str
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
-export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[] }[]; created_at: string; credits?: number }
+export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number }
 export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
 export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number }
 export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
+export interface ClassRow { id: string; name: string; code: string; pupils: number; joined: number; assignments: number }
+export interface PupilRow { id: string; name: string; link: string; url: string; joined_at: string | null; seen_at: string | null }
+export interface AssignedRow { id: string; lesson_id: string; title: string; due: string | null; created_at: string; items: number; done: number; started: number }
+export interface ClassView { class: { id: string; name: string; code: string; url: string }; pupils: PupilRow[]; assignments: AssignedRow[] }
+export interface LessonAssignment { id: string; class_id: string; class_name: string; due: string | null; created_at: string; done: number; pupils: number }
 export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }
 
 async function call<T>(method: string, path: string, body?: unknown, raw?: Blob): Promise<T> {
@@ -31,6 +36,15 @@ export const api = {
   verify: (email: string, code: string) => call<{ teacher: Teacher }>('POST', '/auth/verify', { email, code }),
   me: () => call<{ teacher: Teacher; budget: string | null; credits: Credits }>('GET', '/t/me'),
   update: (f: { name?: string; lang?: string }) => call<{ teacher: Teacher }>('PUT', '/t/me', f),
+  classes: () => call<{ classes: ClassRow[] }>('GET', '/t/classes'),
+  createClass: (name: string) => call<{ class: ClassRow }>('POST', '/t/classes', { name }),
+  renameClass: (id: string, name: string) => call<{ ok: boolean }>('PUT', `/t/classes/${id}`, { name }),
+  deleteClass: (id: string) => call<{ ok: boolean }>('DELETE', `/t/classes/${id}`),
+  classView: (id: string) => call<ClassView>('GET', `/t/classes/${id}`),
+  addPupils: (id: string, names: string) => call<{ added: number }>('POST', `/t/classes/${id}/pupils`, { names }),
+  removePupil: (id: string, pid: string) => call<{ ok: boolean }>('DELETE', `/t/classes/${id}/pupils/${pid}`),
+  assign: (lessonId: string, a: { classId: string; confirmed: boolean; due?: string; retry: boolean; hints: boolean }) => call<{ assignment: { id: string; className: string } }>('POST', `/t/lessons/${lessonId}/assign`, a),
+  lessonAssignments: (lessonId: string) => call<{ assignments: LessonAssignment[] }>('GET', `/t/lessons/${lessonId}/assignments`),
   promo: (code: string) => call<{ added: { credits: number; days: number }; credits: Credits }>('POST', '/t/promo', { code }),
   logout: () => call<{ ok: boolean }>('POST', '/t/logout'),
   photos: (images: { data: string; type: string }[]) => call<{ text: string }>('POST', '/t/notes/photos', { images }),
