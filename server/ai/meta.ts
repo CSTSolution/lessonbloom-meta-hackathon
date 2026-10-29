@@ -37,6 +37,16 @@ export function parseJson<T>(text: string): T {
   return JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')) as T;
 }
 
+// Muse Spark always reasons, and reasoning is billed as output. Left unset, the model chooses how
+// much: a picture check that answers four yes/no fields used ~1,600 output tokens. Each job gets the
+// lowest level that does it well (Meta: "low" for direct-answer tasks); only the second review of
+// the items, which must judge correctness, keeps "medium".
+export const EFFORT: Partial<Record<Endpoint, 'minimal' | 'low' | 'medium'>> = {
+  precheck: 'minimal', errortag: 'minimal',
+  critic: 'low', toc: 'low', rerank: 'low', intake: 'low', plan: 'low', slides: 'low', items: 'low', cards: 'low', write: 'low', ocr: 'low', work: 'low', comments: 'low',
+  check: 'medium',
+};
+
 export class MetaProvider implements AI {
   name = 'meta';
   onUsage?: (u: Usage) => void;
@@ -45,6 +55,7 @@ export class MetaProvider implements AI {
   private sleep: (ms: number) => Promise<void>;
   private speaker?: (r: SpeechRequest) => Promise<Buffer>;
   private schemaOk = true;      // false once json_schema is refused: json_object + the schema in the system prompt
+  private effortOk = true;      // false once a model refuses reasoning_effort: sent without it from then on
   private sizeOk = true;        // false once our image size is refused: the aspect goes into the prompt
 
   constructor(private o: MetaOptions) {
@@ -105,12 +116,14 @@ export class MetaProvider implements AI {
     return this.chain(req.endpoint, models, async (model) => {
       const body = () => ({
         model, temperature: req.creative ? 0.7 : 0.2,
+        ...(this.effortOk && EFFORT[req.endpoint] ? { reasoning_effort: EFFORT[req.endpoint] } : {}),
         messages: [{ role: 'system', content: this.schemaOk ? req.system : `${req.system}\n\nAnswer with one JSON object only, matching this JSON schema:\n${JSON.stringify(req.schema)}` }, { role: 'user', content }],
         response_format: this.schemaOk ? { type: 'json_schema', json_schema: { name: req.endpoint, schema: req.schema } } : { type: 'json_object' },
       });
       const t0 = Date.now();
       const r = await this.post<ChatAnswer>('/chat/completions', body()).catch((e) => {
         if (this.schemaOk && e instanceof ApiError && e.status === 400 && /response_format|json_schema/i.test(e.message)) { this.schemaOk = false; return this.post<ChatAnswer>('/chat/completions', body()); }
+        if (this.effortOk && e instanceof ApiError && e.status === 400 && /reasoning/i.test(e.message)) { this.effortOk = false; return this.post<ChatAnswer>('/chat/completions', body()); }
         throw e;
       });
       this.usage(req.endpoint, model, r, t0);

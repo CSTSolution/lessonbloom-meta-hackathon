@@ -46,6 +46,15 @@ test('json: a busy model hands over to the fallback; json_schema refused -> json
   assert.match(g.calls[1].body.messages[0].content, /matching this JSON schema/);
 });
 
+test('json: each job sets its reasoning level (reasoning is billed as output); refused -> sent without, remembered', async () => {
+  const f = fake([chat('{"title":"a"}'), chat('{"title":"b"}'), chat('{"title":"c"}')]);
+  await f.ai.json({ ...req, endpoint: 'critic' }); await f.ai.json({ ...req, endpoint: 'precheck' }); await f.ai.json({ ...req, endpoint: 'check' });
+  assert.deepEqual(f.calls.map((c) => c.body.reasoning_effort), ['low', 'minimal', 'medium']);
+  const g = fake([{ status: 400, text: 'unsupported value for reasoning_effort' }, chat('{"title":"a"}'), chat('{"title":"b"}')]);
+  await g.ai.json({ ...req, endpoint: 'critic' }); await g.ai.json({ ...req, endpoint: 'cards' });
+  assert.deepEqual(g.calls.map((c) => c.body.reasoning_effort), ['low', undefined, undefined]);
+});
+
 test('errors fail at once and never carry the key; photos travel as data URLs', async () => {
   const f = fake([{ status: 401, text: `bad key ${KEY}` }]);
   await assert.rejects(f.ai.json(req), (e: Error) => /401/.test(e.message) && !e.message.includes(KEY));
