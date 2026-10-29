@@ -215,6 +215,16 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .menu { position: absolute; right: 0; top: 40px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); padding: 12px; min-width: 260px; display: grid; gap: 8px; z-index: 10; }
 .page { max-width: 1040px; margin: 0 auto; padding: 24px 24px 60px; }
 .page.narrow { max-width: 760px; }
+/* Credits and usage */
+.usage-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.usage-tiles .card { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; }
+.usage-tiles .big { font-size: 28px; line-height: 1.2; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.legend i, i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.meter { height: 8px; background: var(--paper); border-radius: 4px; overflow: hidden; } .meter > div { height: 100%; border-radius: 4px; }
+.usage-tbl { width: 100%; border-collapse: collapse; font-size: 14px; } .usage-tbl td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.usage-tbl td.amt { text-align: right; white-space: nowrap; width: 1%; }
+.chart-tip { position: absolute; top: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 14px rgba(23, 32, 51, .12); pointer-events: none; min-width: 140px; }
 .cols { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
 .cols.left { grid-template-columns: 280px minmax(0, 1fr); }
 @media (max-width: 860px) { .cols, .cols.left { grid-template-columns: 1fr; } .top { flex-wrap: wrap; padding: 10px 16px; } .tabs { order: 3; width: 100%; } .page { padding: 16px; } }
@@ -269,6 +279,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 /* phones (Chi, 29 Oct): the five tabs on one line that scrolls sideways, the bar on two rows at most,
    and wide tables as one card per row */
 @media (max-width: 600px) {
+  .usage-tiles { gap: 8px; } .usage-tiles .card { padding: 10px 12px; } .usage-tiles .big { font-size: 22px; }
   .top { gap: 8px; padding: 8px 12px; } .top .brand-name { display: none; } .me { margin-left: auto; gap: 6px; }
   .tabs { order: 3; width: 100%; margin: 0; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .tabs::-webkit-scrollbar { display: none; } .tabs button { flex: 0 0 auto; white-space: nowrap; padding: 8px 10px; }

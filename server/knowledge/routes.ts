@@ -10,7 +10,7 @@ import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { Blocked, type Budget, guardedJson, requireOnTask } from '../guard/guard.ts';
 import type { JobCtl, Jobs } from '../jobs.ts';
-import { creditState } from '../credits.ts';
+import { spare } from '../credits.ts';
 import { OCR_SCHEMA, SCAN_SYSTEM } from '../lesson/prompts.ts';
 import { fail, MSG } from '../http.ts';
 import { ingestBook, ingestPages, NotText } from './ingest.ts';
@@ -47,7 +47,7 @@ export async function sectionOf(sql: Sql, teacherId: string, areaId: string, sec
   return { section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to }, passages };
 }
 
-export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T ; held: <T>(teacherId: string, hold: { used: number }, fn: () => T) => T; jobs: Jobs }) {
+export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string) => T; jobs: Jobs }) {
   const { sql } = d;
 
   app.get('/api/t/areas', async (c) => {
@@ -90,7 +90,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     await mkdir(join(config.dataDir, 'books'), { recursive: true });
     await writeFile(bookFile(id), pdf);
     await sql.query(`insert into books (id, area_id, title, status) values ($1, $2, $3, 'processing')`, [id, a.id, title]);
-    await d.jobs.add(t.id, 'book', id, title, () => d.as(t.id, () => readBook(id, () => ingestBook(sql, d.ai, a.id, id, pdf))), () => dropBook(id));
+    await d.jobs.add(t.id, 'book', id, title, () => d.as(t.id, () => readBook(id, () => ingestBook(sql, d.ai, a.id, id, pdf)), undefined, id), () => dropBook(id));
     return c.json({ book: { id, title, status: 'processing' } });
   });
 
@@ -120,7 +120,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (!pages.some((p) => p.text.replace(/\s/g, '').length >= 20)) return fail(c, 'pdf', 400);
     const id = await newBook(c, a, String(b.title || ''), 'text', pages.length);
     if (!id) return fail(c, 'limitReached', 429);
-    await d.jobs.add(t.id, 'book', id, clip(b.title, 120) || 'Sách', () => d.as(t.id, () => readBook(id, () => ingestPages(sql, d.ai, a.id, id, pages))), () => dropBook(id));
+    await d.jobs.add(t.id, 'book', id, clip(b.title, 120) || 'Sách', () => d.as(t.id, () => readBook(id, () => ingestPages(sql, d.ai, a.id, id, pages)), undefined, id), () => dropBook(id));
     return c.json({ book: { id, status: 'processing' } });
   });
 
@@ -129,7 +129,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const t = c.get('teacher');
     const b = await c.req.json<{ pages?: number }>().catch(() => ({} as { pages?: number }));
     const n = Math.min(config.scan.maxPages, Math.max(1, Math.round(Number(b.pages)) || 1));
-    return c.json({ estimate: scanEstimate(n, (await creditState(sql, t.id)).left) });
+    return c.json({ estimate: scanEstimate(n, (await spare(sql, t.id)).spare) });
   });
   app.post('/api/t/areas/:id/books/scan', async (c) => {
     const t = c.get('teacher'), a = await areaOf(sql, t.id, c.req.param('id'));
@@ -137,7 +137,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const b = await c.req.json<{ title?: string; pages?: number[] }>().catch(() => ({} as { title?: string; pages?: undefined }));
     const pages = [...new Set((Array.isArray(b.pages) ? b.pages : []).map((x) => Math.round(Number(x))).filter((x) => x >= 1 && x <= 2000))].sort((x, y) => x - y);
     if (!pages.length || pages.length > config.scan.maxPages) return fail(c, 'scanPages', 400);
-    const est = scanEstimate(pages.length, (await creditState(sql, t.id)).left);
+    const est = scanEstimate(pages.length, (await spare(sql, t.id)).spare);
     if (!est.enough) return short(c, est);
     const id = await newBook(c, a, String(b.title || ''), 'scan', pages.length);
     if (!id) return fail(c, 'limitReached', 429);
@@ -167,12 +167,12 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (!want.length || want.some((n) => !have.has(n))) return fail(c, 'scanPages', 400);
     const g = await d.budget.check(t.id);
     if (g && g !== 'credits') return fail(c, 'budget', 503);
-    const est = scanEstimate(want.length, (await creditState(sql, t.id)).left);
+    const est = scanEstimate(want.length, (await spare(sql, t.id)).spare);
     if (!est.enough) return short(c, est);
     await holdCredits(t.id, est.need, bk.id);
     const hold = { used: 0 };
     await d.jobs.add(t.id, 'book', bk.id, bk.title,
-      (job) => d.held(t.id, hold, () => readBook(bk.id, () => readScan(bk.area_id, bk.id, want, est.need, hold, job))).finally(() => settle(t.id, bk.id, est.need, hold)),
+      (job) => d.held(t.id, hold, () => readBook(bk.id, () => readScan(bk.area_id, bk.id, want, est.need, hold, job)), bk.id).finally(() => settle(t.id, bk.id, est.need, hold)),
       async () => { await settle(t.id, bk.id, est.need, hold); await dropBook(bk.id); }, est.need);
     return c.json({ ok: true, estimate: est });
   });
@@ -222,7 +222,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     await mkdir(join(config.dataDir, 'books'), { recursive: true });
     await writeFile(bookFile(id), pdf);
     await sql.query(`insert into books (id, area_id, title, status) values ($1, $2, $3, 'processing')`, [id, areaId, s.title]);
-    try { await d.as(t.id, () => ingestBook(sql, d.ai, areaId, id, pdf)); } catch (e) {
+    try { await d.as(t.id, () => ingestBook(sql, d.ai, areaId, id, pdf), undefined, id); } catch (e) {
       console.error(`[book] sample ${id}: ${String((e as Error)?.message).slice(0, 300)}`);
       await sql.query(`update books set status = 'error', error = 'failed' where id = $1`, [id]);
     }

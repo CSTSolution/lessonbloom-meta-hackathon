@@ -6,6 +6,7 @@ import type { AI } from '../ai/types.ts';
 import type { Env } from '../app.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
+import { spare } from '../credits.ts';
 import { Blocked, type Budget, credits, Limiter, requireOnTask } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import type { Files } from '../files.ts';
@@ -102,7 +103,8 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
-    if ((await d.budget.credits(t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
+    const cr = await spare(d.sql, t.id);
+    if (cr.spare < config.guard.lessonCredits) return fail(c, cr.promised && cr.left >= config.guard.lessonCredits ? 'creditsLine' : 'credits', 429);
     const source = sourceOf(m);
     // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
@@ -110,7 +112,11 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
     // one job at a time per account: it waits in her line if a book or another lesson is running
     await d.jobs.add(t.id, 'lesson', id, setup.title,
-      () => new Promise<void>((ready) => { void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages, sql: d.sql, onReady: ready }), id); }),
+      async () => {
+        // when its turn comes she must still have credit (and the app its budget), or it stops here
+        if (await d.budget.check(t.id)) { await lessons.step(id, 'Cô đã hết lượt dùng nên bài này chưa soạn. Cô nhập mã khuyến mãi rồi tạo lại nhé.', 'You ran out of credits, so this lesson was not made. Enter a promo code, then make it again.'); await lessons.fail(id); return; }
+        await new Promise<void>((ready) => { void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages, sql: d.sql, onReady: ready }), id); });
+      },
       async () => { await d.sql.query(`delete from lessons where id = $1 and teacher_id = $2 and status = 'working'`, [id, t.id]); });
     return c.json({ id });
   });

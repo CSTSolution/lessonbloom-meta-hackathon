@@ -5,6 +5,13 @@ export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; e
 export interface Credits { balance: number; subscriber: boolean; planUntil: string | null; daily: { perDay: number; used: number; left: number } | null; left: number }
 export type Level = 'basic' | 'good' | 'advanced';
 export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string; level?: 'mixed' | 'basic' | 'advanced'; make?: { video: boolean; cards: boolean } }
+export type UsageKind = 'lessons' | 'pictures' | 'books' | 'photos' | 'voice' | 'advice' | 'requests';
+export interface Usage {
+  credits: Credits; promised: number; days: number; total: { credits: number; calls: number }; period: { credits: number; calls: number };
+  kinds: Record<UsageKind, { credits: number; calls: number }>; daily: ({ day: string } & Record<UsageKind, number>)[];
+  items: { kind: 'lesson' | 'book'; id: string; title: string; at: string; credits: number; calls: number; parts: Partial<Record<UsageKind, number>> }[];
+  log: { at: string; reason: 'signup' | 'promo' | 'admin' | 'hold' | 'refund'; credits: number; days: number; ref: string; title: string }[];
+}
 export interface Skill { tag: string; name: string; kind: string }
 export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number }
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; redone?: string[]; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
@@ -119,6 +126,7 @@ export const api = {
   scanPage: (bookId: string, n: number, jpeg: Blob) => call<{ ok: boolean }>('PUT', `/t/books/${bookId}/pages/${n}`, undefined, jpeg),
   scanStart: (bookId: string) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/scan/start`),
   jobs: () => call<{ jobs: Job[] }>('GET', '/t/jobs'),
+  usage: (days: number) => call<Usage>('GET', `/t/usage?days=${days}`),
   cancelJob: (id: string) => call<{ ok: boolean; result: string }>('POST', `/t/jobs/${id}/cancel`),
   uploadBook: (areaId: string, file: File, title: string, onProgress?: (share: number) => void) => upload<{ book: BookRow }>(`/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, file, onProgress),
   match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),

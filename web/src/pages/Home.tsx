@@ -18,6 +18,7 @@ import { Path } from './Path.tsx';
 import { Profile } from './Profile.tsx';
 import { Reminders } from './Reminders.tsx';
 import { SignupRole } from './SignupRole.tsx';
+import { Usage } from './Usage.tsx';
 
 const T = {
   vi: {
@@ -28,7 +29,7 @@ const T = {
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Lượt dùng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
-    creditsHint: 'Một bài dùng khoảng 35 lượt.', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} lượt dùng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
+    creditsHint: 'Một bài dùng khoảng 35 lượt.', usage: 'Xem lượt dùng chi tiết', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} lượt dùng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
     notifications: 'Thông báo', profile: 'Hồ sơ', reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
   },
   en: {
@@ -39,7 +40,7 @@ const T = {
     status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
-    creditsHint: 'A lesson uses about 35 credits.', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${pl(c, 'credit')}` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
+    creditsHint: 'A lesson uses about 35 credits.', usage: 'See usage in detail', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${pl(c, 'credit')}` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
     notifications: 'Notifications', profile: 'Profile', reminders: 'Reminder settings', criteria: 'Summary criteria', signOut: 'Sign out', role: { teacher: 'Teacher', parent: 'Parent' },
   },
 };
@@ -73,6 +74,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
         : path === '/reminders' ? <Reminders parent={parent} />
         : path === '/notifications' ? <Notifications parent={parent} />
         : path === '/profile' ? <Profile teacher={teacher} onChange={onChange} />
+        : path === '/usage' ? <Usage />
         : <Main teacher={teacher} t={t} />}
     </div>
   );
@@ -81,6 +83,8 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
 function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: () => void }) {
   const [open, setOpen] = useState(false), [credits, setCredits] = useState<Credits | null>(null), path = usePath(), lang = useLang();
   useEffect(() => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }, [path]);
+  // a job that ends (a lesson made, a book read) changes her credits: ask again
+  useEffect(() => { const f = () => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }; window.addEventListener('lbm-credits', f); return () => window.removeEventListener('lbm-credits', f); }, []);
   const name = teacher.name || teacher.email || t.demo;
   return (
     <div className="me">
@@ -92,6 +96,7 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
       {open && <div className="menu">
         <span className="small muted">{teacher.role ? t.role[teacher.role] : ''}{teacher.kind === 'demo' ? ` · ${t.demo}` : teacher.email ? ` · ${teacher.email}` : ''}</span>
         {credits && <CreditBox credits={credits} account={teacher.kind === 'account'} onChange={setCredits} t={t} />}
+        <button className="link small" onClick={() => { setOpen(false); go('/usage'); }}>{t.usage}</button>
         <button className="link small" onClick={() => { setOpen(false); go('/notifications'); }}>{t.notifications}</button>
         <button className="link small" onClick={() => { setOpen(false); go('/profile'); }}>{t.profile}</button>
         <button className="link small" onClick={() => { setOpen(false); go('/reminders'); }}>{t.reminders}</button>
@@ -191,11 +196,13 @@ const J = {
 function JobsBox({ lang }: { lang: 'vi' | 'en' }) {
   const t = J[lang], [jobs, setJobs] = useState<Job[]>([]), [open, setOpen] = useState(false);
   useEffect(() => {
-    let alive = true, h = 0;
+    let alive = true, h = 0, last = 0;
     const tick = async () => {
       const r = await api.jobs().catch(() => null);
       if (!alive) return;
-      const list = r?.jobs ?? [];
+      const list = r?.jobs ?? [], active = list.filter((j) => j.status === 'running' || j.status === 'queued').length;
+      if (active < last) window.dispatchEvent(new Event('lbm-credits'));
+      last = active;
       setJobs(list);
       h = window.setTimeout(tick, list.some((j) => j.status === 'running' || j.status === 'queued') ? 3000 : 20000);
     };

@@ -109,6 +109,7 @@ Compare at 1280 px. Each was checked side by side on 29 Oct.
 | Steps 1–6 (Material, Questions, Slides, Video, Practice incl. "Find the pairs", Assign) | `Create.tsx`, `LessonPage.tsx`, `Assign.tsx` |
 | Child on the phone (join, today, slides, video, practice, flashcards, find the pairs, what next) | `web/src/pupil/Pupil.tsx` |
 | Parent on the phone (path, advice, notifications grouped by day) | `Path.tsx`, `Learner.tsx`, `Notifications.tsx` |
+| Credits and usage (name menu → "See usage in detail", `/usage`): credits left, used in 7/30/90 days and in all, a chart of each day by kind of work, the breakdown by kind (also the chart's table view), each lesson and book with its parts, and credits in / held / given back | `web/src/pages/Usage.tsx`, `server/usage.ts` |
 
 ## Rules that must never break (doc 1, "Nguyên tắc")
 
@@ -119,6 +120,8 @@ Compare at 1280 px. Each was checked side by side on 29 Oct.
 | Only first names kept; gentle wording (never "yếu", "chậm", "trễ") | `classes/routes.ts`, the prompts in `path/routes.ts` | `path.test.ts` |
 | Personal data removed before anything reaches a model | `server/guard/guard.ts` (`redact`) | `guard.test.ts` "personal data is removed…" |
 | Every AI call is gated, scoped, pre-checked and output-checked | `server/guard/guard.ts` | `guard.test.ts`, `budget.test.ts` |
+| Every call comes off her credits and shows on her usage page (by kind, day, lesson, book); only her own rows | `guard.ts` (`Budget.record`), `server/usage.ts` | `usage.test.ts` |
+| A line of lessons cannot spend credit she does not have: each waiting lesson keeps about 35, and a lesson whose turn comes after her credit ran out stops before any call | `server/credits.ts` (`spare`), `lesson/routes.ts` | `usage.test.ts` |
 
 ## Not built, on purpose
 

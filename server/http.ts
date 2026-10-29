@@ -39,6 +39,7 @@ export const MSG = {
   cutoutPeople: { vi: 'Không cắt người hoặc khuôn mặt: ảnh của các con không đưa vào bài. Cô chọn đồ vật nhé.', en: 'People and faces are not cut out: children\'s photos never go into lessons. Please choose an object.' },
   cutoutNone: { vi: 'AI chưa tìm thấy đồ vật này trong ảnh. Cô thử tên khác hoặc ảnh rõ hơn nhé.', en: 'The AI could not find that in the photo. Try another name or a clearer photo.' },
   pictureFailed: { vi: 'Chưa vẽ được hình phù hợp. Cô thử lại nhé.', en: 'No suitable picture this time. Please try again.' },
+  creditsLine: { vi: 'Lượt dùng còn lại đã dành cho các bài đang chờ trong hàng. Cô chờ các bài đó xong, hoặc nhập mã khuyến mãi để có thêm lượt nhé.', en: 'Your credits left are kept for the lessons already waiting in your line. Wait for those to finish, or enter a promo code for more.' },
   cannotStop: { vi: 'Việc này đang chạy và không dừng giữa chừng được. Cô chờ một chút nhé.', en: 'This job is running and cannot be stopped halfway. Please wait a moment.' },
   scanCredits: { vi: 'Cô chưa đủ lượt để đọc chừng ấy trang (cần dư 50% so với dự kiến). Cô chọn ít trang hơn hoặc nhập mã khuyến mãi nhé.', en: 'Not enough credits to read that many pages (you need 50% more than the estimate). Choose fewer pages or enter a promo code.' },
   scanPages: { vi: 'Chưa nhận đủ các trang. Cô thử gửi lại nhé.', en: 'Not all pages arrived. Please try sending them again.' },

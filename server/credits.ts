@@ -17,6 +17,17 @@ export async function creditState(sql: Sql, teacherId: string): Promise<CreditSt
   return { balance, subscriber: !!t?.sub, planUntil: t?.plan_until ?? null, daily, left: balance + (daily?.left ?? 0) };
 }
 
+// Credit already promised to her line of jobs: about one lesson for each lesson waiting, and what a
+// running lesson has not used yet. New work counts only what is left after that, so a line of
+// lessons cannot run her below zero.
+export async function spare(sql: Sql, teacherId: string) {
+  const left = (await creditState(sql, teacherId)).left;
+  const r = await sql.one<{ n: string }>(`select coalesce(sum(greatest(0, $2::numeric - coalesce((select sum(u.usd) * 100 from ai_usage u where u.lesson_id = j.ref), 0))), 0) as n
+    from jobs j where j.teacher_id = $1 and j.kind = 'lesson' and j.status in ('queued', 'running')`, [teacherId, config.guard.lessonCredits]);
+  const promised = Math.ceil(Number(r?.n ?? 0) - 1e-9);
+  return { left, promised, spare: Math.max(0, left - promised) };
+}
+
 // Takes one call's cost off: the day's allowance first (subscribers), then the balance (it may dip
 // just below zero when calls already running finish; nothing new starts then).
 export async function charge(sql: Sql, teacherId: string, credits: number) {

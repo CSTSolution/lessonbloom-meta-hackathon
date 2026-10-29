@@ -10,6 +10,7 @@ import { config } from './config.ts';
 import type { Sql } from './db/sql.ts';
 import { Budget, clientIp, costOf, CREDIT_USD, Limiter } from './guard/guard.ts';
 import { cleanCode, CODE, redeem } from './credits.ts';
+import { usageRoutes } from './usage.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
 import { Jobs } from './jobs.ts';
@@ -30,14 +31,14 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
   // every model call is logged against the teacher whose request (or background job) made it
   // A job that holds credit up front (reading a scanned book) counts its calls into `hold` instead of
   // charging them one by one; it settles once at the end (the rest goes back).
-  const who = new AsyncLocalStorage<{ teacher: string; lesson?: string; hold?: { used: number } }>();
+  const who = new AsyncLocalStorage<{ teacher: string; lesson?: string; book?: string; hold?: { used: number } }>();
   ai.onUsage = (u) => {
     const w = who.getStore();
     if (w?.hold) w.hold.used += costOf(u) / CREDIT_USD;
-    void budget.record(u, w?.teacher ?? null, w?.lesson ?? null, !w?.hold).catch((e) => console.error(`[usage] ${(e as Error).message}`));
+    void budget.record(u, w?.teacher ?? null, w?.lesson ?? null, !w?.hold, w?.book ?? null).catch((e) => console.error(`[usage] ${(e as Error).message}`));
   };
-  const as = <T>(teacher: string, fn: () => T, lesson?: string) => who.run({ teacher, lesson }, fn);
-  const held = <T>(teacher: string, hold: { used: number }, fn: () => T) => who.run({ teacher, hold }, fn);
+  const as = <T>(teacher: string, fn: () => T, lesson?: string, book?: string) => who.run({ teacher, lesson, book }, fn);
+  const held = <T>(teacher: string, hold: { used: number }, fn: () => T, book?: string) => who.run({ teacher, hold, book }, fn);
   const jobs = deps.jobs ?? new Jobs(sql, config.jobs.concurrent);
 
   const app = new Hono<Env>();
@@ -154,6 +155,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
     return c.body(new Uint8Array(f.data), 200, head);
   });
   knowledgeRoutes(app, { sql, ai, budget, as, held, jobs });
+  usageRoutes(app, { sql });
   lessonRoutes(app, { sql, ai, budget, files, as, jobs });
   editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });
