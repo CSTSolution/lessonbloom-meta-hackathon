@@ -10,7 +10,7 @@ export interface Slide { id: string; kind: string; heading: string; bullets: str
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; redone?: string[]; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
-export interface Lesson { id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
+export interface Lesson { queue?: { place: number } | null; id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
 export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
@@ -32,12 +32,12 @@ export interface Advice { kind: 'practice' | 'next' | 'time'; skill: string; tex
 export interface LearnerView { wording?: boolean; pupil: { id: string; name: string; classId: string; className: string; kind: string }; skills: { skill: string; name: string; label: Label; right: number; of: number; mistake: string | null }[]; sessions: { day: string; answers: number; minutes: number }[];
   current: (PathStep & { week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean; videoSeen: boolean }) | null; advice: Advice[]; reminders: Reminder[]; mates: { id: string; name: string }[] }
 export interface ReminderSettings { pupilSession: boolean; pupilCards: boolean; time: string; assignerTwoDays: boolean; assignerEnd: boolean; assignerStart: boolean }
-export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }
+export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number, public body: Record<string, unknown> = {}) { super(en); } }
 
 async function call<T>(method: string, path: string, body?: unknown, raw?: Blob): Promise<T> {
   const r = await fetch(`/api${path}`, { method, credentials: 'same-origin', headers: raw ? { 'content-type': raw.type } : body ? { 'content-type': 'application/json' } : {}, body: raw ?? (body ? JSON.stringify(body) : undefined) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi máy chủ', j.errorEn || 'Server error', r.status);
+  if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi máy chủ', j.errorEn || 'Server error', r.status, j);
   return j as T;
 }
 
@@ -59,6 +59,9 @@ function upload<T>(path: string, file: Blob, onProgress?: (share: number) => voi
     x.send(file);
   });
 }
+
+export interface ScanEstimate { pages: number; perPage: number; predicted: number; need: number; have: number; enough: boolean; fits: number; maxPages: number }
+export interface Job { id: string; kind: 'lesson' | 'book'; ref: string; title: string; status: 'queued' | 'running' | 'done' | 'error' | 'cancelled'; progress: string; place: number }
 
 export const api = {
   demo: (lang: string) => call<{ teacher: Teacher }>('POST', '/auth/demo', { lang }),
@@ -110,10 +113,17 @@ export const api = {
   createArea: (a: { name: string; subject: string; grade: number }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
   sampleArea: (book: 'toan2' | 'english3' | 'maths2') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
   area: (id: string) => call<{ area: AreaRow; books: BookRow[]; sections: SectionRow[] }>('GET', `/t/areas/${id}`),
+  bookText: (areaId: string, title: string, pages: { page: number; text: string }[]) => call<{ book: { id: string } }>('POST', `/t/areas/${areaId}/books/text`, { title, pages }),
+  scanEstimate: (pages: number) => call<{ estimate: ScanEstimate }>('POST', '/t/scan/estimate', { pages }),
+  scanCreate: (areaId: string, title: string, pages: number[]) => call<{ book: { id: string }; estimate: ScanEstimate }>('POST', `/t/areas/${areaId}/books/scan`, { title, pages }),
+  scanPage: (bookId: string, n: number, jpeg: Blob) => call<{ ok: boolean }>('PUT', `/t/books/${bookId}/pages/${n}`, undefined, jpeg),
+  scanStart: (bookId: string) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/scan/start`),
+  jobs: () => call<{ jobs: Job[] }>('GET', '/t/jobs'),
+  cancelJob: (id: string) => call<{ ok: boolean; result: string }>('POST', `/t/jobs/${id}/cancel`),
   uploadBook: (areaId: string, file: File, title: string, onProgress?: (share: number) => void) => upload<{ book: BookRow }>(`/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, file, onProgress),
   match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),
   intake: (areaId: string, sectionId: string) => call<{ setup: Setup; citation: string }>('POST', '/t/intake', { areaId, sectionId }),
-  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup }) => call<{ id: string }>('POST', '/t/lessons', b),
+  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup }) => call<{ id: string }>('POST', '/t/lessons', b).then((r) => { window.dispatchEvent(new Event('lbm-jobs')); return r; }),
   lessons: () => call<{ lessons: LessonRow[] }>('GET', '/t/lessons'),
   newPicture: (id: string, sid: string) => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/picture`),
   cutout: (id: string, sid: string, photo: string, name: string) => call<{ slide: Slide; matches: number }>('POST', `/t/lessons/${id}/slides/${sid}/cutout`, { photo, name }),

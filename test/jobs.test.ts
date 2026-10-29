@@ -76,7 +76,7 @@ test('a scanned book: estimate, pictures from the browser, credit held, read pag
   assert.equal(big.json.code, 'scanCredits');
   assert.ok(big.json.estimate.fits < 150 && big.json.estimate.need > start);
   // four pages: the estimate, then the pages, then the reading
-  const est = (await call('POST', `/api/t/areas/${area.id}/books/scan/estimate`, { pages: 4 })).json.estimate;
+  const est = (await call('POST', '/api/t/scan/estimate', { pages: 4 })).json.estimate;
   assert.ok(est.enough && est.need === Math.ceil(est.predicted * 1.5));
   const made = (await call('POST', `/api/t/areas/${area.id}/books/scan`, { title: 'Maths 2 scanned', pages: [3, 4, 5, 6] })).json;
   assert.ok(made.book.id);

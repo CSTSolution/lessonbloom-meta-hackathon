@@ -2,7 +2,7 @@
 // học · Lớp học, for a parent "Con của tôi" · Tóm tắt học tập), the language, credits and the profile.
 // No role switch in the header: the role is chosen once at sign-up (SignupRole).
 import { useEffect, useState } from 'react';
-import { api, ApiError, type Credits, type LessonRow, type Teacher } from '../api.ts';
+import { api, ApiError, type Credits, type Job, type LessonRow, type Teacher } from '../api.ts';
 import { pl, setRole, useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
 import { Classes } from './Classes.tsx';
@@ -85,6 +85,7 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
   return (
     <div className="me">
       <LangToggle />
+      <JobsBox lang={lang} />
       <button className="btn ghost small" aria-label={lang === 'vi' ? 'Thông báo' : 'Notifications'} onClick={() => go('/notifications')}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg></button>
       {credits && <button className="btn ghost small" title={t.creditsHint} onClick={() => setOpen(!open)}>{t.credits(credits)}</button>}
       <button className="row link" style={{ gap: 6, color: 'inherit' }} onClick={() => setOpen(!open)}><span className="avatar">{name.trim().slice(0, 1).toUpperCase()}</span><span className="small">{name}</span></button>
@@ -177,6 +178,48 @@ function CreditBox({ credits, account, onChange, t }: { credits: Credits; accoun
         </form>
       ) : <span className="small muted">{t.promoDemo}</span>}
       {msg && <span className="small" role="status">{msg}</span>}
+    </div>
+  );
+}
+
+// "Đang làm": her line of jobs (Son, 29 Oct: one job at a time per account, and show the line). It asks
+// every few seconds while something runs or waits, and at once when a page starts a job.
+const J = {
+  vi: { badge: (r: number, q: number) => `Đang làm: ${r}${q ? ` · Chờ: ${q}` : ''}`, book: 'Đọc sách', lesson: 'Soạn bài', page: (p: string) => `trang ${p}`, waiting: (n: number) => `Chờ (thứ ${n})`, running: 'Đang chạy', stop: 'Dừng', cancel: 'Huỷ', done: 'Xong', error: 'Lỗi', cancelled: 'Đã dừng', none: 'Không có việc nào.', one: 'Mỗi tài khoản làm một việc một lúc; việc sau tự chạy khi việc trước xong.' },
+  en: { badge: (r: number, q: number) => `Working on: ${r}${q ? ` · Waiting: ${q}` : ''}`, book: 'Reading a book', lesson: 'Making a lesson', page: (p: string) => `page ${p}`, waiting: (n: number) => `Waiting (number ${n})`, running: 'Running', stop: 'Stop', cancel: 'Cancel', done: 'Done', error: 'Error', cancelled: 'Stopped', none: 'No jobs.', one: 'Each account runs one job at a time; the next one starts when the one before is done.' },
+};
+function JobsBox({ lang }: { lang: 'vi' | 'en' }) {
+  const t = J[lang], [jobs, setJobs] = useState<Job[]>([]), [open, setOpen] = useState(false);
+  useEffect(() => {
+    let alive = true, h = 0;
+    const tick = async () => {
+      const r = await api.jobs().catch(() => null);
+      if (!alive) return;
+      const list = r?.jobs ?? [];
+      setJobs(list);
+      h = window.setTimeout(tick, list.some((j) => j.status === 'running' || j.status === 'queued') ? 3000 : 20000);
+    };
+    const now = () => { clearTimeout(h); void tick(); };
+    void tick();
+    window.addEventListener('lbm-jobs', now);
+    return () => { alive = false; clearTimeout(h); window.removeEventListener('lbm-jobs', now); };
+  }, []);
+  const running = jobs.filter((j) => j.status === 'running').length, waiting = jobs.filter((j) => j.status === 'queued').length;
+  if (!running && !waiting && !open) return null;
+  return (
+    <div style={{ position: 'relative' }}>
+      <button className="btn ghost small jobs-badge" onClick={() => setOpen(!open)} aria-expanded={open}>{t.badge(running, waiting)}</button>
+      {open && <div className="menu" style={{ minWidth: 280 }}>
+        <span className="small muted">{t.one}</span>
+        {!jobs.length && <span className="small">{t.none}</span>}
+        {jobs.map((j) => (
+          <div key={j.id} className="row small" style={{ gap: 8 }}>
+            <span className="grow"><b>{j.kind === 'book' ? t.book : t.lesson}</b>: {j.title}<br />
+              <span className="muted">{j.status === 'queued' ? t.waiting(j.place) : j.status === 'running' ? `${t.running}${j.kind === 'book' && /^\d+\/\d+$/.test(j.progress) ? ` · ${t.page(j.progress)}` : ''}` : t[j.status]}</span></span>
+            {(j.status === 'queued' || (j.status === 'running' && j.kind === 'book')) && <button className="btn small" onClick={async () => { await api.cancelJob(j.id).catch(() => {}); window.dispatchEvent(new Event('lbm-jobs')); }}>{j.status === 'queued' ? t.cancel : t.stop}</button>}
+          </div>
+        ))}
+      </div>}
     </div>
   );
 }

@@ -125,9 +125,8 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   });
 
   // ---- a scanned book: estimate, then the page pictures, then the reading (credit held first) ----
-  app.post('/api/t/areas/:id/books/scan/estimate', async (c) => {
-    const t = c.get('teacher'), a = await areaOf(sql, t.id, c.req.param('id'));
-    if (!a) return fail(c, 'notFound', 404);
+  app.post('/api/t/scan/estimate', async (c) => {
+    const t = c.get('teacher');
     const b = await c.req.json<{ pages?: number }>().catch(() => ({} as { pages?: number }));
     const n = Math.min(config.scan.maxPages, Math.max(1, Math.round(Number(b.pages)) || 1));
     return c.json({ estimate: scanEstimate(n, (await creditState(sql, t.id)).left) });

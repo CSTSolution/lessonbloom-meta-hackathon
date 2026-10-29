@@ -14,7 +14,7 @@ const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.sta
 
 const T = {
   vi: {
-    working: 'Trợ lý đang soạn bài…', left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
+    working: 'Trợ lý đang soạn bài…', queued: (n: number) => `Đang chờ (thứ ${n}): bài sẽ được soạn khi xong việc đang làm. Mỗi tài khoản làm một việc một lúc.`, left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', toItemsP: 'Tiếp: bài tập', drawing: 'Đang vẽ hình minh hoạ…',
     rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
     makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', preview: 'Nghe thử từng đoạn',
@@ -26,7 +26,7 @@ const T = {
     groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ', pairs: 'Lật thẻ tìm cặp' }, pairsLead: 'Trò chơi cho em, làm từ thẻ nhớ (4 cặp).', toAssign: 'Duyệt xong, sang giao bài',
   },
   en: {
-    working: 'The agent is making your lesson…', left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
+    working: 'The agent is making your lesson…', queued: (n: number) => `Waiting (number ${n} in your line): the lesson is made once the job before it is done. Each account runs one job at a time.`, left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', toItemsP: 'Next: practice', drawing: 'Drawing the picture…',
     rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
     makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', preview: 'Listen to each part',
@@ -62,7 +62,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       {l.status !== 'ready' && (
         <div className="card stack" style={{ maxWidth: 720, margin: '0 auto' }}>
           <h2>{l.setup.title}</h2><b>{l.status === 'working' ? t.working : t.failed}</b>
-          {l.status === 'working' && <Progress steps={l.steps} t={t} />}
+          {l.status === 'working' && (l.queue ? <p className="banner small" role="status">{t.queued(l.queue.place)}</p> : <Progress steps={l.steps} t={t} />)}
           <ol className="steps">{l.steps.map((s, i) => <li key={i} className={i === l.steps.length - 1 && l.status === 'working' ? 'now' : ''}>{lang === 'en' ? s.en : s.vi}</li>)}</ol>
         </div>
       )}
