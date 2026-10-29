@@ -8,6 +8,12 @@
 //   narration        Meta has no text-to-speech: handed to the speaker passed in (voices.ts)
 import { decodeMaskToRaster, parseImageStream, recordsOfKind, type ResponsesEvent } from '@meta-sam/parser';
 import { config } from '../config.ts';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { FFMPEG } from '../lesson/video.ts';
 import type { AI, ChatMsg, ChatTurn, Endpoint, ImageRequest, JsonRequest, SegmentMatch, SpeechRequest, ToolSpec, Usage } from './types.ts';
 
 type Fetch = typeof fetch;
@@ -17,7 +23,7 @@ interface ChatAnswer { choices?: { message?: { content?: string | null; tool_cal
 interface ImageAnswer { data?: { b64_json?: string; url?: string }[] }
 interface ResponsesAnswer { output_text?: string; output?: { content?: { type?: string; text?: string }[] }[] }
 
-export interface MetaOptions { key: string; base?: string; fetch?: Fetch; sleep?: (ms: number) => Promise<void>; speak?: (r: SpeechRequest) => Promise<Buffer> }
+export interface MetaOptions { key: string; base?: string; fetch?: Fetch; sleep?: (ms: number) => Promise<void>; speak?: (r: SpeechRequest) => Promise<Buffer>; toWav?: (audio: Buffer) => Promise<Buffer> }
 
 const BUSY = /\b(429|500|502|503|504)\b/;
 const SIZES = { '4:3': '1024x768', '1:1': '1024x1024', '16:9': '1344x768' } as const;
@@ -159,15 +165,19 @@ export class MetaProvider implements AI {
     return readSegmentation(r.output_text ?? (r.output || []).flatMap((o) => o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text || '').join(''));
   }
 
+  // Muse Voice Transcribe takes a `request` JSON part and an `audio` part, and only mono 16-bit PCM
+  // WAV at 16 or 24 kHz, so every recording (the browser sends webm/opus) is converted first.
   async transcribe(req: { audio: Buffer; mime: string; lang: 'vi' | 'en' }): Promise<string> {
-    const t0 = Date.now();
-    const form = new FormData();
-    form.append('model', config.meta.transcribe);
-    form.append('language', req.lang);
-    form.append('file', new Blob([new Uint8Array(req.audio)], { type: req.mime }), `notes.${req.mime.split('/')[1]?.split(';')[0] || 'webm'}`);
-    const r = JSON.parse(await this.retry('transcribe', () => this.send('/asr/transcribe', form, false))) as { text?: string; turns?: { text?: string }[] };
+    const t0 = Date.now(), wav = await (this.o.toWav ?? toWav16k)(req.audio);
+    const settings = { mode: 'PUSH_TO_TALK', model: config.meta.transcribe, audioEncoding: 'WAV', languageBias: [req.lang === 'vi' ? 'Vietnamese' : 'English'] };
+    const r = JSON.parse(await this.retry('transcribe', () => {
+      const form = new FormData();
+      form.append('request', new Blob([JSON.stringify(settings)], { type: 'application/json' }));
+      form.append('audio', new Blob([new Uint8Array(wav)], { type: 'audio/wav' }), 'notes.wav');
+      return this.send('/asr/transcribe', form, false);
+    })) as { transcript?: string; turns?: { transcript?: string }[] };
     this.onUsage?.({ endpoint: 'transcribe', model: config.meta.transcribe, ms: Date.now() - t0 });
-    return (r.text ?? (r.turns || []).map((t) => t.text || '').join(' ')).trim();
+    return (r.transcript || (r.turns || []).map((t) => t.transcript || '').join(' ')).trim();
   }
 
   async speak(req: SpeechRequest): Promise<Buffer> {
@@ -194,4 +204,14 @@ export async function readSegmentation(text: string): Promise<SegmentMatch[]> {
   }
   const res = await parseImageStream(events()).finalResult;
   return recordsOfKind(res.records, 'mask').map((m) => ({ box: { ...m.bounds }, confidence: m.confidence, mask: decodeMaskToRaster(m.mask), maskWidth: m.mask.width, maskHeight: m.mask.height }));
+}
+
+const run = promisify(execFile);
+async function toWav16k(audio: Buffer): Promise<Buffer> {
+  const dir = await mkdtemp(join(tmpdir(), 'lbm-asr-'));
+  try {
+    await writeFile(join(dir, 'in'), audio);
+    await run(FFMPEG, ['-y', '-loglevel', 'error', '-i', join(dir, 'in'), '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', '-map_metadata', '-1', join(dir, 'out.wav')], { timeout: 60e3 });
+    return await readFile(join(dir, 'out.wav'));
+  } finally { await rm(dir, { recursive: true, force: true }); }
 }

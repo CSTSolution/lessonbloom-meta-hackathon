@@ -16,7 +16,7 @@ function fake(replies: Reply[]) {
     return r.bytes ? new Response(new Uint8Array(r.bytes)) : new Response(r.text ?? JSON.stringify(r.json), { status: r.status ?? 200 });
   }) as typeof globalThis.fetch;
   const usage: Usage[] = [];
-  const ai = new MetaProvider({ key: KEY, base: 'https://meta.test/v1/', fetch, sleep: async () => {} });
+  const ai = new MetaProvider({ key: KEY, base: 'https://meta.test/v1/', fetch, sleep: async () => {}, toWav: async (a) => Buffer.concat([Buffer.from('RIFF'), a]) });
   ai.onUsage = (u) => usage.push(u);
   return { ai, calls, usage };
 }
@@ -94,11 +94,14 @@ test('segment: SAM 3.1 on the Responses API; masks decoded with Meta\'s parser',
   assert.deepEqual(await readSegmentation(''), []);
 });
 
-test('transcribe: Muse Voice Transcribe gets the audio as a file; turns are joined', async () => {
-  const f = fake([{ json: { turns: [{ text: 'Bài 12.' }, { text: 'Phép cộng có nhớ.' }] } }]);
+test('transcribe: a request part with the settings and the audio as 16 kHz WAV; the transcript comes back', async () => {
+  const f = fake([{ json: { sessionId: 's1', transcript: 'Bài 12. Phép cộng có nhớ.', turns: [] } }]);
   assert.equal(await f.ai.transcribe({ audio: Buffer.from('webm'), mime: 'audio/webm', lang: 'vi' }), 'Bài 12. Phép cộng có nhớ.');
   assert.equal(f.calls[0].url, 'https://meta.test/v1/asr/transcribe');
-  assert.equal(f.calls[0].form?.get('model'), 'muse-voice-transcribe-1.0');
-  assert.equal(f.calls[0].form?.get('language'), 'vi');
+  const settings = JSON.parse(await (f.calls[0].form?.get('request') as Blob).text());
+  assert.deepEqual(settings, { mode: 'PUSH_TO_TALK', model: 'muse-voice-transcribe-1.0', audioEncoding: 'WAV', languageBias: ['Vietnamese'] });
+  const audio = f.calls[0].form?.get('audio') as Blob;
+  assert.equal(audio.type, 'audio/wav');
+  assert.equal(Buffer.from(await audio.arrayBuffer()).toString('latin1', 0, 4), 'RIFF', 'converted before sending');
   await assert.rejects(f.ai.speak({ text: 'x', lang: 'vi' }), /no voice engine/);
 });
