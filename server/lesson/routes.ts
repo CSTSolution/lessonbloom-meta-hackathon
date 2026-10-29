@@ -12,6 +12,7 @@ import type { Files } from '../files.ts';
 import { CutoutError, cutOut, cleanName, decodePhoto } from './cutout.ts';
 import { Lessons, runLesson } from './lessons.ts';
 import { illustrate } from './pictures.ts';
+import { spoken as spokenText } from './video.ts';
 import { areaOf, sectionOf } from '../knowledge/routes.ts';
 import { citation, sourceOf } from '../knowledge/search.ts';
 import type { Setup } from './types.ts';
@@ -153,7 +154,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
   const spoken = new Map<string, Buffer>();
   app.get('/api/t/lessons/:id/say/:sid', async (c) => {
     const l = await lessons.get(c.get('teacher').id, c.req.param('id')), s = l?.slides.find((x) => x.id === c.req.param('sid'));
-    const text = s ? (s.narration || s.notes || s.heading).slice(0, 1500) : '';
+    const text = s && l ? spokenText(s, l.setup.lang) : '';
     if (!l || !text) return fail(c, 'notFound', 404);
     const key = `${l.setup.lang}:${text}`;
     let wav = spoken.get(key);

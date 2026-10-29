@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
-import { CHROMIUM, FFMPEG, wavSeconds } from '../server/lesson/video.ts';
+import { CHROMIUM, FFMPEG, spoken, wavSeconds } from '../server/lesson/video.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
 test('slides: rewrite and simpler keep the slide; a new slide comes after the one she is on', async () => {
@@ -63,4 +63,11 @@ test('the lesson video: one MP4 with a chapter per slide', { skip: !(canRender &
 test('WAV length from its header', () => {
   const wav = Buffer.alloc(44 + 32000); wav.write('RIFF', 0, 'latin1'); wav.write('WAVE', 8, 'latin1'); wav.write('fmt ', 12, 'latin1'); wav.writeUInt32LE(16, 16); wav.writeUInt32LE(32000, 28); wav.write('data', 36, 'latin1'); wav.writeUInt32LE(32000, 40);
   assert.equal(wavSeconds(wav), 1);
+});
+
+test('the video reads the narration, each point on the slide and the worked example in words', () => {
+  const s = { id: 'sl03', kind: 'example', heading: 'Example', bullets: ['Add the ones first.', 'Then add the tens'], example: '36 + 27 = 63', narration: "Let's add 36 and 27 together!", notes: '', source: '' } as any;
+  assert.equal(spoken(s, 'en'), "Let's add 36 and 27 together! Add the ones first. Then add the tens. 36 plus 27 equals 63.");
+  assert.equal(spoken({ ...s, bullets: [], example: '52 − 28 = 24', narration: 'Mình cùng trừ nhé' }, 'vi'), 'Mình cùng trừ nhé. 52 trừ 28 bằng 24.');
+  assert.equal(spoken({ ...s, bullets: ['Add the ones first.'], narration: 'Add the ones first, then the tens.', example: '' }, 'en'), 'Add the ones first, then the tens.', 'no point read twice');
 });

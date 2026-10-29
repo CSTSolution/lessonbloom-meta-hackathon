@@ -25,6 +25,17 @@ export function wavSeconds(wav: Buffer): number {
   return 0;
 }
 
+// What the voice reads for a slide: its narration, then each point on the slide, then the worked
+// example said in words. One sentence a slide made 11 slides last 47 s (Chi, 29 Oct; she designed 2–4 min).
+const SAY = { en: { '+': 'plus', '-': 'minus', '=': 'equals', '×': 'times' }, vi: { '+': 'cộng', '-': 'trừ', '=': 'bằng', '×': 'nhân' } } as const;
+export function spoken(s: Slide, lang: 'vi' | 'en'): string {
+  const end = (x: string) => (/[.!?…]$/.test(x.trim()) ? x.trim() : `${x.trim()}.`);
+  const first = (s.narration || s.notes || s.heading || '').trim(), seen = first.toLowerCase();
+  const parts = [first, ...s.bullets.filter((b) => b.trim() && !seen.includes(b.trim().toLowerCase().replace(/[.!?]$/, '')))];
+  if (s.example && !seen.includes(s.example.toLowerCase())) parts.push(s.example.replace(/\s*([+\-−=×])\s*/g, (_, op: string) => ` ${SAY[lang][(op === '−' ? '-' : op) as keyof (typeof SAY)['en']]} `));
+  return parts.filter(Boolean).map(end).join(' ').slice(0, 1500);
+}
+
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 // One slide as a page to photograph (the same look as the app: calm blue, large type for children).
 export function slideHtml(s: Slide, n: number, total: number, title: string, picture: string | null, subtitle: string | null): string {
@@ -55,7 +66,7 @@ async function render(d: { sql: Sql; ai: AI; files: Files }, l: Lesson, opts: { 
     const parts: { file: string; seconds: number; heading: string; start: number }[] = [];
     let start = 0;
     for (const [i, s] of l.slides.entries()) {
-      const text = (s.narration || s.notes || s.heading).slice(0, 1500);
+      const text = spoken(s, l.setup.lang);
       const wav = await d.ai.speak({ text, lang: l.setup.lang, voice: opts.voice, speed: opts.speed });
       const seconds = Math.max(2, wavSeconds(wav) + 0.6);
       let picture: string | null = null;
