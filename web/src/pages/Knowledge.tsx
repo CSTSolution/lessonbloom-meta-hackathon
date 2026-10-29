@@ -4,7 +4,7 @@
 // Private to the assigner (textbook copyright); the demo uses the team's own sample books.
 import { useEffect, useState } from 'react';
 import { api, ApiError, type AreaRow, type SectionRow } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
 const T = {
@@ -19,10 +19,10 @@ const T = {
   },
   en: {
     title: 'Knowledge', lead: 'Lessons come only from these sources, with their pages.', add: '+ Add a source', private: '🔒 Only you can see these; nothing is shared.', all: 'All', math: 'Maths', english: 'English',
-    sources: (n: number) => `${n} sources`, reading: (n: number) => `${n} reading`, ready: 'Ready', grade: (g: number) => `Grade ${g}`, pages: (n: number) => `${n} pages`,
+    sources: (n: number) => `${pl(n, 'source')}`, reading: (n: number) => `${n} reading`, ready: 'Ready', grade: (g: number) => `Grade ${g}`, pages: (n: number) => `${pl(n, 'page')}`,
     status: { processing: 'Reading…', ready: 'Ready', error: 'Error' }, errors: { scanned: 'The file is scanned images without text. Text PDFs only for now.', failed: 'This file could not be read.', blocked: 'This content cannot be used.' },
     view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
-    page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${n} lessons`, rename: 'Rename', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${n} parts`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
+    page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
     splitAt: 'Split from page', newTitle: 'New part name', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Add a PDF book or use a sample book.',
     form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file (with text)', go: 'Upload', busy: 'Uploading…', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Toán 2 (Vietnamese)', maths: 'Maths 2', eng: 'English 3' },
   },

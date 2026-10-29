@@ -81,7 +81,7 @@ export const api = {
   reminders: () => call<{ reminders: ReminderSettings }>('GET', '/t/reminders'),
   saveReminders: (r: ReminderSettings) => call<{ reminders: ReminderSettings }>('PUT', '/t/reminders', r),
   notifications: () => call<{ today: string; notifications: (Reminder & { className: string; classId: string })[] }>('GET', '/t/notifications'),
-  learner: (id: string) => call<LearnerView>('GET', `/t/pupils/${id}`),
+  learner: (id: string, lang?: 'vi' | 'en') => call<LearnerView>('GET', `/t/pupils/${id}${lang ? `?lang=${lang}` : ''}`),
   advice: (id: string, a: { kind?: string; skill?: string; action: 'apply' | 'keep' | 'undo'; adviceId?: string }) => call<{ ok: boolean; adviceId?: string; added?: number }>('POST', `/t/pupils/${id}/advice`, a),
   promo: (code: string) => call<{ added: { credits: number; days: number }; credits: Credits }>('POST', '/t/promo', { code }),
   logout: () => call<{ ok: boolean }>('POST', '/t/logout'),

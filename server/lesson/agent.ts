@@ -14,6 +14,7 @@ import { fill, langName, maxWords, slideCount, SLIDES_SCHEMA } from './prompts.t
 import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides } from './writer.ts';
 
+const LEVEL_WORDS: Record<Level, { vi: string; en: string }> = { basic: { vi: 'cơ bản', en: 'basic' }, good: { vi: 'khá', en: 'good' }, advanced: { vi: 'nâng cao', en: 'advanced' } };
 export const LIMITS = { maxTurns: 18, maxItemCalls: 14, maxItems: 30, minItems: 8, maxFixes: 6 };
 export type Say = (vi: string, en: string) => void | Promise<void>;
 export interface Built { skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; rejected: Rejected[]; agent: AgentNote }
@@ -110,8 +111,10 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         const r = await writeItems(ai, setup, source, skills, { skill: clip(a.skill, 40), template: clip(a.template, 20), level: (['basic', 'good', 'advanced'].includes(a.level) ? a.level : 'basic') as Level, count: Math.min(4, Number(a.count) || 3) }, nextId);
         const room = LIMITS.maxItems - items.length;
         items.push(...r.kept.slice(0, room)); rejected.push(...r.rejected);
-        await say(`Bài luyện tập "${clip(a.skill, 40)}" (${a.level}): giữ ${r.kept.length} câu${r.rejected.length ? `, bộ kiểm tra loại ${r.rejected.length} câu` : ''}.`,
-          `Practice "${clip(a.skill, 40)}" (${a.level}): kept ${r.kept.length}${r.rejected.length ? `, the checker rejected ${r.rejected.length}` : ''}.`);
+        // the teacher sees the skill's name and the level in words, never the internal tag (Chi, 29 Oct)
+        const skillName = skills.find((k) => k.tag === a.skill)?.name || 'practice', lv = LEVEL_WORDS[a.level as Level] ?? LEVEL_WORDS.basic;
+        await say(`Bài luyện tập "${clip(skillName, 60)}" (${lv.vi}): giữ ${r.kept.length} câu${r.rejected.length ? `, bộ kiểm tra loại ${r.rejected.length} câu` : ''}.`,
+          `Practice "${clip(skillName, 60)}" (${lv.en}): kept ${r.kept.length}${r.rejected.length ? `, the checker rejected ${r.rejected.length}` : ''}.`);
         return { kept: r.kept.map((i) => ({ id: i.id, prompt: i.prompt })), rejected: r.rejected.map((x) => x.issues) };
       }
       case 'write_cards': {
@@ -130,7 +133,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         if (fixes >= LIMITS.maxFixes) return { error: 'fix limit reached; call finish' };
         fixes++;
         slides[slides.indexOf(s)] = await simplify(ai, setup, s, clip(a.reason));
-        changes.push(`${s.id}: ${clip(a.reason)}`);
+        changes.push(`Slide ${Number(s.id.slice(2))}: ${clip(a.reason)}`);
         await say(`Đã viết lại slide ${s.id.slice(2)} cho dễ đọc hơn.`, `Made slide ${s.id.slice(2)} easier to read.`);
         return { ok: true };
       }
@@ -139,7 +142,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         if (!i) return { error: `no item ${clip(a.id, 20)}` };
         if (items.length <= LIMITS.minItems) return { error: `a lesson keeps at least ${LIMITS.minItems} items` };
         items = items.filter((x) => x !== i);
-        changes.push(`${i.id} removed: ${clip(a.reason)}`);
+        changes.push(`Item removed: ${clip(a.reason)}`);
         return { ok: true };
       }
       case 'finish':
@@ -202,6 +205,9 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   if (!note) note = setup.lang === 'en'
     ? `I made ${slides.length} slides, ${items.length} practice items and ${cards.length} flashcards from the section of your book. Every item passed the code checks.`
     : `Trợ lý đã soạn ${slides.length} slide, ${items.length} câu luyện tập và ${cards.length} thẻ nhớ từ phần bài trong sách của cô. Mọi câu đều đã qua bộ kiểm tra.`;
+  // what the teacher reads names each skill, never its internal tag ("add_carry_100")
+  const named = (x: string) => skills.reduce((t, k) => t.split(k.tag).join(`"${k.name}"`), x);
+  note = named(note); changes.splice(0, changes.length, ...changes.map(named));
   const [ok] = checkOutput(note + changes.join('\n'), canary, { maxChars: 4000 });
   if (!ok) { note = ''; changes.length = 0; }
   return { skills, slides, items, cards, rejected, agent: { model, turns, finished, note, changes: changes.slice(0, 12) } };

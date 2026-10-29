@@ -4,7 +4,7 @@
 // results only; "Áp dụng" changes things for her alone.
 import { useEffect, useState } from 'react';
 import { api, ApiError, type Advice, type LearnerView } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
 const T = {
@@ -15,10 +15,10 @@ const T = {
     labels: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' }, recent: (r: number, o: number) => `${r}/${o} câu gần nhất đúng`, answers: (n: number) => `${n} câu`, min: (n: number) => `${n} phút`, added: (n: number) => `Đã thêm ${n} câu cho riêng em.`,
   },
   en: {
-    back: '‹ Learning summary', path: 'See the path', now: 'Learning', weeks: (w: number, s: string, e: string, i: number) => `${w} week${w === 1 ? '' : 's'} · ${s} – ${e} · in week ${i}`, video: 'Watched the video', slides: 'Saw the slides', noVideo: 'Not watched yet', left: (n: number) => `${n} items to go`, ends: (d: string) => `Ends: ${d}`,
+    back: '‹ Learning summary', path: 'See the path', now: 'Learning', weeks: (w: number, s: string, e: string, i: number) => `${w} week${w === 1 ? '' : 's'} · ${s} – ${e} · in week ${i}`, video: 'Watched the video', slides: 'Saw the slides', noVideo: 'Not watched yet', left: (n: number) => `${pl(n, 'item')} to go`, ends: (d: string) => `Ends: ${d}`,
     advice: (n: string) => `Advice for ${n}`, adviceSub: 'From your criteria · the AI only words it', kinds: { practice: 'More practice', next: 'Next step', time: 'Lesson time' }, why: '› Why?', apply: 'Apply', keep: 'Keep as is', undo: 'Undo', applied: '✓ Applied', kept: 'Kept as is', lock: '🔒 The plan only changes when you press Apply.', none: 'No advice yet: more answers are needed.',
-    bySkill: 'By skill', bySkillSub: (s: number, p: number, r: number) => `${s} mastered · ${p} practising · ${r} repeated mistake`, sessions: 'Recent sessions', sessionsSub: (n: number, d: string, m: number) => `${n} sessions${d ? ` · last ${d}, ${m} min` : ''}`, sent: 'Reminders sent', sentSub: (n: number) => `${n} reminders`,
-    labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' }, recent: (r: number, o: number) => `${r}/${o} recent answers right`, answers: (n: number) => `${n} answers`, min: (n: number) => `${n} min`, added: (n: number) => `Added ${n} items for this learner only.`,
+    bySkill: 'By skill', bySkillSub: (s: number, p: number, r: number) => `${s} mastered · ${p} practising · ${r} repeated mistake`, sessions: 'Recent sessions', sessionsSub: (n: number, d: string, m: number) => `${pl(n, 'session')}${d ? ` · last ${d}, ${m} min` : ''}`, sent: 'Reminders sent', sentSub: (n: number) => `${pl(n, 'reminder')}`,
+    labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' }, recent: (r: number, o: number) => `${r}/${o} recent answers right`, answers: (n: number) => `${pl(n, 'answer')}`, min: (n: number) => `${n} min`, added: (n: number) => `Added ${pl(n, 'item')} for this learner only.`,
   },
 };
 const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
@@ -26,8 +26,8 @@ const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 export function Learner({ id, parent }: { id: string; parent: boolean }) {
   const t = useT(T), lang = useLang();
   const [v, setV] = useState<LearnerView | null>(null), [why, setWhy] = useState(''), [open, setOpen] = useState(''), [busy, setBusy] = useState(''), [msg, setMsg] = useState('');
-  const load = () => api.learner(id).then(setV).catch(() => setV(null));
-  useEffect(() => { void load(); setMsg(''); }, [id]);
+  const load = () => api.learner(id, lang).then(setV).catch(() => setV(null));
+  useEffect(() => { void load(); setMsg(''); }, [id, lang]);
   if (!v) return null;
   const act = async (a: Advice, action: 'apply' | 'keep' | 'undo') => {
     setBusy(a.kind + action); setMsg('');

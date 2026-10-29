@@ -4,7 +4,7 @@
 // "Đã kiểm tra N câu · M câu tạo lại", each item with its details. Then assigning (the confirm box).
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type Item, type Lesson, type Slide } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
 import { Assign } from './Assign.tsx';
@@ -14,7 +14,7 @@ const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.sta
 
 const T = {
   vi: {
-    working: 'Trợ lý đang soạn bài…', left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} tín dụng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
+    working: 'Trợ lý đang soạn bài…', left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', toItemsP: 'Tiếp: bài tập', drawing: 'Đang vẽ hình minh hoạ…',
     rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
     makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', preview: 'Nghe thử từng đoạn',
@@ -26,15 +26,15 @@ const T = {
     groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ', pairs: 'Lật thẻ tìm cặp' }, pairsLead: 'Trò chơi cho em, làm từ thẻ nhớ (tối đa 6 cặp).', toAssign: 'Duyệt xong, sang giao bài',
   },
   en: {
-    working: 'The agent is making your lesson…', left: (m: number) => (m > 1 ? `About ${m} minutes left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${n} credits.`, pdf: 'Export PDF', printItems: 'Print worksheet',
+    working: 'The agent is making your lesson…', left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', toItemsP: 'Next: practice', drawing: 'Drawing the picture…',
     rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
     makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', preview: 'Listen to each part',
     redoneWhy: 'Written again because', edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
     newPic: 'New picture', cut: 'Cut out from your photo', cutHint: 'Choose a photo of objects (no people) and type what to cut out.', cutName: 'e.g. apples', cutGo: 'Cut out with SAM 3.1', cutDone: (n: number) => `Cut out ${n}.`, busy: 'Working…',
     video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
-    items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number, ai = 0) => `Checked ${n + r} items · ${r - ai} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, details: 'Details', why: 'Why they were written again or removed',
-    levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, allLevels: 'All', kind: 'Skill', explain: 'Explanation', page: 'Source', remove: 'Delete', removeAsk: 'Remove this item from the lesson?', seeAll: (n: number) => `See all ${n}`, n: (n: number) => `${n} items`, q: (i: number) => `${i}.`, tf: { true: 'True', false: 'False' }, answer: 'Answer',
+    items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number, ai = 0) => `Checked ${pl(n + r, 'item')} · ${r - ai} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, details: 'Details', why: 'Why they were written again or removed',
+    levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, allLevels: 'All', kind: 'Skill', explain: 'Explanation', page: 'Source', remove: 'Delete', removeAsk: 'Remove this item from the lesson?', seeAll: (n: number) => `See all ${n}`, n: (n: number) => `${pl(n, 'item')}`, q: (i: number) => `${i}.`, tf: { true: 'True', false: 'False' }, answer: 'Answer',
     groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards', pairs: 'Find the pairs' }, pairsLead: 'A game for the child, made from the flashcards (up to 6 pairs).', toAssign: 'Reviewed: go to assigning',
   },
 };

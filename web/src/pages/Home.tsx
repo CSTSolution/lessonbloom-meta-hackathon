@@ -3,7 +3,7 @@
 // No role switch in the header: the role is chosen once at sign-up (SignupRole).
 import { useEffect, useState } from 'react';
 import { api, ApiError, type Credits, type LessonRow, type Teacher } from '../api.ts';
-import { setRole, useLang, useT } from '../i18n.ts';
+import { pl, setRole, useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
 import { Classes } from './Classes.tsx';
 import { Create } from './Create.tsx';
@@ -27,19 +27,19 @@ const T = {
     groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
-    demo: 'Bản dùng thử', credits: (c: Credits) => `Tín dụng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
-    creditsHint: 'Một bài dùng khoảng 35 tín dụng.', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} tín dụng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
+    demo: 'Bản dùng thử', credits: (c: Credits) => `Lượt dùng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
+    creditsHint: 'Một bài dùng khoảng 35 lượt.', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} lượt dùng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
     notifications: 'Thông báo', profile: 'Hồ sơ', reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
   },
   en: {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
     teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', allClasses: 'All classes', all: 'All',
-    groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${n} lessons`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${i} items`, c && 'Flashcards'].filter(Boolean).join(' · '),
+    groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
-    creditsHint: 'A lesson uses about 35 credits.', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${c} credits` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
+    creditsHint: 'A lesson uses about 35 credits.', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${pl(c, 'credit')}` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
     notifications: 'Notifications', profile: 'Profile', reminders: 'Reminder settings', criteria: 'Summary criteria', signOut: 'Sign out', role: { teacher: 'Teacher', parent: 'Parent' },
   },
 };
@@ -79,13 +79,13 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
 }
 
 function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: () => void }) {
-  const [open, setOpen] = useState(false), [credits, setCredits] = useState<Credits | null>(null), path = usePath();
+  const [open, setOpen] = useState(false), [credits, setCredits] = useState<Credits | null>(null), path = usePath(), lang = useLang();
   useEffect(() => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }, [path]);
   const name = teacher.name || teacher.email || t.demo;
   return (
     <div className="me">
       <LangToggle />
-      <button className="btn ghost small" aria-label="Notifications" onClick={() => go('/notifications')}>🔔</button>
+      <button className="btn ghost small" aria-label={lang === 'vi' ? 'Thông báo' : 'Notifications'} onClick={() => go('/notifications')}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg></button>
       {credits && <button className="btn ghost small" title={t.creditsHint} onClick={() => setOpen(!open)}>{t.credits(credits)}</button>}
       <button className="row link" style={{ gap: 6, color: 'inherit' }} onClick={() => setOpen(!open)}><span className="avatar">{name.trim().slice(0, 1).toUpperCase()}</span><span className="small">{name}</span></button>
       {open && <div className="menu">

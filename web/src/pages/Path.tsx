@@ -3,7 +3,7 @@
 // (week, days left, how many have done the practice) and the reminders that will be sent in the app.
 import { useEffect, useState } from 'react';
 import { api, ApiError, type AreaRow, type ClassRow, type PathView } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
 const T = {
@@ -16,8 +16,8 @@ const T = {
   },
   en: {
     title: 'Learning path', lead: 'Each lesson takes 1, 2 or 3 weeks.', cls: 'Class', child: 'Child', src: 'Source', save: 'Save path', saved: 'Saved.', start: 'Starts on',
-    n: (b: number, w: number) => `${b} lessons · ${w} weeks`, wk: (n: number) => `${n} wk`, st: { done: 'Done', current: 'Now', next: 'Next', later: 'Later' }, ended: (d: string) => `Done ${d}`, starts: (d: string) => `Starts ${d}`,
-    week: (i: number, n: number) => `Week ${i} / ${n}`, left: (n: number, d: string) => `${n} days left, ends ${d}`, done: (d: number, n: number, p: boolean) => (p ? (d ? 'Practice done' : 'Practice not done yet') : `${d}/${n} have done the practice`), page: 'p.',
+    n: (b: number, w: number) => `${pl(b, 'lesson')} · ${pl(w, 'week')}`, wk: (n: number) => `${n} wk`, st: { done: 'Done', current: 'Now', next: 'Next', later: 'Later' }, ended: (d: string) => `Done ${d}`, starts: (d: string) => `Starts ${d}`,
+    week: (i: number, n: number) => `Week ${i} / ${n}`, left: (n: number, d: string) => `${pl(n, 'day')} left, ends ${d}`, done: (d: number, n: number, p: boolean) => (p ? (d ? 'Practice done' : 'Practice not done yet') : `${d}/${n} have done the practice`), page: 'p.',
     reminders: 'Status reminders', remLead: 'Sent in the app.', toPupils: 'To pupils', toChild: 'To your child', toMe: 'To you', seeAll: (n: number) => `See all ${n}`, settings: 'Reminder settings',
     noClass: 'Create a class under Classes first.', noChild: 'Add a child under My children first.', noSrc: 'Add a book to Knowledge first.', make: 'Make lesson', lesson: 'Lesson',
   },

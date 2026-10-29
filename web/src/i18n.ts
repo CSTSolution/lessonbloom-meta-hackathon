@@ -8,6 +8,8 @@ const fromBrowser = (): Lang => 'en';
 let current: Lang = (() => { try { const v = localStorage.getItem(KEY); return v === 'en' || v === 'vi' ? v : fromBrowser(); } catch { return fromBrowser(); } })();
 const subs = new Set<(l: Lang) => void>();
 export const getLang = () => current;
+// English counts: "1 lesson", "2 lessons" (Vietnamese has no plural)
+export const pl = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export function setLang(l: Lang) { current = l; try { localStorage.setItem(KEY, l); } catch { /* private mode */ } document.documentElement.lang = l; subs.forEach((f) => f(l)); }
 export function useLang(): Lang { const [l, set] = useState(current); useEffect(() => { subs.add(set); return () => { subs.delete(set); }; }, []); return l; }
 // A parent reads the same screens in a parent's words (Chi: the text follows the role): in Vietnamese

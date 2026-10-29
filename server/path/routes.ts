@@ -273,8 +273,9 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   const pupilMine = (c: Context<Env>) => sql.one<{ id: string; name: string; class_id: string; class_name: string; kind: string }>(
     `select p.id, p.name, p.class_id, k.name as class_name, k.kind from pupils p join classes k on k.id = p.class_id where p.id = $1 and k.teacher_id = $2`, [c.req.param('id'), c.get('teacher').id]);
 
-  const learner = async (tid: string, p: { id: string; name: string; class_id: string }) => {
-    const cr = await criteriaOf(tid), data = await classData(p.class_id), labels = labelsFor(data, cr), lang = data.lang;
+  // `ui`: the language the assigner reads the page in (Chi: advice in English on a Vietnamese screen was wrong)
+  const learner = async (tid: string, p: { id: string; name: string; class_id: string }, ui?: 'vi' | 'en') => {
+    const cr = await criteriaOf(tid), data = await classData(p.class_id), labels = labelsFor(data, cr), lang = ui ?? data.lang;
     const skills = [...labels.entries()].filter(([, m]) => m.has(p.id)).map(([sk, m]) => ({ skill: sk, name: data.skills.get(sk) || sk, ...m.get(p.id)! }));
     const mine = data.answers.filter((a) => a.pupil_id === p.id);
     const sessions = [...new Set(mine.map((a) => a.day))].reverse().slice(0, 6).map((day) => {
@@ -316,7 +317,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   app.get('/api/t/pupils/:id', async (c) => {
     const p = await pupilMine(c);
     if (!p) return fail(c, 'notFound', 404);
-    const L = await learner(c.get('teacher').id, p);
+    const q = c.req.query('lang'), L = await learner(c.get('teacher').id, p, q === 'vi' || q === 'en' ? q : undefined);
     const s = await remindersOf(c.get('teacher').id);
     const logged = await sql.query<{ day: string; kind: string; text: string }>(`select to_char(day, 'YYYY-MM-DD') as day, kind, text from pupil_reminders where pupil_id = $1 order by day desc limit 20`, [p.id]);
     const sent = logged.map((r) => ({ date: r.day, who: 'pupils' as const, kind: r.kind, vi: r.text.split('\n')[0], en: r.text.split('\n')[1] || r.text }));

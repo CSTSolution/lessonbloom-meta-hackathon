@@ -40,7 +40,7 @@ export function SignupRole({ teacher, onDone }: { teacher: Teacher; onDone: (t: 
           <div className="grid2">
             {(['teacher', 'parent'] as const).map((r) => (
               <button type="button" key={r} className={`list-row ${role === r ? 'sel' : ''}`} style={{ display: 'grid', textAlign: 'left', gap: 4, cursor: 'pointer' }} onClick={() => setRole(r)} aria-pressed={role === r}>
-                <b className="small">{r === 'teacher' ? '🧑‍🏫 ' + t.teacher : '👪 ' + t.parent}</b><span className="small muted">{r === 'teacher' ? t.teacherSub : t.parentSub}</span>
+                <b className="small">{r === 'teacher' ? t.teacher : t.parent}</b><span className="small muted">{r === 'teacher' ? t.teacherSub : t.parentSub}</span>
               </button>
             ))}
           </div>

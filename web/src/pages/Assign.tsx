@@ -3,7 +3,7 @@
 // remembered: every assigning asks again (Chi's appendix 1b). The server refuses it unticked too.
 import { useEffect, useState } from 'react';
 import { api, ApiError, type ClassRow, type ClassView, type LessonAssignment } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { copyText } from './Classes.tsx';
 
 // a parent assigns to one child: the child's own link instead of the class code and the pupils' list
@@ -28,8 +28,8 @@ const T = {
     opts: 'Options', due: 'Due date', retry: 'Unlimited retries', hints: 'Hints after a wrong answer', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'No due date'} · ${r ? 'unlimited retries' : 'one try per item'} · ${h ? 'hints' : 'no hints'}`,
     kids: (n: string) => `Pupils of ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} joined · class code ${c}`, none: 'No pupils yet: add their first names under Classes.',
     parents: 'Send to parents', parentsSub: 'A private link for each child, no sign-in', isNew: 'New',
-    checkedN: (n: number, r: number, ai = 0) => `Code checked ${n} items · ${r} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, confirm: 'I have read and checked the AI-generated slides and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
-    done: (n: string) => `Assigned to ${n}. Pupils see it straight away under “Today”.`, earlier: 'Assigned', progress: (d: number, n: number) => `${d}/${n} pupils finished`,
+    checkedN: (n: number, r: number, ai = 0) => `Code checked ${pl(n, 'item')} · ${r} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, confirm: 'I have read and checked the AI-generated slides and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
+    done: (n: string) => `Assigned to ${n}. Pupils see it straight away under “Today”.`, earlier: 'Assigned', progress: (d: number, n: number) => `${d}/${pl(n, 'pupil')} finished`,
   },
 };
 

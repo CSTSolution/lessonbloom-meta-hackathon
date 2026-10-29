@@ -3,7 +3,7 @@
 // Class names show exactly as typed (no "Lớp " in front).
 import { useEffect, useState } from 'react';
 import { api, ApiError, type ClassRow, type ClassView } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
 const T = {
@@ -17,7 +17,7 @@ const T = {
   },
   en: {
     title: 'Your classes', lead: 'Pupils join with the class code; only first names are kept.', add: '+ Add class', namePh: 'Class name, e.g. 2A', create: 'Create', cancel: 'Cancel',
-    pupils: (n: number) => `${n} pupils`, given: (n: number) => `${n} lessons assigned`, notJoined: (n: number) => `${n} not joined yet`, allIn: 'Everyone has joined',
+    pupils: (n: number) => `${pl(n, 'pupil')}`, given: (n: number) => `${pl(n, 'lesson')} assigned`, notJoined: (n: number) => `${n} not joined yet`, allIn: 'Everyone has joined',
     assigned: 'Assigned lessons', none: 'Nothing assigned yet. Open a lesson and press “Assign”.', due: 'Due', doneOf: 'Done', open: 'Open lesson',
     kids: 'Pupils', joined: 'Joined', waiting: 'Not yet', addKids: '+ Add pupils', kidsPh: 'One first name per line, e.g.:\nAn\nBinh', save: 'Add',
     code: 'Class code', onlyNames: 'First names only.', link: 'Link to join', print: 'Print class code', copy: 'Copy', copied: 'Copied', parentLink: 'Private link for parents', remove: 'Remove', rename: 'Rename', del: 'Delete class', delAsk: 'Delete this class with its assigned lessons and the pupils\' results?',

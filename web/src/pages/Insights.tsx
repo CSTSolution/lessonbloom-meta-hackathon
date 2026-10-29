@@ -4,7 +4,7 @@
 // Supports regular assessment under Circular 27/2020: no marks, no comparing pupils.
 import { useEffect, useState } from 'react';
 import { api, ApiError, type Criteria as Crit, type Label, type LessonRow, type Summary } from '../api.ts';
-import { useLang, useT } from '../i18n.ts';
+import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
 const T = {
@@ -22,9 +22,9 @@ const T = {
     tt27: 'Supports regular assessment under Circular 27/2020: comments, no marks, no comparing pupils. Final levels stay the teacher\'s decision; LessonBloom is not used for tests or end-of-term assessment.',
     grid: 'Skills × classes table', clsRepeat: (n: number) => `${n} class skill${n === 1 ? '' : 's'} with a repeated mistake`, kidsRepeat: (n: number) => `${n} learner${n === 1 ? '' : 's'} repeating it`,
     overview: 'All classes', overviewP: 'All children', ratio: 'Skills · all classes', byClass: 'By class', byChild: 'By child', detail: 'Details ›', labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
-    legend: 'Repeated mistake: practise more of the same · Practising: not enough answers yet · Mastered: ready for harder items', edit: 'Edit criteria ›', count: (n: number) => `${n} class skills`,
+    legend: 'Repeated mistake: practise more of the same · Practising: not enough answers yet · Mastered: ready for harder items', edit: 'Edit criteria ›', count: (n: number) => `${pl(n, 'class skill')}`,
     one: (n: string) => `Class detail · ${n}`, oneP: (n: string) => `Detail · ${n}`, mist: (n: string) => `Repeated mistakes · ${n}`, solid: (n: string) => `Mastered and next · ${n}`, comments: (n: string) => `Suggested comments · ${n}`,
-    write: 'Write suggested comments', writing: 'Writing…', copy: 'Copy', none: 'No results yet. When learners practise, the summary shows here.', pupils: (n: number) => `${n} learners`, next: 'Ready for harder items or the next lesson on the path.', noMist: 'No repeated mistakes.', aiNote: "The AI only words the labels; learners' names are never sent to it.",
+    write: 'Write suggested comments', writing: 'Writing…', copy: 'Copy', none: 'No results yet. When learners practise, the summary shows here.', pupils: (n: number) => `${pl(n, 'learner')}`, next: 'Ready for harder items or the next lesson on the path.', noMist: 'No repeated mistakes.', aiNote: "The AI only words the labels; learners' names are never sent to it.",
   },
 };
 type Dict = (typeof T)['vi'];
@@ -115,7 +115,7 @@ const C = {
     rule: 'Rule', value: 'Value', recent: 'Look at the most recent answers', min: 'Label only after at least', solid: 'when at least this many are right', repeat: 'when fewer than this are right', same: 'or the same kind of mistake at least', times: 'times, within', sessions: 'sessions', practising: 'when neither of the above, or not enough answers', rest: 'Everything else', q: 'answers',
     cls: 'The class · one skill', clsSub: (c: Crit) => `Repeated mistake ≥ ${c.classRepeat}% of learners · Mastered ≥ ${c.classSolid}%`, clsRepeat: 'The class has a repeated mistake from', clsSolid: 'The class has mastered it from', ofPupils: '% of learners',
     nextT: 'Suggesting what next', nextSub: (n: number) => `3 labels → 3 suggestions · ${n}/3 on`, sPractice: 'More practice of the same kind', sTime: 'More time for the lesson', sNext: 'Harder items or the next lesson', lbl: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
-    preview: 'Try it with these criteria', right: (r: number, o: number) => `${r}/${o} right`, clsLevel: 'Class level', share: (r: number, o: number) => `${r}/${o} learners with a repeated mistake`,
+    preview: 'Try it with these criteria', right: (r: number, o: number) => `${r}/${o} right`, clsLevel: 'Class level', share: (r: number, o: number) => `${r}/${pl(o, 'learner')} with a repeated mistake`,
     note: 'Defaults 80 / 50 / 3 times in 2 sessions / 30% / 70%. Applies to all your classes.', tt27: 'Supports regular assessment under Circular 27/2020: no marks, no comparing learners; learners never see labels.',
   },
 };
