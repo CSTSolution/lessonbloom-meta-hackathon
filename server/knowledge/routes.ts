@@ -111,6 +111,22 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     return id;
   };
 
+  // #17 (Chi): "Try again" for a book that failed. An uploaded PDF is still on the server, so it is read
+  // again in her line of jobs; a book read in the browser kept no file, so she adds it again instead.
+  app.post('/api/t/books/:id/retry', async (c) => {
+    const t = c.get('teacher'), bk = await bookMine(c);
+    if (!bk || bk.status !== 'error') return fail(c, 'notFound', 404);
+    const pdf = (bk.source ?? 'pdf') === 'pdf' ? await readFile(bookFile(bk.id)).catch(() => null) : null;
+    if (!pdf) return fail(c, 'retryAdd', 400);
+    if (!(await sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [bk.id]))) {
+      await sql.query('delete from passages where book_id = $1', [bk.id]);
+      await sql.query('delete from sections where book_id = $1', [bk.id]);
+      await sql.query(`update books set status = 'processing', error = null where id = $1`, [bk.id]);
+      await d.jobs.add(t.id, 'book', bk.id, bk.title, () => d.as(t.id, () => readBook(bk.id, () => ingestBook(sql, d.ai, bk.area_id, bk.id, pdf)), undefined, bk.id));
+    }
+    return c.json({ ok: true });
+  });
+
   // A big PDF with text: the browser reads the text layer and sends only the text (the file stays with her).
   app.post('/api/t/areas/:id/books/text', async (c) => {
     const t = c.get('teacher'), a = await areaOf(sql, t.id, c.req.param('id'));

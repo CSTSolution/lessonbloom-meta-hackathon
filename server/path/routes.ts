@@ -29,7 +29,7 @@ export const cleanReminders = (x: unknown): ReminderSettings => {
 
 const TOPIC_SYSTEM = `You group the parts of a primary-school book into its chapters ("chủ đề"), e.g. Toán 2: "Số và phép tính", "Hình học", "Đo lường"; English: the unit themes. Use the book's own chapter names when the titles show them. Give every part exactly one short chapter name, in the book's language. Keep the parts in their order.`;
 const TOPIC_SCHEMA = { type: 'object', properties: { parts: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, topic: { type: 'string' } }, required: ['id', 'topic'] } } }, required: ['parts'] };
-const COMMENT_SYSTEM = `You write one short comment (1-2 sentences, in {{lang}}) for each learner, for the teacher's regular feedback under Vietnam's Circular 27/2020 (nhận xét thường xuyên): what the learner has mastered and what they are practising, by skill. Positive and specific; never "yếu", "chậm", "trễ", never marks, ranks or comparisons with others. Learners are called "Em 1", "Em 2"…; keep exactly those names.`;
+const COMMENT_SYSTEM = `You write one short comment (1-2 sentences, in {{lang}}) for each learner, for the teacher's ongoing feedback while learners learn (comments, never scores): what the learner has mastered and what they are practising, by skill. Positive and specific; never "yếu", "chậm", "trễ", never marks, ranks or comparisons with others. Learners are called "Em 1", "Em 2"…; keep exactly those names.`;
 const ADVICE_SYSTEM = `You word advice cards for a primary-school teacher or parent about ONE learner. The decision is already made by code; never change it, never add advice. For each card write one or two short, warm, specific sentences in {{lang}}: what was seen and what to do. Call the learner exactly {child}. No marks, no percentages unless given, no comparisons, never "yếu", "chậm", "trễ".`;
 const ADVICE_SCHEMA = { type: 'object', properties: { cards: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string' }, text: { type: 'string' } }, required: ['kind', 'text'] } } }, required: ['cards'] };
 const COMMENT_SCHEMA = { type: 'object', properties: { comments: { type: 'array', items: { type: 'object', properties: { who: { type: 'string' }, text: { type: 'string' } }, required: ['who', 'text'] } } }, required: ['comments'] };
@@ -135,6 +135,17 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
         }
         out.push(...one.filter((r) => r.date >= from && r.date <= to).map((r) => ({ ...r, className: pa.class_name, classId: pa.class_id })));
       }
+    }
+    // #17 (Chi): a book she added has been read, or could not be (reading can take minutes; she may leave)
+    for (const j of await sql.query<{ day: string; status: string; title: string; area: string | null; sections: string; pages: number; error: string | null }>(
+      `select to_char(j.ended_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, j.status, j.title, a.name as area, b.pages, b.error,
+          (select count(*) from sections s where s.book_id = b.id and s.title <> '—') as sections
+        from jobs j join books b on b.id = j.ref left join areas a on a.id = b.area_id
+        where j.teacher_id = $1 and j.kind = 'book' and j.status in ('done', 'error') and j.ended_at > now() - interval '14 days'`, [t.id])) {
+      const ok = j.status === 'done' && !j.error, n = Number(j.sections);
+      out.push({ date: j.day, who: 'assigner', kind: ok ? 'bookReady' : 'bookError', className: j.area || j.title, classId: '',
+        vi: ok ? `Đã thêm sách “${j.title}” vào Kho kiến thức: ${n} bài · ${j.pages} trang.` : `Chưa đọc được sách “${j.title}”. Mở Kho kiến thức để xem lý do và thử lại.`,
+        en: ok ? `“${j.title}” is in your Knowledge: ${n} ${n === 1 ? 'lesson' : 'lessons'} · ${j.pages} ${j.pages === 1 ? 'page' : 'pages'}.` : `“${j.title}” could not be read. Open Knowledge to see why and try again.` });
     }
     out.sort((a, b) => b.date.localeCompare(a.date));
     return c.json({ today, notifications: out });

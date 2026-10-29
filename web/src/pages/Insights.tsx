@@ -1,7 +1,8 @@
 // "Tóm tắt học tập" (Chi's design) and its criteria. A teacher: five folding parts (overview of the
 // classes, one class in detail, repeated mistakes, mastered + next, suggested comments); a parent: the
 // same per child. Labels are worked out by code from the criteria; only the comments are written by AI.
-// Supports regular assessment under Circular 27/2020: no marks, no comparing pupils.
+// Supports ongoing feedback while children learn: no scores, no comparing (Chi, 29 Oct: no circular number,
+// not only for Vietnam; a parent's own wording).
 import { useEffect, useState } from 'react';
 import { api, ApiError, type Criteria as Crit, type Label, type LessonRow, type Summary } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
@@ -10,7 +11,7 @@ import { go } from '../router.ts';
 const T = {
   vi: {
     title: 'Tóm tắt học tập', advice: 'Tư vấn riêng cho từng em', adviceSub: (n: number) => `${n} em có kết quả để tư vấn.`, seeEach: 'Xem chi tiết từng em ›', lesson: 'Bài học', allLessons: 'Tất cả bài', cls: 'Lớp', child: 'Con',
-    tt27: 'Hỗ trợ đánh giá thường xuyên theo Thông tư 27/2020/TT-BGDĐT: nhận xét, không chấm điểm, không so sánh học sinh. Mức Hoàn thành tốt / Hoàn thành / Chưa hoàn thành vẫn do cô quyết định; LessonBloom không dùng cho kiểm tra, đánh giá định kỳ.',
+    tt27: 'Hỗ trợ nhận xét thường xuyên trong quá trình học: không chấm điểm, không so sánh học sinh. Mức hoàn thành cuối cùng vẫn do cô quyết định; LessonBloom không dùng cho kiểm tra, đánh giá định kỳ.', tt27p: 'Hỗ trợ nhận xét thường xuyên trong quá trình học: không chấm điểm, không so sánh con với bạn khác. Đây là gợi ý để bố mẹ luyện thêm cùng con ở nhà; mức hoàn thành ở trường vẫn do giáo viên của con quyết định.',
     grid: 'Xem bảng dạng bài × lớp', clsRepeat: (n: number) => `${n} dạng bài cả lớp lặp lỗi`, kidsRepeat: (n: number) => `${n} lượt em lặp lỗi`,
     overview: 'Tổng quan các lớp', overviewP: 'Tổng quan các con', ratio: 'Tỉ lệ dạng bài · tất cả các lớp', byClass: 'Theo từng lớp', byChild: 'Theo từng con', detail: 'Xem chi tiết ›', labels: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' },
     legend: 'Lỗi lặp lại: cần luyện thêm cùng dạng · Đang luyện: chưa đủ lượt làm để kết luận · Đã vững: có thể chuyển bài nâng cao', edit: 'Chỉnh tiêu chí ›', count: (n: number) => `${n} lượt dạng bài`,
@@ -19,7 +20,7 @@ const T = {
   },
   en: {
     title: 'Learning summary', advice: 'Advice for each learner', adviceSub: (n: number) => `${n} learner${n === 1 ? ' has' : 's have'} results to advise on.`, seeEach: 'See each learner ›', lesson: 'Lesson', allLessons: 'All lessons', cls: 'Class', child: 'Child',
-    tt27: 'Supports regular assessment under Circular 27/2020: comments, no marks, no comparing pupils. Final levels stay the teacher\'s decision; LessonBloom is not used for tests or end-of-term assessment.',
+    tt27: 'Supports ongoing feedback while pupils learn: comments, no scores, no comparing pupils. Final achievement levels remain the teacher\'s decision; LessonBloom is not used for periodic tests or assessments.', tt27p: 'Supports ongoing feedback while your child learns: no scores, no comparing with other children. It is a guide for practising together at home; your child\'s achievement level at school remains their teacher\'s decision.',
     grid: 'Skills × classes table', clsRepeat: (n: number) => `${n} class skill${n === 1 ? '' : 's'} with a repeated mistake`, kidsRepeat: (n: number) => `${n} learner${n === 1 ? '' : 's'} repeating it`,
     overview: 'All classes', overviewP: 'All children', ratio: 'Skills · all classes', byClass: 'By class', byChild: 'By child', detail: 'Details ›', labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
     legend: 'Repeated mistake: practise more of the same · Practising: not enough answers yet · Mastered: ready for harder items', edit: 'Edit criteria ›', count: (n: number) => `${pl(n, 'class skill')}`,
@@ -61,7 +62,7 @@ export function Insights({ parent }: { parent: boolean }) {
         <label className="small">{t.lesson} <select value={lessonId} onChange={(e) => setLessonId(e.target.value)}><option value="">{t.allLessons}</option>{lessons.map((l) => <option key={l.id} value={l.id}>{l.setup.title}</option>)}</select></label>
         <span className="small">{parent ? t.child : t.cls}</span>{s.classes.map((x) => <button key={x.id} className={`pill ${k === x.id ? 'on' : ''}`} onClick={() => setK(x.id)}>{x.name}</button>)}
       </div>
-      {!parent && <p className="banner blue small" style={{ marginBottom: 10 }}>ⓘ {t.tt27}</p>}
+      <p className="banner blue small" style={{ marginBottom: 10 }}>ⓘ {parent ? t.tt27p : t.tt27}</p>
       {!s.classes.some((x) => x.skills.length) ? <div className="card"><p className="muted">{t.none}</p></div> : <div className="stack">
         {section('overview', parent ? t.overviewP : t.overview, t.count(s.total.solid + s.total.practising + s.total.repeat), s.total.repeat ? <span className="tag repeat">{t.clsRepeat(s.total.repeat)}</span> : null, <>
           <div className="grid2">
@@ -107,7 +108,7 @@ const C = {
     cls: 'Cả lớp · một dạng bài', clsSub: (c: Crit) => `Lỗi lặp lại ≥ ${c.classRepeat}% số em · Đã vững ≥ ${c.classSolid}% số em`, clsRepeat: 'Lớp có Lỗi lặp lại khi từ', clsSolid: 'Lớp Đã vững khi từ', ofPupils: '% số em',
     nextT: 'Gợi ý bài tiếp theo', nextSub: (n: number) => `3 nhãn → 3 gợi ý · ${n}/3 đang bật`, sPractice: 'Luyện thêm cùng dạng', sTime: 'Thêm thời gian cho bài', sNext: 'Bài nâng cao hoặc bài tiếp', lbl: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' },
     preview: 'Xem thử với tiêu chí hiện tại', right: (r: number, o: number) => `${r}/${o} câu đúng`, clsLevel: 'Mức của lớp', share: (r: number, o: number) => `${r}/${o} em đang lặp lỗi`,
-    note: 'Mặc định 80 / 50 / 3 lần·2 buổi / 30% / 70%. Áp dụng cho mọi lớp cô dạy.', tt27: 'Hỗ trợ đánh giá thường xuyên theo Thông tư 27/2020/TT-BGDĐT: không chấm điểm, không so sánh học sinh, học sinh không thấy nhãn.',
+    note: 'Mặc định 80 / 50 / 3 lần·2 buổi / 30% / 70%. Áp dụng cho mọi lớp cô dạy.', tt27: 'Hỗ trợ nhận xét thường xuyên trong quá trình học: không chấm điểm, không so sánh học sinh; học sinh không thấy nhãn.',
   },
   en: {
     title: 'Summary criteria', lead: 'Thresholds for the labels on each skill.', reset: 'Back to defaults', save: 'Save criteria', saved: 'Saved.', def: 'Default',
@@ -116,7 +117,7 @@ const C = {
     cls: 'The class · one skill', clsSub: (c: Crit) => `Repeated mistake ≥ ${c.classRepeat}% of learners · Mastered ≥ ${c.classSolid}%`, clsRepeat: 'The class has a repeated mistake from', clsSolid: 'The class has mastered it from', ofPupils: '% of learners',
     nextT: 'Suggesting what next', nextSub: (n: number) => `3 labels → 3 suggestions · ${n}/3 on`, sPractice: 'More practice of the same kind', sTime: 'More time for the lesson', sNext: 'Harder items or the next lesson', lbl: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
     preview: 'Try it with these criteria', right: (r: number, o: number) => `${r}/${o} right`, clsLevel: 'Class level', share: (r: number, o: number) => `${r}/${pl(o, 'learner')} with a repeated mistake`,
-    note: 'Defaults 80 / 50 / 3 times in 2 sessions / 30% / 70%. Applies to all your classes.', tt27: 'Supports regular assessment under Circular 27/2020: no marks, no comparing learners; learners never see labels.',
+    note: 'Defaults 80 / 50 / 3 times in 2 sessions / 30% / 70%. Applies to all your classes.', tt27: 'Supports ongoing feedback while pupils learn: no scores, no comparing pupils; pupils never see labels.',
   },
 };
 const DEF: Crit = { recent: 10, min: 5, solid: 80, repeat: 50, same: 3, sessions: 2, classRepeat: 30, classSolid: 70, practice: true, time: true, next: true };

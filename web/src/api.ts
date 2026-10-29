@@ -124,6 +124,7 @@ export const api = {
   scanEstimate: (pages: number) => call<{ estimate: ScanEstimate }>('POST', '/t/scan/estimate', { pages }),
   scanCreate: (areaId: string, title: string, pages: number[]) => call<{ book: { id: string }; estimate: ScanEstimate }>('POST', `/t/areas/${areaId}/books/scan`, { title, pages }),
   scanPage: (bookId: string, n: number, jpeg: Blob) => call<{ ok: boolean }>('PUT', `/t/books/${bookId}/pages/${n}`, undefined, jpeg),
+  retryBook: (bookId: string) => call<{ ok: boolean }>('POST', `/t/books/${bookId}/retry`),
   scanStart: (bookId: string) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/scan/start`),
   jobs: () => call<{ jobs: Job[] }>('GET', '/t/jobs'),
   usage: (days: number) => call<Usage>('GET', `/t/usage?days=${days}`),

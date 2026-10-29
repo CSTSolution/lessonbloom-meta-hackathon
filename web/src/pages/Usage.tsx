@@ -62,7 +62,7 @@ export function Usage() {
         <table className="usage-tbl"><tbody>{kinds.map((k) => (
           <tr key={k}>
             <td><i className="dot" style={{ background: COLOR[k] }} />{t.kinds[k]}<span className="small muted" style={{ display: 'block' }}>{t.calls(u.kinds[k].calls)}</span></td>
-            <td style={{ width: '32%' }}><div className="meter"><div style={{ width: `${(u.kinds[k].credits / max) * 100}%`, background: COLOR[k] }} /></div></td>
+            <td style={{ width: '32%' }}><div className="usage-meter"><div style={{ width: `${(u.kinds[k].credits / max) * 100}%`, background: COLOR[k] }} /></div></td>
             <td className="amt"><b>{num(u.kinds[k].credits, lang)}</b><span className="small muted" style={{ display: 'block' }}>{Math.round((u.kinds[k].credits / u.period.credits) * 100)}%</span></td>
           </tr>))}
           <tr><td><b>{t.sum}</b></td><td /><td className="amt"><b>{num(u.period.credits, lang)}</b></td></tr>

@@ -221,7 +221,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .usage-tiles .big { font-size: 28px; line-height: 1.2; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .legend i, i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
-.meter { height: 8px; background: var(--paper); border-radius: 4px; overflow: hidden; } .meter > div { height: 100%; border-radius: 4px; }
+.usage-meter { height: 8px; background: var(--paper); border-radius: 4px; overflow: hidden; } .usage-meter > div { height: 100%; border-radius: 4px; }
 .usage-tbl { width: 100%; border-collapse: collapse; font-size: 14px; } .usage-tbl td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .usage-tbl td.amt { text-align: right; white-space: nowrap; width: 1%; }
 .chart-tip { position: absolute; top: 4px; display: flex; flex-direction: column; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 14px rgba(23, 32, 51, .12); pointer-events: none; min-width: 140px; }

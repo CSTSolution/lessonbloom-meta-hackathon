@@ -88,7 +88,7 @@ Measured live on 29 Oct: a scanned page costs about 0.74 credits and 3.4 s (thre
 | Each lesson 1, 2 or 3 weeks; dates follow on; lessons grouped by topic | `server/path/routes.ts` (`/api/t/path`), `Path.tsx` | `path.test.ts` "path, summary, advice…" |
 | Advice per learner (More practice / Lesson time / Next step) with Why? / Apply / Keep as is, and Undo. Decided by code; Muse Spark only words it; names never sent to the model | `path/routes.ts` (advice, `wordAdvice`), `Learner.tsx` | `path.test.ts` (advice, undo, no names sent) |
 | Reminders: start, middle (moved off Sat/Sun), 2 days left, end, flashcards after 2–3 days. In the app only, at most one a day for a child, never after 20:00, a chosen time and an on/off for each | `path/routes.ts` (`remindersFor`, `pupilReminder`), `Reminders.tsx` | `path.test.ts` (times), `chi.test.ts` "the mid-lesson reminder goes only to a learner who has not finished…" |
-| Learning summary: five folding parts; Circular 27 note; skills × classes table | `Insights.tsx` | `path.test.ts` (summary), screen check |
+| Learning summary: five folding parts; the ongoing-feedback note (teacher and parent wording, no circular number, #16); skills × classes table | `Insights.tsx` | `path.test.ts` (summary), screen check |
 | Suggested comments: learners sent as "Em 1…", names filled in on our server | `path/routes.ts` (comments) | `path.test.ts` |
 
 ## Task 5 · Design screens (doc 1, PDF pages 6–21)
@@ -109,6 +109,7 @@ Compare at 1280 px. Each was checked side by side on 29 Oct.
 | Steps 1–6 (Material, Questions, Slides, Video, Practice incl. "Find the pairs", Assign) | `Create.tsx`, `LessonPage.tsx`, `Assign.tsx` |
 | Child on the phone (join, today, slides, video, practice, flashcards, find the pairs, what next) | `web/src/pupil/Pupil.tsx` |
 | Parent on the phone (path, advice, notifications grouped by day) | `Path.tsx`, `Learner.tsx`, `Notifications.tsx` |
+| Knowledge takes a PDF or photos of book pages (#18: each photo a page, read like a scanned book, first page number set by her); each book shows where it is: waiting, reading page k/N, added (lessons, pages), or the reason with Try again (#17); the bell says when a book is done | `Knowledge.tsx` (`AddSource`, `BookStatus`), `web/src/photo.ts`, `knowledge/routes.ts` (retry), `path/routes.ts` (notifications) | `books-status.test.ts`, `jobs.test.ts`, screen check |
 | Credits and usage (name menu → "See usage in detail", `/usage`): credits left, used in 7/30/90 days and in all, a chart of each day by kind of work, the breakdown by kind (also the chart's table view), each lesson and book with its parts, and credits in / held / given back | `web/src/pages/Usage.tsx`, `server/usage.ts` |
 
 ## Rules that must never break (doc 1, "Nguyên tắc")

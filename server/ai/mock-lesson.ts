@@ -79,7 +79,8 @@ export const lessonAnswers: [string, (r: JsonRequest) => unknown][] = [
       objectives: english ? (/\d\s*[+−-]\s*\d/.test(notes) ? ['Add two-digit numbers, carrying 1 to the tens.', 'Solve a one-step word problem.'] : ['Name six colours.', 'Ask and answer "What colour is it?".']) : ['Cộng có nhớ hai số có hai chữ số.', 'Giải bài toán có lời văn một bước.'], minutes: 25, lang: english ? 'en' : 'vi' };
   }],
   ['work', () => ({ usable: true, topic: 'Phép cộng có nhớ trong phạm vi 100', kind: 'add_carry', mistakes: ['Quên nhớ 1 sang hàng chục (36 + 27 = 53)'] })],
-  ['ocr', (r) => ({ usable: true, text: Array.from({ length: (r.fixture as F).photos }, (_, i) => `Trang ${i + 1}: Phép cộng có nhớ trong phạm vi 100. Ví dụ: 36 + 27 = 63. Luyện tập: 48 + 25; 19 + 36.`).join('\n') })],
+  // one page of a scanned book or a photo of a page (fixture.page), or the photos of a lesson (fixture.photos)
+  ['ocr', (r) => (r.fixture as { page?: number }).page ? { usable: true, text: `Lesson ${(r.fixture as { page: number }).page}: Adding within 100\nMia has 36 apples and gets 27 more. 36 + 27 = 63.\nPractice: 48 + 25; 19 + 36.` } : ({ usable: true, text: Array.from({ length: (r.fixture as F).photos }, (_, i) => `Trang ${i + 1}: Phép cộng có nhớ trong phạm vi 100. Ví dụ: 36 + 27 = 63. Luyện tập: 48 + 25; 19 + 36.`).join('\n') })],
   ['plan', (r) => plan((r.fixture as F).setup, (r.fixture as F).count)],
   ['slides', (r) => {
     const f = r.fixture as F;
