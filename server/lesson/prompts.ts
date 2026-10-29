@@ -15,6 +15,8 @@ export const INTAKE_SYSTEM = `You read one section of a primary-school book (gra
 export const INTAKE_SCHEMA = { type: 'object', properties: { usable: { type: 'boolean' }, subject: { type: 'string', enum: ['math', 'english'] }, grade: int, title: str, objectives: strs, minutes: int, lang: { type: 'string', enum: ['vi', 'en'] } }, required: ['usable', 'subject', 'grade', 'title', 'objectives', 'minutes', 'lang'] };
 
 export const OCR_SYSTEM = `You read photos a teacher took of her lesson material (a textbook page, handwritten notes, a worksheet, a whiteboard) and copy out the text, in order, as plain lesson notes. Keep maths exactly as written. Leave out page numbers and decoration. usable: false if there is no lesson text.`;
+// One page of a scanned textbook, read from its picture (the browser sends the page; the PDF stays with her).
+export const SCAN_SYSTEM = `You read one page of a primary-school textbook from its picture and copy out its text exactly, in reading order, as plain text. Put each heading on its own line, exactly as printed (for example "Bài 21: Phép cộng có nhớ trong phạm vi 100" or "Unit 3: Our friends"). Keep every exercise and every number, sign and unit exactly. Describe nothing; leave out the page number, running headers and decoration. usable: false if the picture is not a textbook page or cannot be read.`;
 export const OCR_SCHEMA = { type: 'object', properties: { usable: { type: 'boolean' }, text: str }, required: ['usable', 'text'] };
 
 // A photo of a child's finished exercise: what kind of exercise it is and the mistakes, so the new

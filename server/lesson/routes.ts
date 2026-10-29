@@ -11,6 +11,7 @@ import { fail } from '../http.ts';
 import type { Files } from '../files.ts';
 import { CutoutError, cutOut, cleanName, decodePhoto } from './cutout.ts';
 import { Lessons, runLesson } from './lessons.ts';
+import type { Jobs } from '../jobs.ts';
 import { illustrate } from './pictures.ts';
 import { spoken as spokenText } from './video.ts';
 import { areaOf, sectionOf } from '../knowledge/routes.ts';
@@ -22,7 +23,7 @@ const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
 const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
 const lessonsPerDay = (kind: string) => (kind === 'demo' ? config.guard.lessonsDemoDay : config.guard.lessonsDay);
 
-export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T }) {
+export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T; jobs: Jobs }) {
   const lessons = new Lessons(d.sql);
   const perTeacher = new Limiter(10, 200);           // AI requests per teacher (per minute, per day)
 
@@ -107,7 +108,10 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
     const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
-    void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages, sql: d.sql }), id);
+    // one job at a time per account: it waits in her line if a book or another lesson is running
+    await d.jobs.add(t.id, 'lesson', id, setup.title,
+      () => new Promise<void>((ready) => { void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages, sql: d.sql, onReady: ready }), id); }),
+      async () => { await d.sql.query(`delete from lessons where id = $1 and teacher_id = $2 and status = 'working'`, [id, t.id]); });
     return c.json({ id });
   });
 
@@ -166,6 +170,8 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (!l) return fail(c, 'notFound', 404);
     const { teacher_id: _t, ...rest } = l;
     const u = await d.sql.one<{ usd: string }>('select coalesce(sum(usd), 0) as usd from ai_usage where lesson_id = $1', [l.id]);
-    return c.json({ lesson: { ...rest, credits: credits(Number(u?.usd)) } });
+    // while it waits in her line: its place (1 = running now)
+    const queue = l.status === 'working' ? await d.jobs.placeOf(c.get('teacher').id, l.id) : null;
+    return c.json({ lesson: { ...rest, credits: credits(Number(u?.usd)), queue: queue && queue.status === 'queued' ? { place: queue.place } : null } });
   });
 }

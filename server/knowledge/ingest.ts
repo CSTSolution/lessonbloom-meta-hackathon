@@ -77,6 +77,14 @@ export class NotText extends Error {}
 export async function ingestBook(sql: Sql, ai: AI, areaId: string, bookId: string, pdf: Buffer) {
   const { pages, scanned } = await readPdf(pdf);
   if (!pages.length || scanned / pages.length > 0.5) throw new NotText();
+  return ingestPages(sql, ai, areaId, bookId, pages);
+}
+
+// The same from pages already read: a PDF's text layer sent by the browser, or pages read from their
+// pictures (a scanned book). Pages keep their book page numbers, so every lesson can cite them.
+export async function ingestPages(sql: Sql, ai: AI, areaId: string, bookId: string, pages: PdfPage[]) {
+  pages = pages.filter((p) => p.text.trim());
+  if (!pages.length) throw new NotText();
   let sections = sectionsFrom(paragraphs(pages));
   if (sections.filter((s) => s.title).length < 2) sections = await sectionsByModel(ai, pages);
   await sql.tx(async (t) => {
@@ -91,7 +99,7 @@ export async function ingestBook(sql: Sql, ai: AI, areaId: string, bookId: strin
           [`${bookId}-p${ord}`, bookId, areaId, sid, p.page, ord, p.text, `${s.title}\n${p.text}`]);
       }
     }
-    await t.query(`update books set status = 'ready', pages = $2 where id = $1`, [bookId, pages.length]);
+    await t.query(`update books set status = 'ready', pages = greatest(pages, $2) where id = $1`, [bookId, pages.length]);
   });
   return { pages: pages.length, sections: sections.length };
 }

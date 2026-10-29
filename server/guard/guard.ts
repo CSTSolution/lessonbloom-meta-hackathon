@@ -170,11 +170,12 @@ export const costOf = (u: Usage) => {
 export const TODAY = `date_trunc('day', now() at time zone 'Asia/Ho_Chi_Minh') at time zone 'Asia/Ho_Chi_Minh'`;
 export class Budget {
   constructor(private sql: Sql) {}
-  async record(u: Usage, teacherId: string | null, lessonId: string | null = null) {
+  // `charge` false: logged against her, but paid from credit already held for the job
+  async record(u: Usage, teacherId: string | null, lessonId: string | null = null, charge_ = true) {
     const usd = costOf(u);
     await this.sql.query('insert into ai_usage (teacher_id, lesson_id, endpoint, model, verdict, in_tokens, out_tokens, images, usd, ms) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       [teacherId, lessonId, u.endpoint, u.model, u.verdict || 'ok', Math.round(u.inTokens || 0), Math.round(u.outTokens || 0), u.images || 0, usd, Math.round(u.ms || 0)]);
-    if (teacherId) await charge(this.sql, teacherId, usd / CREDIT_USD);
+    if (teacherId && charge_) await charge(this.sql, teacherId, usd / CREDIT_USD);
   }
   async check(teacherId: string): Promise<null | 'disabled' | 'total' | 'app_day' | 'credits'> {
     if (config.guard.disabled) return 'disabled';

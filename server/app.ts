@@ -8,10 +8,11 @@ import { Accounts, cleanEmail, EMAIL, publicTeacher, type Teacher } from './auth
 import type { AI } from './ai/types.ts';
 import { config } from './config.ts';
 import type { Sql } from './db/sql.ts';
-import { Budget, clientIp, Limiter } from './guard/guard.ts';
+import { Budget, clientIp, costOf, CREDIT_USD, Limiter } from './guard/guard.ts';
 import { cleanCode, CODE, redeem } from './credits.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
+import { Jobs } from './jobs.ts';
 import { addChild, addClass, classRoutes } from './classes/routes.ts';
 import { knowledgeRoutes } from './knowledge/routes.ts';
 import { editRoutes } from './lesson/edit.ts';
@@ -21,15 +22,23 @@ import type { Mailer } from './mail.ts';
 
 export type Env = { Variables: { teacher: Teacher; token: string } };
 const COOKIE = 'lbm_s';
-export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files }) {
+export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files; jobs?: Jobs }) {
   const { sql, ai, mail } = deps, files = deps.files ?? new Files(join(config.dataDir, 'files'));
   const accounts = new Accounts(sql), budget = new Budget(sql);
   const demoPerIp = new Limiter(3, config.guard.demoPerIpDay), codePerIp = new Limiter(5, config.guard.codesPerIpDay), codePerEmail = new Limiter(2, config.guard.codesPerEmailDay);
   const verifyPerIp = new Limiter(10, 100);
   // every model call is logged against the teacher whose request (or background job) made it
-  const who = new AsyncLocalStorage<{ teacher: string; lesson?: string }>();
-  ai.onUsage = (u) => { const w = who.getStore(); void budget.record(u, w?.teacher ?? null, w?.lesson ?? null).catch((e) => console.error(`[usage] ${(e as Error).message}`)); };
+  // A job that holds credit up front (reading a scanned book) counts its calls into `hold` instead of
+  // charging them one by one; it settles once at the end (the rest goes back).
+  const who = new AsyncLocalStorage<{ teacher: string; lesson?: string; hold?: { used: number } }>();
+  ai.onUsage = (u) => {
+    const w = who.getStore();
+    if (w?.hold) w.hold.used += costOf(u) / CREDIT_USD;
+    void budget.record(u, w?.teacher ?? null, w?.lesson ?? null, !w?.hold).catch((e) => console.error(`[usage] ${(e as Error).message}`));
+  };
   const as = <T>(teacher: string, fn: () => T, lesson?: string) => who.run({ teacher, lesson }, fn);
+  const held = <T>(teacher: string, hold: { used: number }, fn: () => T) => who.run({ teacher, hold }, fn);
+  const jobs = deps.jobs ?? new Jobs(sql, config.jobs.concurrent);
 
   const app = new Hono<Env>();
   app.onError((e, c) => { console.error(`[error] ${c.req.method} ${c.req.path}: ${(e as Error).stack || e}`); return fail(c, 'server', 500); });
@@ -144,10 +153,16 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files 
     }
     return c.body(new Uint8Array(f.data), 200, head);
   });
-  knowledgeRoutes(app, { sql, ai, budget, as });
-  lessonRoutes(app, { sql, ai, budget, files, as });
+  knowledgeRoutes(app, { sql, ai, budget, as, held, jobs });
+  lessonRoutes(app, { sql, ai, budget, files, as, jobs });
   editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });
   classRoutes(app, { sql, ai, files, reminder: path.pupilReminder });
+  // her line of jobs (reading a book, making a lesson) and taking one out
+  app.get('/api/t/jobs', async (c) => c.json({ jobs: await jobs.list(c.get('teacher').id) }));
+  app.post('/api/t/jobs/:id/cancel', async (c) => {
+    const r = await jobs.cancel(c.get('teacher').id, c.req.param('id'));
+    return r === 'notFound' ? fail(c, 'notFound', 404) : r === 'cannotStop' ? fail(c, 'cannotStop', 409) : c.json({ ok: true, result: r });
+  });
   return app;
 }

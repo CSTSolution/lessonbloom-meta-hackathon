@@ -42,4 +42,8 @@ export const config = {
     lessonsDemoDay: num('LB_LESSONS_DEMO_DAY', 3), lessonsDay: num('LB_LESSONS_DAY', 10),
   },
   session: { days: 30, demoDays: 7 },
+  // one job at a time per account; this many at once in the whole app (Meta's limits, our server)
+  jobs: { concurrent: num('LB_JOBS_CONCURRENT', 3) },
+  // reading a scanned page with Muse Spark: credits per page (measured live) and the margin she must have
+  scan: { pageCredits: num('LB_SCAN_PAGE_CREDITS', 0.9), margin: 1.5, maxPages: 200, pagesAtOnce: 3, maxImage: 1.5e6 },
 };
