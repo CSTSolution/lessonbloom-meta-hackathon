@@ -119,5 +119,5 @@ Compare at 1280 px. Each was checked side by side on 29 Oct.
 ## Known limits
 
 - One Vietnamese voice (the narration voices run on our own server; Meta has no text-to-speech).
-- Lessons take about 2 minutes on the live models; the local mock is instant.
+- Lessons take about 1 minute on the live models (pictures follow); the local mock is instant.
 - 100 credits at sign-up is about two lessons. Ask Son for more on a test account.
