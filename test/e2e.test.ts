@@ -14,7 +14,7 @@ test('a teacher, from sign-up to a pupil practising and the summary', async () =
   // sign-up: a demo account, the teacher role and her class
   assert.equal((await call('POST', '/api/auth/demo', { lang: 'en' })).status, 200);
   const me0 = (await call('GET', '/api/t/me')).json;
-  assert.equal(me0.credits.balance, 100, '100 credits at sign-up');
+  assert.equal(me0.credits.balance, 120, '120 credits at sign-up');
   await call('POST', '/api/t/role', { role: 'teacher', name: 'Ms Hanh', subject: 'math', classes: ['Year 2 Blue'] });
   assert.equal((await call('GET', '/api/t/me')).json.teacher.role, 'teacher');
 

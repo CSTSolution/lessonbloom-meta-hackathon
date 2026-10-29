@@ -48,17 +48,17 @@ test('admin: per-assigner credits, lessons with their cost, books, calls and ref
   assert.equal((await get('/api/users/nobody')).error, 'No such user.');
 });
 
-test('credits: 100 once at sign-up, taken off call by call; too few stops new work', async () => {
+test('credits: 120 once at sign-up, taken off call by call; too few stops new work', async () => {
   const s = await testServer(), call = s.client();
   await call('POST', '/api/auth/demo');
   const before = (await call('GET', '/api/t/me')).json.credits;
-  assert.deepEqual(before, { balance: 100, subscriber: false, planUntil: null, daily: null, left: 100 });
+  assert.deepEqual(before, { balance: config.guard.signupCredits, subscriber: false, planUntil: null, daily: null, left: config.guard.signupCredits });
   const { areaId } = await areaWithBook(call, 'toan2');
   const { id, match } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ');
   const l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson;
   assert.ok(l.credits > 0);
   const after = (await call('GET', '/api/t/me')).json.credits;
-  assert.ok(after.balance < 100 && after.balance >= 100 - l.credits - 3, `${after.balance} after a lesson of ${l.credits}`);
+  assert.ok(after.balance < config.guard.signupCredits && after.balance >= config.guard.signupCredits - l.credits - 3, `${after.balance} after a lesson of ${l.credits}`);
   const t = (await call('GET', '/api/t/me')).json.teacher;
   await s.sql.query(`update teachers set credits = $2 where id = $1`, [t.id, config.guard.lessonCredits - 1]);
   const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: match.sectionId })).json;
@@ -73,7 +73,7 @@ test('credits: 100 once at sign-up, taken off call by call; too few stops new wo
   const fresh = s.client('198.51.100.30');
   await fresh('POST', '/api/auth/code', { email: 'co.mai@example.com' });
   await fresh('POST', '/api/auth/verify', { email: 'co.mai@example.com', code: s.sent.at(-1)!.code });
-  assert.equal((await fresh('GET', '/api/t/me')).json.credits.balance, 100, 'a new email account gets the 100');
+  assert.equal((await fresh('GET', '/api/t/me')).json.credits.balance, config.guard.signupCredits, 'a new email account gets the sign-up credits');
 });
 
 test('subscribers: the daily allowance is used before the balance and comes back each day', async () => {
@@ -87,11 +87,11 @@ test('subscribers: the daily allowance is used before the balance and comes back
   const b = new Budget(s.sql);
   await b.record({ endpoint: 'image', model: 'muse-image-1.0', images: 150 }, t.id);
   let c = (await call('GET', '/api/t/me')).json.credits;
-  assert.equal(c.balance, 100, 'the allowance pays first');
+  assert.equal(c.balance, config.guard.signupCredits, 'the allowance pays first');
   assert.equal(c.daily.left, 50);
   await b.record({ endpoint: 'image', model: 'muse-image-1.0', images: 80 }, t.id);
   c = (await call('GET', '/api/t/me')).json.credits;
-  assert.deepEqual([c.daily.left, c.balance, c.left], [0, 70, 70], 'then the balance');
+  assert.deepEqual([c.daily.left, c.balance, c.left], [0, config.guard.signupCredits - 30, config.guard.signupCredits - 30], 'then the balance');
   await s.sql.query(`update teachers set day_date = day_date - 1 where id = $1`, [t.id]);
   assert.equal((await call('GET', '/api/t/me')).json.credits.daily.left, 200, 'a new day, a new allowance');
   await post(`/api/users/${t.id}/grant`, { end: true });
@@ -117,7 +117,7 @@ test('promo codes: made in the admin view, once per assigner, email accounts onl
   const a = await signIn('198.51.100.41', 'a@example.com');
   const r = (await a('POST', '/api/t/promo', { code: ' thu-nghiem ' })).json;
   assert.deepEqual(r.added, { credits: 50, days: 7 });
-  assert.equal(r.credits.balance, 150);
+  assert.equal(r.credits.balance, config.guard.signupCredits + 50);
   assert.ok(r.credits.subscriber && r.credits.daily.perDay === 200);
   assert.equal((await a('POST', '/api/t/promo', { code: 'THU-NGHIEM' })).json.code, 'promoUsed');
   assert.equal((await a('POST', '/api/t/promo', { code: 'NOPE-1234' })).json.code, 'promoBad');
