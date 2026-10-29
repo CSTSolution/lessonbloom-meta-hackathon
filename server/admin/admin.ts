@@ -2,24 +2,56 @@
 // site: it listens on its own port, which the server publishes on 127.0.0.1 only (reached through an
 // SSH tunnel, deploy/vps/admin.sh), and every API request needs LB_ADMIN_KEY. Besides reading, it makes
 // promo codes and gives an assigner credits or subscriber days (every grant is logged).
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { cleanCode, CODE, creditState, grant, newCode } from '../credits.ts';
-import { credits, TODAY } from '../guard/guard.ts';
+import { clientIp, credits, Limiter, TODAY } from '../guard/guard.ts';
 
 const PAGE = await readFile(new URL('./page.html', import.meta.url), 'utf8');
 const same = (a: string, b: string) => { const h = (x: string) => createHash('sha256').update(x).digest(); return timingSafeEqual(h(a), h(b)); };
 const num = (x: unknown) => Number(x ?? 0);
 const usdOut = (usd: unknown) => ({ usd: Math.round(num(usd) * 1e4) / 1e4, credits: credits(num(usd)) });
 
-export function createAdmin(sql: Sql, key = config.adminKey) {
+// A team login (admin_logins): its scrypt hash, made on Son's Mac (scripts/admin-login.ts).
+export const hashPass = (pass: string, salt = randomBytes(16)) => `scrypt$${salt.toString('hex')}$${scryptSync(pass, salt, 32).toString('hex')}`;
+const passOk = (pass: string, stored: string) => {
+  const [kind, salt, hash] = stored.split('$');
+  return kind === 'scrypt' && !!salt && !!hash && timingSafeEqual(scryptSync(pass, Buffer.from(salt, 'hex'), 32), Buffer.from(hash, 'hex'));
+};
+// in a read-only view, no one's email is shown (Chi sees what people do, not who they are)
+const maskEmails = (text: string) => text.replace(/([\w.+-])[\w.+-]*@[\w-]+(\.[\w-]+)+/g, '$1…@…');
+
+// `private` (its own port, 127.0.0.1 only): the admin key, everything. `public` (/admin on the site): a
+// team login with email and password, read only: no promo codes, no grants, emails hidden.
+export function createAdmin(sql: Sql, key = config.adminKey, mode: 'private' | 'public' = 'private') {
   const app = new Hono();
+  const tokens = new Map<string, { email: string; until: number }>(), tries = new Limiter(5, 30);
   app.get('/', (c) => c.html(PAGE, 200, { 'cache-control': 'no-store', 'x-robots-tag': 'noindex' }));
+  if (mode === 'public') app.post('/login', async (c) => {
+    if (!tries.take(clientIp(c))) return c.json({ error: 'Too many tries. Wait a few minutes.' }, 429);
+    const b = await c.req.json<{ email?: string; password?: string }>().catch(() => ({} as { email?: string; password?: string }));
+    const email = String(b.email ?? '').trim().toLowerCase(), row = await sql.one<{ pass: string }>('select pass from admin_logins where email = $1', [email]);
+    if (!row || !passOk(String(b.password ?? ''), row.pass)) return c.json({ error: 'That email and password did not match.' }, 401);
+    await sql.query('update admin_logins set last_at = now() where email = $1', [email]);
+    const token = randomBytes(24).toString('hex');
+    for (const [k, v] of tokens) if (v.until < Date.now()) tokens.delete(k);
+    tokens.set(token, { email, until: Date.now() + 12 * 36e5 });
+    return c.json({ token });
+  });
   app.use('/api/*', async (c, next) => {
     const got = (c.req.header('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (mode === 'public') {
+      const t = got && tokens.get(got);
+      if (!t || t.until < Date.now()) return c.json({ error: 'Please sign in.' }, 401);
+      if (c.req.method !== 'GET') return c.json({ error: 'This view is read only. Ask Son for promo codes or credits.' }, 403);
+      await next();
+      if (c.res.headers.get('content-type')?.includes('json')) c.res = new Response(maskEmails(await c.res.text()), { status: c.res.status, headers: c.res.headers });
+      c.header('cache-control', 'no-store');
+      return;
+    }
     if (!key || key.length < 16 || !got || !same(got, key)) return c.json({ error: 'The admin key is needed.' }, 401);
     await next();
     c.header('cache-control', 'no-store');

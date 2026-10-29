@@ -38,6 +38,8 @@ const ai = pickProvider();
 const app = createApp({ sql, ai, mail: smtpMailer() });
 
 // built web app: hashed bundles cached for a year, the page itself always revalidated
+// the team's read-only admin view on the site (email and password); the full one stays on its own port
+app.route('/admin', createAdmin(sql, '', 'public'));
 app.use('/assets/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable'); }, serveStatic({ root: './web/dist' }));
 app.use('/favicon.svg', serveStatic({ root: './web/dist' }));
 app.get('*', async (c, next) => { await next(); c.header('Cache-Control', 'no-cache'); }, serveStatic({ path: './web/dist/index.html' }));

@@ -46,6 +46,9 @@
 <main id="view"></main>
 <script>
 const KEY = 'lbm-admin-key';
+// on the site (/admin) it is the team's read-only view, signed in with an email and password
+const TEAM = location.pathname.startsWith('/admin'), API = TEAM ? '/admin/api' : '/api';
+if (TEAM) document.getElementById('out').textContent = 'Sign out';
 const view = document.getElementById('view');
 let key = ''; try { key = sessionStorage.getItem(KEY) || ''; } catch {}
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -60,15 +63,15 @@ const chip = (s, cls = s) => `<span class="chip ${esc(cls)}">${esc(s)}</span>`;
 const table = (cols, rows, onRow) => `<div class="wrap"><table><thead><tr>${cols.map((c) => `<th class="${c.r ? 'r' : ''}">${esc(c.h)}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.map((r) => `<tr ${onRow ? `class="click" data-go="${esc(onRow(r))}"` : ''}>${cols.map((c) => `<td class="${c.r ? 'r' : ''} ${c.wide ? 'wide' : ''}">${c.f(r)}</td>`).join('')}</tr>`).join('') : `<tr><td class="muted" colspan="${cols.length}">Nothing yet.</td></tr>`}</tbody></table></div>`;
 
 async function get(path) {
-  const r = await fetch('/api' + path, { headers: { authorization: 'Bearer ' + key } });
-  if (r.status === 401) { askKey('That key was not accepted.'); throw new Error('key'); }
+  const r = await fetch(API + path, { headers: { authorization: 'Bearer ' + key } });
+  if (r.status === 401) { askKey(TEAM ? 'Please sign in again.' : 'That key was not accepted.'); throw new Error('key'); }
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.status);
   return j;
 }
 
 async function post(path, body) {
-  const r = await fetch('/api' + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(API + path, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || r.status);
   return j;
@@ -78,6 +81,17 @@ const day = (t) => t ? new Date(t).toLocaleDateString('en-GB', { ...tz, day: '2-
 
 function askKey(msg = '') {
   document.getElementById('out').hidden = true;
+  if (TEAM) {
+    view.innerHTML = `<form class="key"><h1>LessonBloom admin (read only)</h1><input type="email" name="email" autocomplete="username" required placeholder="Email"><input type="password" name="password" autocomplete="current-password" required placeholder="Password"><button>Sign in</button><p class="err">${esc(msg)}</p></form>`;
+    view.querySelector('form').onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await fetch('/admin/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(formData(e.target)) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return askKey(j.error || 'Could not sign in.');
+      key = j.token; try { sessionStorage.setItem(KEY, key); } catch {} route();
+    };
+    return;
+  }
   view.innerHTML = `<form class="key"><h1>Admin key</h1><p class="muted">deploy/vps/admin.sh put it on your clipboard. It stays in this tab only.</p><input type="password" autocomplete="off" required placeholder="LB_ADMIN_KEY"><button>Open</button><p class="err">${esc(msg)}</p></form>`;
   view.querySelector('form').onsubmit = (e) => { e.preventDefault(); key = view.querySelector('input').value.trim(); try { sessionStorage.setItem(KEY, key); } catch {} route(); };
 }
