@@ -281,15 +281,26 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     const r = await assignmentOf(c);
     if (r.error) return r.error;
     const it = r.a.content.items.find((i) => i.id === c.req.param('item'));
-    const text = it && it.subject === 'english' ? it.say || '' : '';
+    // a listening item: only the words to hear; any other item: its question, read aloud for young
+    // readers (Chi's "Nghe câu hỏi"). The answer is never in the question, so nothing is given away.
+    const lang = r.a.content.lang === 'en' || it?.subject === 'english' ? 'en' : 'vi';
+    const x = it as (typeof it & { say?: string; sentence?: string; story?: string }) | undefined;
+    const text = !x ? '' : x.template === 'listen' ? x.say || '' : readable(`${x.prompt}${x.sentence ? ` ${x.sentence}` : ''}`, lang);
     if (!text) return fail(c, 'notFound', 404);
-    const key = hash(`${r.a.content.lang}:${text}`);
+    const key = hash(`${lang}:${text}`);
     let wav = said.get(key);
     if (!wav) {
-      try { wav = await d.ai.speak({ text, lang: 'en' }); } catch { return fail(c, 'aiBusy', 503); }
+      try { wav = await d.ai.speak({ text, lang }); } catch { return fail(c, 'aiBusy', 503); }
       if (said.size > 500) said.clear();
       said.set(key, wav);
     }
     return c.body(new Uint8Array(wav), 200, { 'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400' });
   });
+}
+
+// A question as it is said: "61 - 37 = ?" → "61 minus 37 equals what?", a gap → "blank".
+const WORDS = { en: { '+': 'plus', '-': 'minus', '=': 'equals', '×': 'times', '?': 'what', gap: 'blank' }, vi: { '+': 'cộng', '-': 'trừ', '=': 'bằng', '×': 'nhân', '?': 'bao nhiêu', gap: 'chỗ trống' } } as const;
+export function readable(q: string, lang: 'vi' | 'en'): string {
+  const w = WORDS[lang];
+  return q.replace(/_{2,}/g, ` ${w.gap} `).replace(/=\s*\?/g, `= ${w['?']}?`).replace(/\s*([+\-−=×])\s*(?=[\d\s\w])/g, (_, op: string) => ` ${w[(op === '−' ? '-' : op) as '+' | '-' | '=' | '×']} `).replace(/\s+/g, ' ').trim().slice(0, 400);
 }

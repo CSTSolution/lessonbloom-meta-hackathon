@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { forPupil, isRight } from '../server/classes/check.ts';
+import { readable } from '../server/classes/routes.ts';
 import type { Item } from '../server/lesson/types.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
@@ -65,5 +66,8 @@ test('assigning needs the confirm box; pupils join by code, practise, and the as
   assert.equal((await parent('GET', '/api/p/today')).json.pupil.name, 'Bình');
   const svg = await s.app.request(`/api/t/classes/${k.id}/qr.svg`);
   assert.equal(svg.status, 401, 'the QR needs the assigner');
-  assert.equal((await kid('GET', `/api/p/a/${a.id}/say/${first.id}`)).status, 404, 'only listening items are spoken');
+  // "Nghe câu hỏi": any question is read aloud, the symbols as words, never the answer
+  assert.equal((await kid('GET', `/api/p/a/${a.id}/say/${first.id}`)).status, 200);
+  const read = readable(first.prompt, 'vi');
+  assert.ok(!/[+=]/.test(read) && !new RegExp(`(?<!\\d)${first.answer}(?!\\d)`).test(read), read);
 });

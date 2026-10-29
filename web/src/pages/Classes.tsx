@@ -87,7 +87,7 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
       {mist.length > 0 && <div className="banner warn row"><span className="grow"><b>{lang === 'en' ? 'Mistake that keeps coming back' : 'Dạng đang lặp lỗi'}:</b> {[...new Set(mist.map((m) => m.what))].join(' · ')}</span><button className="link small" onClick={() => go(`/insight?class=${id}`)}>{lang === 'en' ? 'See the summary ›' : 'Xem tóm tắt ›'}</button></div>}
       <div className="row"><h3 className="grow">{t.assigned}</h3><AssignMore classId={id} /></div>
       {v.assignments.length ? (
-        <table className="tbl"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th>{lang === 'en' ? 'Status' : 'Trạng thái'}</th><th /></tr></thead><tbody>
+        <table className="tbl stack-sm"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th>{lang === 'en' ? 'Status' : 'Trạng thái'}</th><th /></tr></thead><tbody>
           {v.assignments.map((a) => (
             <tr key={a.id}><td>{a.title}</td><td>{a.due ? day(a.due, lang) : t.noDue}</td>
               <td><span className="meter"><i style={{ width: `${v.pupils.length ? (100 * a.done) / v.pupils.length : 0}%` }} /></span> {a.done}/{v.pupils.length}</td>

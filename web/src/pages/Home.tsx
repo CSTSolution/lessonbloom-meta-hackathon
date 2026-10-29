@@ -58,7 +58,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
   return (
     <div>
       <header className="top">
-        <button className="brand link" style={{ color: 'inherit' }} onClick={() => go('/')}><img src="/favicon.svg" alt="" />LessonBloom</button>
+        <button className="brand link" style={{ color: 'inherit' }} onClick={() => go('/')} aria-label="LessonBloom"><img src="/favicon.svg" alt="" /><span className="brand-name">LessonBloom</span></button>
         <nav className="tabs">{tabs.map((k) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => go(k)}>{k === '/classes' && parent ? t.kids : t.nav[k]}</button>)}</nav>
         <Me teacher={teacher} t={t} onSignOut={onSignOut} />
       </header>
