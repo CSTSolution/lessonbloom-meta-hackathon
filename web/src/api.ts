@@ -41,6 +41,25 @@ async function call<T>(method: string, path: string, body?: unknown, raw?: Blob)
   return j as T;
 }
 
+// A file upload that reports how much has been sent (fetch cannot), with the same errors as call()
+export const MAX_PDF = 30e6;
+function upload<T>(path: string, file: Blob, onProgress?: (share: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', `/api${path}`);
+    x.setRequestHeader('content-type', file.type || 'application/pdf');
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total); };
+    x.onload = () => {
+      let j: Record<string, string> = {};
+      try { j = JSON.parse(x.responseText); } catch { /* not JSON */ }
+      if (x.status >= 200 && x.status < 300) resolve(j as T);
+      else reject(new ApiError(j.code || 'server', j.error || 'Lỗi máy chủ', j.errorEn || 'Server error', x.status));
+    };
+    x.onerror = () => reject(new ApiError('network', 'Mất kết nối khi tải lên. Cô thử lại nhé.', 'The connection dropped while uploading. Please try again.', 0));
+    x.send(file);
+  });
+}
+
 export const api = {
   demo: (lang: string) => call<{ teacher: Teacher }>('POST', '/auth/demo', { lang }),
   sendCode: (email: string, lang: string) => call<{ sent: boolean }>('POST', '/auth/code', { email, lang }),
@@ -91,7 +110,7 @@ export const api = {
   createArea: (a: { name: string; subject: string; grade: number }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
   sampleArea: (book: 'toan2' | 'english3' | 'maths2') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
   area: (id: string) => call<{ area: AreaRow; books: BookRow[]; sections: SectionRow[] }>('GET', `/t/areas/${id}`),
-  uploadBook: (areaId: string, file: File, title: string) => call<{ book: BookRow }>('POST', `/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, undefined, file),
+  uploadBook: (areaId: string, file: File, title: string, onProgress?: (share: number) => void) => upload<{ book: BookRow }>(`/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, file, onProgress),
   match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),
   intake: (areaId: string, sectionId: string) => call<{ setup: Setup; citation: string }>('POST', '/t/intake', { areaId, sectionId }),
   create: (b: { areaId: string; sectionId: string; request: string; setup: Setup }) => call<{ id: string }>('POST', '/t/lessons', b),

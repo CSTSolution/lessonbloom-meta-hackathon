@@ -39,7 +39,7 @@ export const MSG = {
   cutoutPeople: { vi: 'Không cắt người hoặc khuôn mặt: ảnh của các con không đưa vào bài. Cô chọn đồ vật nhé.', en: 'People and faces are not cut out: children\'s photos never go into lessons. Please choose an object.' },
   cutoutNone: { vi: 'AI chưa tìm thấy đồ vật này trong ảnh. Cô thử tên khác hoặc ảnh rõ hơn nhé.', en: 'The AI could not find that in the photo. Try another name or a clearer photo.' },
   pictureFailed: { vi: 'Chưa vẽ được hình phù hợp. Cô thử lại nhé.', en: 'No suitable picture this time. Please try again.' },
-  pdf: { vi: 'Cô chọn một tệp PDF (tối đa 40 MB) nhé.', en: 'Please choose a PDF file (up to 40 MB).' },
+  pdf: { vi: 'Cô chọn một tệp PDF tối đa 30 MB nhé. Sách lớn hơn thì tách ra từng chương rồi tải lên.', en: 'Please choose a PDF of up to 30 MB. For a bigger book, split it into chapters and upload those.' },
   limitReached: { vi: 'Đã đạt số lượng tối đa.', en: 'You have reached the maximum.' },
   requestShort: { vi: 'Cô cho biết cần dạy phần nào (ví dụ: Bài 21, cộng có nhớ).', en: 'Say which part to teach (for example: Unit 6, colours).' },
   noMatch: { vi: 'Chưa tìm thấy phần này trong sách của cô. Cô thử cách gọi khác, hoặc tải thêm sách vào kho kiến thức nhé.', en: 'This part was not found in your books. Try other words, or add a book to the knowledge area.' },

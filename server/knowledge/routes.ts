@@ -13,7 +13,7 @@ import { fail } from '../http.ts';
 import { ingestBook, NotText } from './ingest.ts';
 import { citation, findSection, NoMatch, sourceOf } from './search.ts';
 
-export const LIMITS = { areas: 10, booksPerArea: 6, pdfBytes: 40e6 };
+export const LIMITS = { areas: 10, booksPerArea: 6, pdfBytes: 30e6 };   // 30 MB a file (Chi, 29 Oct); the browser checks it before sending
 export interface Area { id: string; teacher_id: string; name: string; subject: 'math' | 'english'; grade: number }
 
 const clip = (s: unknown, n: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
