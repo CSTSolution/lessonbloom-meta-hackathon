@@ -52,7 +52,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
 
   app.get('/api/t/areas', async (c) => {
     const rows = await sql.query(`select a.id, a.name, a.subject, a.grade,
-        coalesce(json_agg(json_build_object('id', b.id, 'title', b.title, 'status', b.status, 'pages', b.pages, 'error', b.error,
+        coalesce(json_agg(json_build_object('id', b.id, 'title', b.title, 'status', b.status, 'pages', b.pages, 'error', b.error, 'source', b.source,
           'sections', (select count(*) from sections s where s.book_id = b.id and s.title <> '—')) order by b.created_at) filter (where b.id is not null), '[]') as books
       from areas a left join books b on b.area_id = a.id where a.teacher_id = $1 group by a.id order by a.created_at`, [c.get('teacher').id]);
     return c.json({ areas: rows });
@@ -74,7 +74,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const sections = await sql.query(`select s.id, s.book_id, s.title, s.page_from, s.page_to,
         (select count(*) from lessons l where l.refs->0->>'sectionId' = s.id)::int as lessons
       from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
-    const books = await sql.query('select id, title, status, pages, error from books where area_id = $1 order by created_at', [a.id]);
+    const books = await sql.query('select id, title, status, pages, error, source from books where area_id = $1 order by created_at', [a.id]);
     return c.json({ area: { id: a.id, name: a.name, subject: a.subject, grade: a.grade }, books, sections });
   });
 

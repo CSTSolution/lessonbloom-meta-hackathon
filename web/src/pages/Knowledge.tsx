@@ -76,8 +76,9 @@ export function Knowledge() {
           ); })}
         </div>
         {a && <div className="card stack" style={{ gap: 10 }}>
-          <div className="row"><div className="grow"><h2>{a.name}</h2><span className="small muted">{t[a.subject]} · {t.grade(a.grade)} · PDF{book?.pages ? ` · ${t.pages(book.pages)}` : ''}</span></div>
-            {book && <a className="btn small" href={`/api/t/books/${book.id}/file`} target="_blank" rel="noreferrer">{t.view}</a>}
+          <div className="row"><div className="grow"><h2>{a.name}</h2><span className="small muted">{t[a.subject]} · {t.grade(a.grade)} · {book?.source === 'scan' ? 'Scan' : book?.source === 'text' ? (lang === 'en' ? 'Text' : 'Chữ') : 'PDF'}{book?.pages ? ` · ${t.pages(book.pages)}` : ''}</span></div>
+            {/* only an uploaded PDF is kept on the server; a book read in the browser left only its text */}
+            {book && (book.source ?? 'pdf') === 'pdf' && <a className="btn small" href={`/api/t/books/${book.id}/file`} target="_blank" rel="noreferrer">{t.view}</a>}
             <button className="btn small danger" onClick={() => { if (confirm(t.removeAsk)) void run('del', async () => { await api.deleteArea(a.id); setSel(''); await load(); }); }}>{t.remove}</button></div>
           {book?.error && <p className="note">{t.errors[book.error as keyof typeof t.errors] ?? book.error}</p>}
           <div><b>{t.parts(sections.length)}</b><p className="small muted">{t.partsLead}</p></div>
