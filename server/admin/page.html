@@ -42,7 +42,7 @@
 </style>
 </head>
 <body>
-<header><b>LessonBloom Meta · Admin</b><a href="#/">Overview</a><span class="grow"></span><span id="when" class="muted small"></span><button class="ghost" id="out" hidden>Forget key</button></header>
+<header><b>LessonBloom Meta · Admin</b><a href="#/">Overview</a><a href="#/t">Testers</a><span class="grow"></span><span id="when" class="muted small"></span><button class="ghost" id="out" hidden>Forget key</button></header>
 <main id="view"></main>
 <script>
 const KEY = 'lbm-admin-key';
@@ -210,13 +210,34 @@ async function lesson(id) {
     ${(l.rejected || []).length ? `<h2>Rejected by the checks</h2>${table([{ h: 'Codes', f: (r) => esc((r.codes || []).join(' ')) }, { h: 'Issues', wide: 1, f: (r) => esc((r.issues || []).join('; ')) }], l.rejected)}` : ''}`;
 }
 
+// #19: the pilot, by promo code: one row per tester
+async function testers(code) {
+  const codes = (await get('/promo')).codes || [];
+  if (!code) code = (codes.find((x) => x.active && x.code !== 'JUDGES') || codes[0] || {}).code || '';
+  const d = code ? await get('/testers/' + encodeURIComponent(code)) : { testers: [] }, mins = (m) => m == null ? '–' : m < 60 ? `${m} min` : `${(m / 60).toFixed(1)} h`;
+  const sum = (k) => d.testers.reduce((a, r) => a + Number(r[k] || 0), 0);
+  view.innerHTML = `
+    <h1>Testers</h1>
+    <p class="muted">Everyone who used one promo code. Click a row for that person's lessons, books and calls.</p>
+    <p>${codes.map((x) => `<a href="#/t/${esc(x.code)}" style="margin-right:10px">${x.code === code ? `<b>${esc(x.code)}</b>` : esc(x.code)}</a>`).join('')}</p>
+    ${d.code ? `<p class="muted small">${n(d.code.credits)} credits · used ${n(d.code.used)}/${n(d.code.max_uses)} · ${d.code.expires_at ? 'until ' + when(d.code.expires_at) : 'no end'} · ${d.code.active ? 'active' : 'off'}${d.code.note ? ' · ' + esc(d.code.note) : ''}</p>` : ''}
+    ${table([
+      { h: 'Who', f: (r) => `${esc(r.name || r.email || r.id)}<div class="small muted">${esc(r.role || '')} · ${esc(r.email || '')}</div>` },
+      { h: 'Joined code', f: (r) => when(r.redeemed) }, { h: 'Last seen', f: (r) => when(r.seen_at) },
+      { h: 'Books', r: 1, f: (r) => n(r.books) }, { h: 'Lessons (ready)', r: 1, f: (r) => `${n(r.lessons)} (${n(r.ready)})` }, { h: 'Assigned', r: 1, f: (r) => n(r.assignments) },
+      { h: 'First book → first assignment', r: 1, f: (r) => mins(r.book_to_assign_min) }, { h: 'Lesson → assignment (median)', r: 1, f: (r) => mins(r.lesson_to_assign_min) },
+      { h: 'Items the checks rejected', r: 1, f: (r) => n(r.rejected) }, { h: 'Items changed by hand', r: 1, f: (r) => n(r.hand_items) }, { h: 'Asked AI for more', r: 1, f: (r) => n(r.asked_more) },
+      { h: 'Credits', r: 1, f: cr }], d.testers, (r) => '/u/' + encodeURIComponent(r.id))}
+    ${d.testers.length ? `<p class="muted small">In all: ${n(d.testers.length)} testers · ${n(sum('lessons'))} lessons · ${n(sum('assignments'))} assigned · ${n(sum('rejected'))} items rejected by the checks · ${n(sum('hand_items'))} changed by hand · ${n(sum('credits'))} credits.</p>` : ''}`;
+}
+
 async function route() {
   if (!key) return askKey();
   document.getElementById('out').hidden = false;
   document.getElementById('when').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', tz) + ' (Hanoi)';
   const h = location.hash.slice(1) || '/', [, kind, id] = h.split('/');
   view.innerHTML = '<p class="muted">Loading…</p>';
-  try { kind === 'u' ? await user(decodeURIComponent(id)) : kind === 'l' ? await lesson(decodeURIComponent(id)) : await overview(); }
+  try { kind === 'u' ? await user(decodeURIComponent(id)) : kind === 'l' ? await lesson(decodeURIComponent(id)) : kind === 't' ? await testers(decodeURIComponent(id || '')) : await overview(); }
   catch (e) { if (e.message !== 'key') view.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 view.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-go]'); if (tr && !e.target.closest('a')) location.hash = tr.dataset.go; });

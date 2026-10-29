@@ -140,6 +140,29 @@ export function createAdmin(sql: Sql, key = config.adminKey, mode: 'private' | '
   const int = (x: unknown, max: number) => Math.min(max, Math.max(0, Math.round(Number(x) || 0)));
 
   app.get('/api/promo', async (c) => c.json({ codes: await sql.query(`select p.*, (select count(*) from promo_uses u where u.code = p.code)::int as people from promo_codes p order by created_at desc`) }));
+  // #19 (Chi): the pilot. Everyone who used one promo code, with what they made and how: lessons, the
+  // time from her first book to her first assignment and from a lesson to its assignment, the items
+  // the checks rejected (rewritten or dropped), what she changed by hand, and what it cost.
+  app.get('/api/testers/:code', async (c) => {
+    const code = cleanCode(c.req.param('code'));
+    const rows = await sql.query<Record<string, unknown> & { usd: string }>(`select t.id, t.name, t.email, t.role, t.kind, pu.at as redeemed, t.seen_at,
+        (select count(*) from lessons l where l.teacher_id = t.id)::int as lessons,
+        (select count(*) from lessons l where l.teacher_id = t.id and l.status = 'ready')::int as ready,
+        (select count(*) from books b join areas a on a.id = b.area_id where a.teacher_id = t.id)::int as books,
+        (select count(*) from assignments x where x.teacher_id = t.id)::int as assignments,
+        (select round(extract(epoch from (min(x.created_at) - (select min(b.created_at) from books b join areas a on a.id = b.area_id where a.teacher_id = t.id))) / 60)
+          from assignments x where x.teacher_id = t.id)::int as book_to_assign_min,
+        (select round(percentile_cont(0.5) within group (order by extract(epoch from (f.first - l.created_at)) / 60))
+          from lessons l join lateral (select min(a2.created_at) as first from assignments a2 where a2.lesson_id = l.id) f on f.first is not null where l.teacher_id = t.id)::int as lesson_to_assign_min,
+        (select coalesce(sum(jsonb_array_length(l.rejected)), 0) from lessons l where l.teacher_id = t.id)::int as rejected,
+        (select count(*) from lesson_edits e where e.teacher_id = t.id and e.kind in ('item_edit', 'item_remove'))::int as hand_items,
+        (select count(*) from lesson_edits e where e.teacher_id = t.id and e.kind in ('slide_rewrite', 'slide_add', 'item_add'))::int as asked_more,
+        (select coalesce(sum(u.usd), 0) from ai_usage u where u.teacher_id = t.id) as usd
+      from promo_uses pu join teachers t on t.id = pu.teacher_id where pu.code = $1 order by pu.at`, [code]);
+    const p = await sql.one('select code, credits, max_uses, used, expires_at, active, note from promo_codes where code = $1', [code]);
+    return c.json({ code: p, testers: rows.map(({ usd, ...r }) => ({ ...r, ...usdOut(usd) })) });
+  });
+
   app.post('/api/promo', async (c) => {
     const b = await body(c), code = b.code ? cleanCode(b.code) : newCode();
     const credits = int(b.credits, 100000), days = int(b.days, 3660), maxUses = Math.max(1, int(b.maxUses, 100000)), expiresDays = int(b.expiresDays, 3660);

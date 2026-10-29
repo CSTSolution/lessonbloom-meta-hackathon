@@ -158,6 +158,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const l = await lessons.get(c.get('teacher').id, c.req.param('id'));
     if (!l) return fail(c, 'notFound', 404);
     await d.sql.query(`update lessons set items = coalesce((select jsonb_agg(x) from jsonb_array_elements(items) x where x->>'id' <> $2), '[]'::jsonb), updated_at = now() where id = $1`, [l.id, c.req.param('item')]);
+    await d.sql.query(`insert into lesson_edits (teacher_id, lesson_id, kind) values ($1, $2, 'item_remove')`, [c.get('teacher').id, l.id]).catch(() => {});
     return c.json({ ok: true });
   });
   // Step 4: one slide's narration, read by the server's local voice (free, nothing goes to Meta).

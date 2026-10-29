@@ -46,6 +46,9 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   const aiFail = (c: Context<Env>, e: unknown) => (e instanceof Blocked ? (e.busy ? fail(c, 'aiBusy', 503) : fail(c, 'aiBlocked')) : fail(c, 'aiBusy', 503));
   const saveSlides = (id: string, slides: Slide[]) => sql.query('update lessons set slides = $2::jsonb, updated_at = now() where id = $1', [id, J(slides)]);
   const saveItems = (id: string, items: Item[]) => sql.query('update lessons set items = $2::jsonb, updated_at = now() where id = $1', [id, J(items)]);
+  // what she changed by hand (#19: the pilot numbers in the admin view)
+  const logEdit = (c: Context<Env>, lessonId: string, kind: 'item_edit' | 'item_add' | 'slide_rewrite' | 'slide_add') =>
+    sql.query('insert into lesson_edits (teacher_id, lesson_id, kind) values ($1, $2, $3)', [c.get('teacher').id, lessonId, kind]).catch(() => {});
   const newSlideId = (slides: Slide[]) => { let n = slides.length + 1; while (slides.some((s) => s.id === `sl${String(n).padStart(2, '0')}`)) n++; return `sl${String(n).padStart(2, '0')}`; };
   const newItemId = (items: Item[]) => { let n = items.length + 1; return () => { while (items.some((i) => i.id === `ex${String(n).padStart(2, '0')}`)) n++; return `ex${String(n++).padStart(2, '0')}`; }; };
 
@@ -62,6 +65,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       if (!fresh) return fail(c, 'aiBusy', 503);
       const slide: Slide = { ...s, heading: fresh.heading || s.heading, bullets: fresh.bullets?.length ? fresh.bullets : s.bullets, example: fresh.example ?? s.example, notes: fresh.notes || s.notes, narration: fresh.narration || s.narration, source: fresh.source || s.source };
       await saveSlides(l.id, l.slides.map((x) => (x.id === s.id ? slide : x)));
+      await logEdit(c, l.id, 'slide_rewrite');
       return c.json({ slide });
     } catch (e) { return aiFail(c, e); }
   });
@@ -83,6 +87,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const slide: Slide = { ...s, id: newSlideId(l.slides), page: l.slides.find((x) => x.page)?.page };
       const slides = [...l.slides.slice(0, at), slide, ...l.slides.slice(at)];
       await saveSlides(l.id, slides);
+      await logEdit(c, l.id, 'slide_add');
       return c.json({ slide, slides });
     } catch (e) { return aiFail(c, e); }
   });
@@ -110,6 +115,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     const issues = checkItem(next, contextOf(l.setup, l.skills, l.source));
     if (issues.length) return c.json({ code: 'itemCheck', error: issues.map((i) => i.msg).join('; '), errorEn: issues.map((i) => i.msg).join('; '), issues }, 400);
     await saveItems(l.id, l.items.map((x) => (x.id === it.id ? next : x)));
+    await logEdit(c, l.id, 'item_edit');
     return c.json({ item: next });
   });
 
@@ -135,6 +141,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const at = req.after ? l.items.findIndex((x) => x.id === req.after) + 1 : l.items.length;
       const items = [...l.items.slice(0, at), ...r.kept, ...l.items.slice(at)];
       await saveItems(l.id, items);
+      await logEdit(c, l.id, 'item_add');
       return c.json({ items, added: r.kept, rejected: r.rejected.length });
     } catch (e) { return aiFail(c, e); }
   };
