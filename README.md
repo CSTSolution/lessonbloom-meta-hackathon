@@ -6,7 +6,7 @@ A teacher or parent uploads their own book, types one sentence about what to lea
 
 Built on Meta's models for the **Meta Global AI Developer Hackathon** (Oct 26 – Nov 4, 2026). Grades 1–5, Maths and English; English first, with Vietnamese as a second language.
 
-**Live:** https://lessonbloom-meta.cstsolution.com (try it with a sample book, no sign-up) · **What was built, and when:** [HACKATHON.md](HACKATHON.md)
+**Live:** https://lessonbloom-meta.cstsolution.com (try it with a sample book, no sign-up) · **What was built, and when:** [HACKATHON.md](HACKATHON.md) · **Reviewing it against the design docs:** [docs/REVIEW.md](docs/REVIEW.md)
 
 ## What it does
 

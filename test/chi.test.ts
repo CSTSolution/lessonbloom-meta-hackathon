@@ -2,6 +2,7 @@
 // the criteria preview and the three suggestions; the mid-lesson reminder only for who has not finished.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { clock } from '../server/path/labels.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
 test('items carry their page; a teacher types her classes at sign-up', async () => {
@@ -33,4 +34,40 @@ test('criteria: a live preview on her own class, and the three suggestions can b
   assert.equal((await call('PUT', '/api/t/criteria', { next: false })).json.criteria.next, false);
   const d = (await call('GET', `/api/t/pupils/${room.pupils[0].id}`)).json;
   assert.ok(!d.advice.some((x: any) => x.kind === 'next'), 'a switched-off suggestion is not offered');
+});
+
+test('the mid-lesson reminder goes only to a learner who has not finished the practice', async () => {
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  await call('POST', '/api/t/role', { role: 'teacher', name: 'Ms Hanh', subject: 'math', classes: ['2A'] });
+  const { areaId } = await areaWithBook(call, 'maths2');
+  const { id, lesson } = await lessonFrom(call, areaId, 'Lesson 21 adding with regrouping');
+  const k = (await call('GET', '/api/t/classes')).json.classes[0];
+  await call('POST', `/api/t/classes/${k.id}/pupils`, { names: 'Mia\nLeo' });
+  const a = (await call('POST', `/api/t/lessons/${id}/assign`, { classId: k.id, confirmed: true })).json.assignment;
+  const kid = async (ip: string, name: string) => {
+    const c2 = s.client(ip), room = (await c2('GET', `/api/p/class/${k.code}`)).json;
+    await c2('POST', '/api/p/enter', { code: k.code, pupilId: room.pupils.find((x: any) => x.name === name).id });
+    return c2;
+  };
+  const mia = await kid('198.51.100.120', 'Mia'), leo = await kid('198.51.100.121', 'Leo');
+  for (const it of lesson.items) await leo('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer });
+  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  clock.now = () => Date.parse(`${today}T00:00:00Z`) + (18 - 7) * 3600e3 + 30 * 60e3;   // 18:30 Vietnam time
+  try {
+    const p = (await call('GET', `/api/t/path?classId=${k.id}&areaId=${areaId}`)).json, sec = lesson.refs[0].sectionId;
+    const order = [sec, ...p.steps.map((x: any) => x.sectionId).filter((x: string) => x !== sec)];
+    // a lesson of 2 weeks; move its start back until today is its middle day (weekends move the date)
+    let found = false;
+    for (let back = 1; back <= 12 && !found; back++) {
+      const start = new Date(Date.parse(`${today}T00:00:00Z`) - back * 864e5).toISOString().slice(0, 10);
+      await call('PUT', `/api/t/path/${p.path.id}`, { start, steps: order.map((x: string, i: number) => ({ sectionId: x, weeks: i === 0 ? 2 : 1 })) });
+      await s.sql.query('delete from pupil_reminders');
+      const r = (await mia('GET', '/api/p/today')).json.reminder;
+      found = !!r && /still practice/.test(r.en);
+    }
+    assert.ok(found, 'Mia, who has not practised, gets the mid-lesson reminder');
+    const leoR = (await leo('GET', '/api/p/today')).json.reminder;
+    assert.ok(!leoR || !/still practice/.test(leoR.en), `Leo has finished, so no mid-lesson reminder (${leoR?.en})`);
+  } finally { clock.now = () => Date.now(); }
 });
