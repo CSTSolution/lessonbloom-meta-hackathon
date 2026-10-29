@@ -11,6 +11,7 @@ import { go, usePath } from '../router.ts';
 
 type L = 'vi' | 'en';
 const ROUND = 5;   // questions in one go (Chi, 29 Oct: 22 in one run was too many)
+const PAIRS = 4;  // pairs in the game (Chi's design: "Tìm 4 cặp", 8 cards fit one phone screen)
 const S = {
   vi: {
     hiKid: 'Chào con!', joinSub: 'Nhập mã lớp cô đưa, rồi chọn tên con nhé.', codeLabel: 'Mã lớp', next: 'Tiếp', who: 'Con là ai?', notMe: 'Đổi lớp', noName: 'Không thấy tên con? Hỏi cô giáo nhé.',
@@ -109,7 +110,7 @@ export function Pupil() {
                 : l.slides > 0 && <Act tone="blue" icon="book" title={t.slides} sub={l.slides_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/slides`)} />}
               {l.cards > 0 && <Act tone="green" icon="cards" title={t.cards} sub={`${t.nCards(l.cards)}${l.cards_seen ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/cards`)} />}
               {l.items > 0 && <Act tone="orange" icon="pencil" title={t.practise} sub={`${t.nItems(l.items)}${l.done ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/practice`)} />}
-              {l.cards >= 3 && <Act tone="purple" icon="pairs" title={t.pairs} sub={t.nPairs(Math.min(6, l.cards))} onClick={() => go(`/hoc/a/${l.id}/match`)} />}
+              {l.cards >= 3 && <Act tone="purple" icon="pairs" title={t.pairs} sub={t.nPairs(Math.min(PAIRS, l.cards))} onClick={() => go(`/hoc/a/${l.id}/match`)} />}
             </div>
             {parts.length > 0 && <div className="p-progress"><span className="small"><b>{t.gotSoFar}</b></span><div className="p-seg">{parts.map((x, i) => <i key={i} className={x ? 'on' : ''} />)}</div></div>}
           </section>
@@ -311,7 +312,7 @@ function Video({ l, t, onEnd, onBack }: { l: PLesson; t: T; onEnd: () => void; o
 // a pair stays open. No timer, no score.
 function Match({ l, t, onBack }: { l: PLesson; t: T; onBack: () => void }) {
   const make = () => {
-    const tiles = l.cards.slice(0, 6).flatMap((c) => [{ k: c.id, text: c.front, emo: c.emoji }, { k: c.id, text: c.back, emo: '' }]);
+    const tiles = l.cards.slice(0, PAIRS).flatMap((c) => [{ k: c.id, text: c.front, emo: c.emoji }, { k: c.id, text: c.back, emo: '' }]);
     for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
     return tiles;
   };
