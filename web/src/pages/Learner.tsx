@@ -27,8 +27,11 @@ export function Learner({ id, parent }: { id: string; parent: boolean }) {
   const t = useT(T), lang = useLang();
   const [v, setV] = useState<LearnerView | null>(null), [why, setWhy] = useState(''), [open, setOpen] = useState(''), [busy, setBusy] = useState(''), [msg, setMsg] = useState('');
   const load = () => api.learner(id, lang).then(setV).catch(() => setV(null));
-  useEffect(() => { void load(); setMsg(''); }, [id, lang]);
-  if (!v) return null;
+  useEffect(() => { setV(null); void load(); setMsg(''); }, [id, lang]);
+  // the advice is worded by Muse Spark in the background; ask again until it is there (at most 5 times)
+  const [tries, setTries] = useState(0);
+  useEffect(() => { if (!v?.wording || tries >= 5) return; const h = setTimeout(() => { setTries((n) => n + 1); void load(); }, 3000); return () => clearTimeout(h); }, [v, tries]);
+  if (!v) return <div className="page narrow"><p className="muted" role="status" style={{ marginTop: 24 }}>{lang === 'vi' ? 'Đang tải…' : 'Loading…'}</p></div>;
   const act = async (a: Advice, action: 'apply' | 'keep' | 'undo') => {
     setBusy(a.kind + action); setMsg('');
     try { const r = await api.advice(v.pupil.id, { kind: a.kind, skill: a.skill, action, adviceId: a.applied ?? undefined }); if (r.added) setMsg(t.added(r.added)); await load(); }

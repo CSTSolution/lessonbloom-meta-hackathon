@@ -17,7 +17,7 @@ const T = {
     pick: 'Chọn lớp để giao bài', forClass: (n: string) => `Giao bài cho lớp ${n}`, noClass: 'Cô chưa có lớp. Tạo lớp trong mục Lớp học trước nhé.', newClass: 'Tên lớp mới, ví dụ 2A', make: 'Tạo lớp',
     link: 'Đường dẫn cho học sinh', linkSub: (c: string) => `Link và mã QR · mã lớp ${c}`, copy: 'Chép link', copied: 'Đã chép',
     opts: 'Tuỳ chọn', due: 'Hạn làm bài', retry: 'Làm lại không giới hạn', hints: 'Gợi ý khi làm sai', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'Không hạn'} · ${r ? 'làm lại không giới hạn' : 'mỗi câu một lần'} · ${h ? 'có gợi ý' : 'không gợi ý'}`,
-    kids: (n: string) => `Học sinh lớp ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} đã vào học · mã lớp ${c}`, none: 'Lớp chưa có học sinh: cô thêm tên gọi trong mục Lớp học.',
+    kids: (n: string) => `Học sinh lớp ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} đã vào học · mã lớp ${c}`, none: 'Lớp chưa có học sinh: cô thêm tên gọi trong mục Lớp học.', noPupils: 'Lớp chưa có học sinh nên chưa ai thấy bài. Cô thêm tên gọi của các em ở Lớp học trước nhé.',
     parents: 'Gửi cho phụ huynh', parentsSub: 'Link riêng cho từng em, không cần đăng nhập', isNew: 'Mới',
     checkedN: (n: number, r: number, ai = 0) => `Đã kiểm tra ${n} câu bằng code · ${r} câu tạo lại${ai ? ` · AI rà soát bỏ ${ai} câu` : ''}`, confirm: 'Tôi đã đọc và kiểm tra slide, bài tập AI soạn trước khi giao bài.', confirmSub: 'Tick lại mỗi lần giao bài.', go: 'Giao bài', tickFirst: 'Tick ô xác nhận ở trên để giao bài.',
     done: (n: string) => `Đã giao cho lớp ${n}. Học sinh thấy bài ngay ở “Hôm nay con học gì”.`, earlier: 'Đã giao', progress: (d: number, n: number) => `${d}/${n} em làm xong`,
@@ -26,7 +26,7 @@ const T = {
     pick: 'Choose a class', forClass: (n: string) => `Assign to ${n}`, noClass: 'No classes yet. Create one under Classes first.', newClass: 'New class name, e.g. 2A', make: 'Create class',
     link: 'Link for pupils', linkSub: (c: string) => `Link and QR code · class code ${c}`, copy: 'Copy link', copied: 'Copied',
     opts: 'Options', due: 'Due date', retry: 'Unlimited retries', hints: 'Hints after a wrong answer', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'No due date'} · ${r ? 'unlimited retries' : 'one try per item'} · ${h ? 'hints' : 'no hints'}`,
-    kids: (n: string) => `Pupils of ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} joined · class code ${c}`, none: 'No pupils yet: add their first names under Classes.',
+    kids: (n: string) => `Pupils of ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} joined · class code ${c}`, none: 'No pupils yet: add their first names under Classes.', noPupils: 'This class has no pupils yet, so nobody will see the lesson. Add their first names under Classes first.',
     parents: 'Send to parents', parentsSub: 'A private link for each child, no sign-in', isNew: 'New',
     checkedN: (n: number, r: number, ai = 0) => `Code checked ${pl(n, 'item')} · ${r} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, confirm: 'I have read and checked the AI-generated slides and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
     done: (n: string) => `Assigned to ${n}. Pupils see it straight away under “Today”.`, earlier: 'Assigned', progress: (d: number, n: number) => `${d}/${pl(n, 'pupil')} finished`,
@@ -97,6 +97,7 @@ export function Assign({ lessonId, parent = false, checked, redone, removed }: {
           <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} />
           <span><b>{t.confirm}</b><span className="small muted" style={{ display: 'block' }}>{t.confirmSub}</span></span>
         </label>
+        {!parent && view.pupils.length === 0 && <p className="banner warn small" role="alert">{t.noPupils}</p>}
         <button className="btn primary lg" disabled={!ticked || busy} onClick={assign}>{t.go}</button>
         {!ticked && <p className="small muted" style={{ textAlign: 'center' }}>{t.tickFirst}</p>}
       </>}

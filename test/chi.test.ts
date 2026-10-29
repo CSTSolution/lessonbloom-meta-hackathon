@@ -71,3 +71,30 @@ test('the mid-lesson reminder goes only to a learner who has not finished the pr
     assert.ok(!leoR || !/still practice/.test(leoR.en), `Leo has finished, so no mid-lesson reminder (${leoR?.en})`);
   } finally { clock.now = () => Date.now(); }
 });
+
+test('the learning path follows the lesson that was assigned; a path she saved stays hers', async () => {
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  await call('POST', '/api/t/role', { role: 'teacher', name: 'Ms Hanh', subject: 'math', classes: ['2A', '2B'] });
+  const { areaId } = await areaWithBook(call, 'maths2');
+  const [k, k2] = (await call('GET', '/api/t/classes')).json.classes;
+  const path = async (classId: string) => (await call('GET', `/api/t/path?classId=${classId}&areaId=${areaId}`)).json;
+  // opened before anything is assigned: the book's first lesson, from this Monday
+  const before = await path(k.id);
+  assert.match(before.steps[0].title, /Lesson 20/);
+  // Lesson 21 is assigned: it becomes the current lesson, from today (Chi saw Lesson 20 "current" and 21 "from 02/11")
+  const { id, lesson } = await lessonFrom(call, areaId, 'Lesson 21 adding with regrouping');
+  await call('POST', `/api/t/lessons/${id}/assign`, { classId: k.id, confirmed: true });
+  const after = await path(k.id), cur = after.steps.find((x: any) => x.status === 'current');
+  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  assert.equal(cur.sectionId, lesson.refs[0].sectionId, 'the assigned lesson is the current one');
+  assert.equal(after.path.start, today, 'from today');
+  assert.equal(after.steps.length, before.steps.length, 'no part is lost: the earlier ones come last');
+  // a path the teacher saved herself is not re-planned by the next assignment
+  const p2 = await path(k2.id);
+  await call('PUT', `/api/t/path/${p2.path.id}`, { start: p2.path.start, steps: p2.steps.map((x: any) => ({ sectionId: x.sectionId, weeks: 2 })) });
+  await call('POST', `/api/t/lessons/${id}/assign`, { classId: k2.id, confirmed: true });
+  const kept = await path(k2.id);
+  assert.equal(kept.path.id, p2.path.id);
+  assert.ok(kept.steps.every((x: any) => x.weeks === 2), 'her weeks are kept');
+});

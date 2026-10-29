@@ -34,7 +34,7 @@ export function Path({ parent }: { parent: boolean }) {
     api.areas().then((r) => { const ready = r.areas.filter((x) => x.books.some((b) => b.status === 'ready')); setAreas(ready); setA(ready[0]?.id || ''); }).catch(() => {});
   }, []);
   const load = () => { if (k && a) api.path(k, a).then((p) => { setV(p); setWeeks(Object.fromEntries(p.steps.map((s) => [s.sectionId, s.weeks]))); setStart(p.path.start); setOpen(p.steps.find((s) => s.status === 'current')?.topic || p.steps[0]?.topic || ''); }).catch(() => setV(null)); };
-  useEffect(load, [k, a]);
+  useEffect(() => { setV(null); load(); }, [k, a]);
   if (!classes) return null;
   if (!classes.length || !areas.length) return <div className="page narrow"><h1>{t.title}</h1><div className="card" style={{ marginTop: 12 }}><p className="muted">{!classes.length ? (parent ? t.noChild : t.noClass) : t.noSrc}</p></div></div>;
   const changed = v && (start !== v.path.start || v.steps.some((s) => weeks[s.sectionId] !== s.weeks));
@@ -49,6 +49,7 @@ export function Path({ parent }: { parent: boolean }) {
         <label className="small">{t.src} <select value={a} onChange={(e) => setA(e.target.value)}>{areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
         <label className="small">{t.start} <input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></label>
       </div>
+      {!v && k && a && <p className="muted" role="status" style={{ marginTop: 16 }}>{lang === 'vi' ? 'Đang tải lộ trình… (lần đầu với một nguồn có thể mất vài giây)' : 'Loading the path… (the first time for a source can take a few seconds)'}</p>}
       {v && <div className="cols">
         <div className="stack">
           {topics.map((tp) => { const steps = v.steps.filter((s) => s.topic === tp), st = steps.some((s) => s.status === 'current') ? 'current' : steps.every((s) => s.status === 'done') ? 'done' : 'later'; return (

@@ -53,7 +53,10 @@ export function Knowledge() {
         {(['', 'math', 'english'] as const).map((s) => <button key={s} className={`pill ${subject === s ? 'on' : ''}`} onClick={() => { setSubject(s); setGrade(0); }}>{s ? t[s] : t.all}</button>)}
         {subject && grades.length > 1 && grades.map((g) => <button key={g} className={`pill ${grade === g ? 'on' : ''}`} onClick={() => setGrade(grade === g ? 0 : g)}>{t.grade(g)}</button>)}
       </div>
-      {!areas.length && !adding && <div className="card"><p className="muted">{t.none}</p></div>}
+      {!areas.length && !adding && <div className="card stack" style={{ gap: 8 }}><p className="muted">{t.none}</p>
+        {/* the sample books right here, not only inside "Add a source" (Chi, 29 Oct) */}
+        <div className="row">{(['maths2', 'english3', 'toan2'] as const).map((b) => <button key={b} className="btn small" disabled={!!busy} onClick={() => run('sample', async () => { const id = (await api.sampleArea(b)).area.id; await load(); setSel(id); })}>{b === 'maths2' ? t.form.maths : b === 'english3' ? t.form.eng : t.form.toan}</button>)}
+          <button className="btn small primary" onClick={() => setAdding(true)}>{t.form.title}</button></div></div>}
       {areas.length > 0 && <div className="cols left">
         <div className="stack">
           {(['math', 'english'] as const).filter((s) => shown.some((x) => x.subject === s)).map((s) => { const list = shown.filter((x) => x.subject === s), reading = list.filter((x) => x.books.some((b) => b.status === 'processing')).length; return (
@@ -116,9 +119,9 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
       </div>
       <div className="row"><button className="btn primary" disabled={busy || !file}>{busy ? t.form.busy : t.form.go}</button><span className="grow" />
         <span className="small muted">{t.form.sample}</span>
-        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('maths2')).area.id)}>📘 {t.form.maths}</button>
-        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('english3')).area.id)}>📗 {t.form.eng}</button>
-        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('toan2')).area.id)}>📘 {t.form.toan}</button></div>
+        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('maths2')).area.id)}>{t.form.maths}</button>
+        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('english3')).area.id)}>{t.form.eng}</button>
+        <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('toan2')).area.id)}>{t.form.toan}</button></div>
       {err && <p className="note">{err}</p>}
     </form>
   );

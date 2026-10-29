@@ -71,13 +71,19 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     for (const x of rows) await sql.query('update sections set topic = $2 where id = $1', [x.id, topics.get(x.id) || x.book]);
   };
 
-  // The path for a class (or child) and a source; made with 1 week per part, from this Monday, the first time.
+  // The path for a class (or child) and a source, made the first time with 1 week per part. With a
+  // lesson assigned from this source, the path starts today with that lesson (the latest one) and goes
+  // on in book order; the parts before it come last. Without one, it starts this Monday at the first part.
   const pathFor = async (tid: string, classId: string, areaId: string) => {
     let p = await sql.one<{ id: string; start_date: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start_date from paths where class_id = $1 and area_id = $2`, [classId, areaId]);
     if (!p) {
       const id = `p${classId.slice(0, 6)}${areaId.slice(0, 6)}${Date.now().toString(36)}`;
-      await sql.query('insert into paths (id, teacher_id, class_id, area_id, start_date) values ($1, $2, $3, $4, $5) on conflict (class_id, area_id) do nothing', [id, tid, classId, areaId, mondayOf(vnToday())]);
-      const secs = await sql.query<{ id: string }>(`select s.id from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [areaId]);
+      const book = await sql.query<{ id: string }>(`select s.id from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [areaId]);
+      const given = await sql.one<{ section: string }>(`select l.refs->0->>'sectionId' as section from assignments a join lessons l on l.id = a.lesson_id
+        where a.class_id = $1 and l.area_id = $2 order by a.created_at desc limit 1`, [classId, areaId]);
+      const at = given ? book.findIndex((x) => x.id === given.section) : -1;
+      const secs = at > 0 ? [...book.slice(at), ...book.slice(0, at)] : book;
+      await sql.query('insert into paths (id, teacher_id, class_id, area_id, start_date) values ($1, $2, $3, $4, $5) on conflict (class_id, area_id) do nothing', [id, tid, classId, areaId, at >= 0 ? vnToday() : mondayOf(vnToday())]);
       for (const [i, s] of secs.entries()) await sql.query('insert into path_steps (path_id, section_id, ord, weeks) values ($1, $2, $3, 1) on conflict do nothing', [id, s.id, i]);
       p = (await sql.one<{ id: string; start_date: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start_date from paths where class_id = $1 and area_id = $2`, [classId, areaId]))!;
     }
@@ -155,6 +161,8 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const weeks = [1, 2, 3].includes(Number(s?.weeks)) ? Number(s!.weeks) : 1;
       await sql.query('update path_steps set weeks = $3, ord = $4 where path_id = $1 and section_id = $2', [p.id, String(s?.sectionId || ''), weeks, i]);
     }
+    // saved by the assigner: from now on assigning a lesson never re-plans this path
+    await sql.query('update paths set updated_at = now() where id = $1', [p.id]);
     return c.json({ ok: true });
   });
 
@@ -253,20 +261,23 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   // Advice in the AI's words (Chi: code decides, the AI only words it). The learner is "{child}" to the
   // model; her name is put in here. Worded once per set of facts; on any problem the template stays.
   const worded = new Map<string, Record<string, string>>();
+  // The page never waits for the wording: without a cached one it shows the code's own sentence,
+  // starts Muse Spark in the background, and says `wording` so the page asks again shortly (Chi: ~10 s blank).
+  const wording = new Map<string, Promise<void>>();
   const wordAdvice = async (tid: string, name: string, lang: 'vi' | 'en', cards: { kind: string; text: string; why: string }[]) => {
-    if (!cards.length) return cards;
+    if (!cards.length) return { cards, pending: false };
     const facts = cards.map((x) => ({ kind: x.kind, decision: x.text.split(name).join('{child}'), because: x.why.split(name).join('{child}') }));
-    const key = JSON.stringify([lang, facts]);
-    let w = worded.get(key);
-    if (!w && (await d.budget.check(tid)) === null) {
-      try {
-        const r = await d.as(tid, () => guardedJson<{ cards: { kind: string; text: string }[] }>(d.ai, { endpoint: 'comments', system: ADVICE_SYSTEM.replace('{{lang}}', lang === 'vi' ? 'Vietnamese' : 'English'), prompt: wrapUser(JSON.stringify(facts)), schema: ADVICE_SCHEMA, fixture: { advice: facts } }));
-        w = Object.fromEntries((r.cards || []).filter((x) => x.text?.includes('{child}')).map((x) => [x.kind, String(x.text).slice(0, 300)]));
-        if (worded.size > 2000) worded.clear();
-        worded.set(key, w);
-      } catch { w = {}; }
+    const key = JSON.stringify([lang, facts]), w = worded.get(key);
+    if (!w && !wording.has(key) && (await d.budget.check(tid)) === null) {
+      wording.set(key, (async () => {
+        try {
+          const r = await d.as(tid, () => guardedJson<{ cards: { kind: string; text: string }[] }>(d.ai, { endpoint: 'comments', system: ADVICE_SYSTEM.replace('{{lang}}', lang === 'vi' ? 'Vietnamese' : 'English'), prompt: wrapUser(JSON.stringify(facts)), schema: ADVICE_SCHEMA, fixture: { advice: facts } }));
+          if (worded.size > 2000) worded.clear();
+          worded.set(key, Object.fromEntries((r.cards || []).filter((x) => x.text?.includes('{child}')).map((x) => [x.kind, String(x.text).slice(0, 300)])));
+        } catch { worded.set(key, {}); } finally { wording.delete(key); }
+      })());
     }
-    return cards.map((x) => (w?.[x.kind] ? { ...x, text: w[x.kind].split('{child}').join(name) } : x));
+    return { cards: cards.map((x) => (w?.[x.kind] ? { ...x, text: w[x.kind].split('{child}').join(name) } : x)), pending: !w && wording.has(key) };
   };
 
   // ---- one learner: labels by skill, recent sessions, reminders, and the three advice cards ----
@@ -311,7 +322,8 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     if (cr.time && current && current.daysLeft <= 2 && current.itemsLeft > 0) { const a = isDone('time', current.sectionId); cards.push({ kind: 'time', skill: current.sectionId, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
       text: vi ? `Còn ${Math.max(0, current.daysLeft)} ngày, ${p.name} còn ${current.itemsLeft} câu bài tập. Nên kéo dài bài này thêm 1 tuần.` : `${Math.max(0, current.daysLeft)} days left and ${current.itemsLeft} items to go. Give this lesson one more week.`,
       why: vi ? `Bài “${current.title}” hết ngày ${current.end.slice(8, 10)}/${current.end.slice(5, 7)}.` : `“${current.title}” ends on ${current.end}.` }); }
-    return { skills, sessions, current, advice: await wordAdvice(tid, p.name, lang, cards), lang };
+    const adv = await wordAdvice(tid, p.name, lang, cards);
+    return { skills, sessions, current, advice: adv.cards, wording: adv.pending, lang };
   };
 
   app.get('/api/t/pupils/:id', async (c) => {

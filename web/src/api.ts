@@ -29,7 +29,7 @@ export interface Criteria { recent: number; min: number; solid: number; repeat: 
 export interface SummaryClass { id: string; name: string; kind: string; skills: { skill: string; name: string; label: Label; counts: Record<Label, number> }[]; pupils: { id: string; name: string; skills: Record<string, Label> }[]; mistakes: { skill: string; what: string; pupils: number }[] }
 export interface Summary { criteria: Criteria; classes: SummaryClass[]; total: Record<Label, number>; learners: number }
 export interface Advice { kind: 'practice' | 'next' | 'time'; skill: string; text: string; why: string; applied: string | null; kept: boolean }
-export interface LearnerView { pupil: { id: string; name: string; classId: string; className: string; kind: string }; skills: { skill: string; name: string; label: Label; right: number; of: number; mistake: string | null }[]; sessions: { day: string; answers: number; minutes: number }[];
+export interface LearnerView { wording?: boolean; pupil: { id: string; name: string; classId: string; className: string; kind: string }; skills: { skill: string; name: string; label: Label; right: number; of: number; mistake: string | null }[]; sessions: { day: string; answers: number; minutes: number }[];
   current: (PathStep & { week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean; videoSeen: boolean }) | null; advice: Advice[]; reminders: Reminder[]; mates: { id: string; name: string }[] }
 export interface ReminderSettings { pupilSession: boolean; pupilCards: boolean; time: string; assignerTwoDays: boolean; assignerEnd: boolean; assignerStart: boolean }
 export class ApiError extends Error { constructor(public code: string, public vi: string, public en: string, public status: number) { super(en); } }

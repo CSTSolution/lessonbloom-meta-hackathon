@@ -148,6 +148,9 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     const id = newId(10);
     await sql.query(`insert into assignments (id, lesson_id, class_id, teacher_id, content, due, retry, hints, confirmed_at) values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, now())`,
       [id, l.id, k.id, t.id, J(snapshot(l)), due, b.retry !== false, b.hints !== false]);
+    // the learning path follows what was assigned (Chi, 29 Oct): a path the assigner never edited is
+    // made again from this lesson on the next view; one she saved herself is left as it is
+    await sql.query(`delete from paths p using lessons l where l.id = $3 and p.class_id = $1 and p.teacher_id = $2 and p.area_id = l.area_id and p.updated_at = p.created_at`, [k.id, t.id, l.id]);
     // a parent has no Video step (Chi): the child's video is made now, in the background (local voices, free)
     if (t.role === 'parent' && d.files && config.autoVideo && (l as Lesson & { video_status?: string }).video_status === 'none') {
       await sql.query(`update lessons set video_status = 'working:0' where id = $1`, [l.id]);

@@ -78,7 +78,11 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   assert.ok(!s.ai.calls.filter((x: any) => x.endpoint === 'comments').some((x: any) => /An|Bình/.test(JSON.stringify(x))), 'no names went to the model');
   // An's detail and the advice cards
   const anId = cls.pupils.find((x: any) => x.name === 'An').id;
-  const d = (await call('GET', `/api/t/pupils/${anId}`)).json;
+  // the page comes at once; Muse Spark's wording of the advice follows (the page asks again)
+  const first = (await call('GET', `/api/t/pupils/${anId}`)).json;
+  assert.equal(first.wording, true, 'the wording is on its way, the page did not wait for it');
+  let d = first;
+  for (let i = 0; i < 50 && d.wording; i++) { await new Promise((r) => setTimeout(r, 20)); d = (await call('GET', `/api/t/pupils/${anId}`)).json; }
   assert.ok(d.current && d.current.week === 1 && d.skills.length);
   const practice = d.advice.find((x: any) => x.kind === 'practice');
   assert.ok(practice, 'a practice card for the skill she is stuck on');
