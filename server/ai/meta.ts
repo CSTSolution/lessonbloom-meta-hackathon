@@ -23,9 +23,10 @@ interface ChatAnswer { choices?: { message?: { content?: string | null; tool_cal
 interface ImageAnswer { data?: { b64_json?: string; url?: string }[] }
 interface ResponsesAnswer { output_text?: string; output?: { content?: { type?: string; text?: string }[] }[] }
 
-export interface MetaOptions { key: string; base?: string; fetch?: Fetch; sleep?: (ms: number) => Promise<void>; speak?: (r: SpeechRequest) => Promise<Buffer>; toWav?: (audio: Buffer) => Promise<Buffer> }
+export interface MetaOptions { key: string; base?: string; fetch?: Fetch; sleep?: (ms: number) => Promise<void>; speak?: (r: SpeechRequest) => Promise<Buffer>; toWav?: (audio: Buffer) => Promise<Buffer>; timeoutMs?: number }
 
-const BUSY = /\b(429|500|502|503|504)\b/;
+// Worth trying again: busy or failing servers, and a connection that dropped or ran out of time.
+const BUSY = /\b(429|500|502|503|504)\b|fetch failed|timed? ?out|aborted|ECONNRESET|socket hang up|truncated/i;
 const SIZES = { '4:3': '1024x768', '1:1': '1024x1024', '16:9': '1344x768' } as const;
 
 export class ApiError extends Error {
@@ -47,6 +48,10 @@ export const EFFORT: Partial<Record<Endpoint, 'minimal' | 'low' | 'medium'>> = {
   check: 'medium',
 };
 
+// A ceiling on each answer (reasoning included), well above the largest seen live, so a runaway answer
+// ends instead of running until the connection is cut. An answer cut at the ceiling is tried again.
+const MAX_OUT: Partial<Record<Endpoint, number>> = { precheck: 2000, errortag: 2000, critic: 4000, intake: 4000, toc: 6000, rerank: 6000, cards: 6000, items: 8000, comments: 8000, check: 10000, slides: 16000 };
+
 export class MetaProvider implements AI {
   name = 'meta';
   onUsage?: (u: Usage) => void;
@@ -67,14 +72,15 @@ export class MetaProvider implements AI {
   }
 
   private async send(path: string, body: BodyInit, json: boolean) {
-    const r = await this.fetch(`${this.base}${path}`, { method: 'POST', headers: { authorization: `Bearer ${this.o.key}`, ...(json ? { 'content-type': 'application/json' } : {}) }, body });
+    // a request that hangs is cut off and tried again (one hung for 5 minutes on 29 Oct and stopped the agent)
+    const r = await this.fetch(`${this.base}${path}`, { method: 'POST', headers: { authorization: `Bearer ${this.o.key}`, ...(json ? { 'content-type': 'application/json' } : {}) }, body, signal: AbortSignal.timeout(this.o.timeoutMs ?? 90e3) });
     const text = await r.text();
     if (!r.ok) throw new ApiError(r.status, text.split(this.o.key).join('[key]'));
     return text;
   }
   private async post<T>(path: string, body: unknown): Promise<T> { return JSON.parse(await this.send(path, JSON.stringify(body), true)) as T; }
 
-  // Transient errors (429, 5xx) back off and try again, up to 5 times; anything else fails at once.
+  // Transient errors (429, 5xx, a dropped or timed-out connection) back off and try again, up to 5 times; anything else fails at once.
   private async retry<T>(what: string, fn: () => Promise<T>): Promise<T> {
     let last: unknown;
     for (let i = 0; i < 5; i++) {
@@ -117,6 +123,7 @@ export class MetaProvider implements AI {
       const body = () => ({
         model, temperature: req.creative ? 0.7 : 0.2,
         ...(this.effortOk && EFFORT[req.endpoint] ? { reasoning_effort: EFFORT[req.endpoint] } : {}),
+        max_tokens: MAX_OUT[req.endpoint] ?? 8000,
         messages: [{ role: 'system', content: this.schemaOk ? req.system : `${req.system}\n\nAnswer with one JSON object only, matching this JSON schema:\n${JSON.stringify(req.schema)}` }, { role: 'user', content }],
         response_format: this.schemaOk ? { type: 'json_schema', json_schema: { name: req.endpoint, schema: req.schema } } : { type: 'json_object' },
       });
@@ -128,6 +135,7 @@ export class MetaProvider implements AI {
       });
       this.usage(req.endpoint, model, r, t0);
       const text = r.choices?.[0]?.message?.content;
+      if (r.choices?.[0]?.finish_reason === 'length') throw new Error('truncated: the answer reached max_tokens');
       if (!text) throw new Error(`empty answer (${r.choices?.[0]?.finish_reason})`);
       return parseJson<T>(text);
     });
@@ -137,7 +145,7 @@ export class MetaProvider implements AI {
     const messages = req.messages.map(toApi), tools = req.tools.map((t) => ({ type: 'function', function: t }));
     return this.chain(req.endpoint, [config.meta.agent, config.meta.text], async (model) => {
       const t0 = Date.now();
-      const r = await this.post<ChatAnswer>('/chat/completions', { model, messages, tools, tool_choice: 'auto', temperature: 0.2 });
+      const r = await this.post<ChatAnswer>('/chat/completions', { model, messages, tools, tool_choice: 'auto', temperature: 0.2, max_tokens: 8000 });
       this.usage(req.endpoint, model, r, t0);
       const m = r.choices?.[0]?.message;
       return { model, text: m?.content || '', toolCalls: (m?.tool_calls || []).map((c) => ({ id: c.id, name: c.function.name, args: c.function.arguments || '{}' })) };

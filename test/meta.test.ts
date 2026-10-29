@@ -50,9 +50,23 @@ test('json: each job sets its reasoning level (reasoning is billed as output); r
   const f = fake([chat('{"title":"a"}'), chat('{"title":"b"}'), chat('{"title":"c"}')]);
   await f.ai.json({ ...req, endpoint: 'critic' }); await f.ai.json({ ...req, endpoint: 'precheck' }); await f.ai.json({ ...req, endpoint: 'check' });
   assert.deepEqual(f.calls.map((c) => c.body.reasoning_effort), ['low', 'minimal', 'medium']);
+  assert.deepEqual(f.calls.map((c) => c.body.max_tokens), [4000, 2000, 10000], 'a ceiling on every answer');
   const g = fake([{ status: 400, text: 'unsupported value for reasoning_effort' }, chat('{"title":"a"}'), chat('{"title":"b"}')]);
   await g.ai.json({ ...req, endpoint: 'critic' }); await g.ai.json({ ...req, endpoint: 'cards' });
   assert.deepEqual(g.calls.map((c) => c.body.reasoning_effort), ['low', undefined, undefined]);
+});
+
+test('json: a dropped or timed-out connection is tried again; every request has a time limit', async () => {
+  let n = 0; const signals: (AbortSignal | undefined)[] = [];
+  const fetch = (async (_url: string, init?: RequestInit) => {
+    signals.push(init?.signal ?? undefined);
+    if (n++ === 0) throw new TypeError('fetch failed');
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"title":"ok"}' } }], usage: {} }));
+  }) as typeof globalThis.fetch;
+  const ai = new MetaProvider({ key: KEY, base: 'https://meta.test/v1/', fetch, sleep: async () => {} });
+  assert.deepEqual(await ai.json(req), { title: 'ok' });
+  assert.equal(n, 2);
+  assert.ok(signals.every((x) => x instanceof AbortSignal));
 });
 
 test('errors fail at once and never carry the key; photos travel as data URLs', async () => {
