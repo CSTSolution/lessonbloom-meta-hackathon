@@ -3,7 +3,7 @@
 // was held and given back. 1 credit = US$0.01 of Meta's price. The breakdown below the chart is also
 // its table view (three of the chart colours are light on white).
 import { useEffect, useRef, useState } from 'react';
-import { api, type Usage as U, type UsageKind } from '../api.ts';
+import { api, ApiError, type Usage as U, type UsageKind } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
@@ -20,6 +20,7 @@ const T = {
     short: { lessons: 'Soạn bài', pictures: 'Hình', books: 'Đọc sách', photos: 'Ảnh', voice: 'Giọng nói', advice: 'Nhận xét', requests: 'Tìm bài' },
     byKind: 'Theo loại việc', share: 'Phần', each: 'Từng bài và từng sách', lesson: 'Bài', book: 'Sách', untitled: '(đã xoá)', open: 'Mở',
     log: 'Lượt vào và giữ chỗ', reason: { signup: 'Khi đăng ký', promo: 'Mã khuyến mãi', admin: 'LessonBloom tặng', hold: 'Giữ chỗ để đọc sách', refund: 'Trả lại phần chưa dùng' },
+    promo: 'Mã khuyến mãi', promoPh: 'Nhập mã', apply: 'Dùng mã', promoOk: (c: number) => `Đã thêm ${c} lượt.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
     hint: 'Một bài khoảng 35 lượt (kèm hình). Đọc sách dạng ảnh khoảng 1 lượt một trang; sách có chữ gần như không tốn lượt.', back: '← Bài giảng',
   },
   en: {
@@ -30,6 +31,7 @@ const T = {
     short: { lessons: 'Lessons', pictures: 'Pictures', books: 'Books', photos: 'Photos', voice: 'Voice', advice: 'Advice', requests: 'Finding' },
     byKind: 'By kind of work', share: 'Share', each: 'Each lesson and book', lesson: 'Lesson', book: 'Book', untitled: '(deleted)', open: 'Open',
     log: 'Credits in, held and given back', reason: { signup: 'When you joined', promo: 'Promo code', admin: 'From LessonBloom', hold: 'Held to read a book', refund: 'Given back (not used)' },
+    promo: 'Promo code', promoPh: 'Enter a code', apply: 'Apply', promoOk: (c: number) => `Added ${pl(c, 'credit')}.`, promoDemo: 'Sign in with your email to use a promo code.',
     hint: 'A lesson uses about 35 credits, pictures included. A scanned book about 1 credit a page; a book with text costs almost nothing.', back: '← Lessons',
   },
 };
@@ -38,9 +40,9 @@ type Dict = (typeof T)['en'];
 // credits: whole numbers from 10 up, one decimal below
 const num = (n: number, lang: 'vi' | 'en') => (n >= 10 || n === 0 ? Math.round(n) : n).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-GB', { maximumFractionDigits: 1 });
 
-export function Usage() {
-  const t = useT(T), lang = useLang(), [days, setDays] = useState(30), [u, setU] = useState<U | null>(null);
-  useEffect(() => { api.usage(days).then(setU).catch(() => setU(null)); }, [days]);
+export function Usage({ account }: { account: boolean }) {
+  const t = useT(T), lang = useLang(), [days, setDays] = useState(30), [u, setU] = useState<U | null>(null), [n, setN] = useState(0);
+  useEffect(() => { api.usage(days).then(setU).catch(() => setU(null)); }, [days, n]);
   const date = (d: string) => new Date(d).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-GB', { timeZone: 'Asia/Ho_Chi_Minh', day: 'numeric', month: 'short' });
   if (!u) return <div className="page narrow" />;
   const kinds = KINDS.filter((k) => u.kinds[k].credits > 0), max = Math.max(...kinds.map((k) => u.kinds[k].credits), 0.1);
@@ -52,6 +54,7 @@ export function Usage() {
         <div className="card"><span className="small muted">{t.period(days)}</span><b className="big">{num(u.period.credits, lang)}</b><span className="small muted">{t.calls(u.period.calls)}</span></div>
         <div className="card"><span className="small muted">{t.total}</span><b className="big">{num(u.total.credits, lang)}</b><span className="small muted">{t.calls(u.total.calls)}</span></div>
       </div>
+      <Promo t={t} account={account} onAdded={() => { setN(n + 1); window.dispatchEvent(new Event('lbm-credits')); }} />
       <div className="card stack" style={{ gap: 10 }}>
         <div className="row"><b className="grow">{t.chart}</b>{[7, 30, 90].map((d) => <button key={d} className={`pill ${d === days ? 'on' : ''}`} onClick={() => setDays(d)}>{t.days(d)}</button>)}</div>
         {u.period.credits > 0 ? <Chart u={u} t={t} lang={lang} /> : <p className="small muted">{t.none}</p>}
@@ -88,6 +91,25 @@ export function Usage() {
         <p className="small muted">{t.hint}</p>
       </div>
     </div>
+  );
+}
+
+// The promo code box here too (#19: Chi's testers enter their code on this page); email accounts only.
+function Promo({ t, account, onAdded }: { t: Dict; account: boolean; onAdded: () => void }) {
+  const lang = useLang(), [code, setCode] = useState(''), [msg, setMsg] = useState(''), [busy, setBusy] = useState(false);
+  if (!account) return <p className="small muted">{t.promoDemo}</p>;
+  const apply = async () => {
+    setBusy(true); setMsg('');
+    try { const r = await api.promo(code); setCode(''); setMsg(t.promoOk(r.added.credits)); onAdded(); }
+    catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); }
+  };
+  return (
+    <form className="card row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); void apply(); }}>
+      <b className="small">{t.promo}</b>
+      <input className="grow" value={code} maxLength={32} placeholder={t.promoPh} aria-label={t.promo} onChange={(e) => setCode(e.target.value.toUpperCase())} style={{ minWidth: 0, padding: '6px 10px', border: '1px solid var(--line)', borderRadius: 8 }} />
+      <button className="btn small" disabled={busy || code.trim().length < 4}>{t.apply}</button>
+      {msg && <span className="small" role="status" style={{ flexBasis: '100%' }}>{msg}</span>}
+    </form>
   );
 }
 

@@ -74,7 +74,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
         : path === '/reminders' ? <Reminders parent={parent} />
         : path === '/notifications' ? <Notifications parent={parent} />
         : path === '/profile' ? <Profile teacher={teacher} onChange={onChange} />
-        : path === '/usage' ? <Usage />
+        : path === '/usage' ? <Usage account={teacher.kind === 'account'} />
         : <Main teacher={teacher} t={t} />}
     </div>
   );
