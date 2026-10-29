@@ -7,7 +7,7 @@ Chi's documents, newest first:
 3. **"LessonBloom – Việc cần làm cho Meta Hackathon"**, 27 Oct. Its "sessions per week" planning was replaced by 1/2/3 weeks per lesson in doc 1.
 4. **"LessonBloom – Báo cáo kiểm thử đầy đủ"**, 17 and 21 Oct. Bugs A–V.
 
-The docs aren't in this repo; ask Chi for them. Status as of **29 Oct 2026**: everything below is built, deployed and covered by tests. The test suite passes (69 tests), and a live run on the real Meta models passed 24/24 checks twice.
+The docs aren't in this repo; ask Chi for them. Status as of **29 Oct 2026**: everything below is built and deployed, and each row names its automated test or says "screen check" where only a look at the screen proves it. The test suite passes (69 tests), and a live run on the real Meta models passed 24/24 checks twice.
 
 ## How to check
 
