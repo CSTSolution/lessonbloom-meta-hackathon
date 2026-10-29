@@ -12,7 +12,7 @@ Built on Meta's models for the **Meta Global AI Developer Hackathon** (Oct 26 â€
 
 | Step | What happens | Models |
 |---|---|---|
-| Your book | A PDF is split into lessons and pages; the owner can rename, split or merge parts. Private to them | Muse Spark (only when a book has no headings) |
+| Your book | A PDF of any size, opened in the browser; a scanned book is read page by page from pictures (the cost estimated and held first). It is split into lessons and pages; the owner can rename, split or merge parts. Private to them | Muse Spark (vision for scanned pages; contents only when a book has no headings) |
 | One sentence | Typed, spoken, a photo of the lesson, or a photo of a child's finished exercise (its kind and mistakes). The matching part of the book is found and cited by page; nothing outside it is taught | Muse Spark (re-rank, vision), Muse Voice Transcribe |
 | The lesson | An agent plans the skills and slides, writes slides, practice and flashcards through tools, reviews its own work and fixes or drops what fails. Pictures in one house style, each checked and redrawn once if needed; cut-outs from your own photo | **Muse Wonder** (agent), Muse Spark, Muse Image, SAM 3.1 |
 | Checked by code | For maths the model supplies numbers; code writes the question and works out the answer. Every item passes a check for its type (calculation shown, listening words never printed, skill, unit, the book's number range and operation), is written again at most twice, then dropped and logged | none: code |

@@ -59,6 +59,17 @@ All five were checked live on 29 Oct.
 | Scope rules: "within 100" means no number above 100 and no subtraction in an addition lesson; English words only from the part | `server/lesson/items.ts` (`scopeOf`, `checkItem`) | `knowledge.test.ts` "the scope of a section…", `english.test.ts` "the scope of an English part…" |
 | Not found: say "Not in your knowledge area yet" and write nothing | `knowledge/routes.ts` (match), `Create.tsx` | `lessons.test.ts` "API: request -> matched section…" |
 
+## Books read in the browser, scanned books, and the job queue (Chi's review 29 Oct #11–#15; Son, 29 Oct)
+
+| Requirement | Where | Test |
+|---|---|---|
+| The PDF is opened in the browser (any size): a text PDF up to 30 MB is uploaded, a bigger one sends only its text | `web/src/pdf.ts`, `Knowledge.tsx` (`AddSource`), `server/knowledge/routes.ts` (`/books/text`) | `jobs.test.ts` "a big text PDF…" |
+| A scanned book: she picks pages (up to 200), sees the estimate and that she needs 50% more; each page is drawn as a JPEG and sent; Muse Spark reads it (`SCAN_SYSTEM`); pages keep their numbers | `pdf.ts` (`pageJpeg`), `knowledge/routes.ts` (`/scan/estimate`, `/books/scan`, `/pages/:n`, `/scan/start`, `readScan`) | `jobs.test.ts` "a scanned book…", "the estimate…" |
+| Credit: 1.5x the estimate held before reading, stopped before going past it, the rest given back once; a restart gives the hold back | `knowledge/routes.ts` (`holdCredits`, `settle`), `server/app.ts` (`held`), `server/main.ts` | `jobs.test.ts` "a scanned book…" |
+| One job at a time per account (reading a book or making a lesson), 3 in the whole app; her line in the top bar with Stop / Cancel; a waiting lesson shows its place | `server/jobs.ts`, `app.ts` (`/api/t/jobs`), `Home.tsx` (`JobsBox`), `LessonPage.tsx` | `jobs.test.ts` (both queue tests) |
+
+Measured live on 29 Oct: a scanned page costs about 0.74 credits and 3.4 s (three pages at a time); the estimate uses 0.9.
+
 ## Task 3 · Parent role
 
 | Requirement | Where | Test |
@@ -114,7 +125,6 @@ Compare at 1280 px. Each was checked side by side on 29 Oct.
 - **Payment:** Son, 28 Oct, "No payment for now". Credits and promo codes exist.
 - **Reminders by Zalo or email:** doc 1 says in the app only.
 - **The old parent screens** (Parent home, Done, Weekly report, Parent plan): doc 1 says keep them for later.
-- **Scanned books (OCR):** next step. A PDF needs real text.
 
 ## Known limits
 
