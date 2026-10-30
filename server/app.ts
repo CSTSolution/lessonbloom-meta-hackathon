@@ -11,6 +11,7 @@ import type { Sql } from './db/sql.ts';
 import { Budget, clientIp, costOf, CREDIT_USD, Limiter } from './guard/guard.ts';
 import { cleanCode, CODE, redeem } from './credits.ts';
 import { usageRoutes } from './usage.ts';
+import { r2Store, type Store } from './storage.ts';
 import { Files } from './files.ts';
 import { fail } from './http.ts';
 import { Jobs } from './jobs.ts';
@@ -23,7 +24,7 @@ import type { Mailer } from './mail.ts';
 
 export type Env = { Variables: { teacher: Teacher; token: string } };
 const COOKIE = 'lbm_s';
-export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files; jobs?: Jobs }) {
+export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files; jobs?: Jobs; store?: Store | null }) {
   const { sql, ai, mail } = deps, files = deps.files ?? new Files(join(config.dataDir, 'files'));
   const accounts = new Accounts(sql), budget = new Budget(sql);
   const demoPerIp = new Limiter(3, config.guard.demoPerIpDay), codePerIp = new Limiter(5, config.guard.codesPerIpDay), codePerEmail = new Limiter(2, config.guard.codesPerEmailDay);
@@ -39,7 +40,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
   };
   const as = <T>(teacher: string, fn: () => T, lesson?: string, book?: string) => who.run({ teacher, lesson, book }, fn);
   const held = <T>(teacher: string, hold: { used: number }, fn: () => T, book?: string, lesson?: string) => who.run({ teacher, hold, book, lesson }, fn);
-  const jobs = deps.jobs ?? new Jobs(sql, config.jobs.concurrent);
+  const jobs = deps.jobs ?? new Jobs(sql, config.jobs.concurrent), store = deps.store === undefined ? r2Store() : deps.store;
 
   const app = new Hono<Env>();
   app.onError((e, c) => { console.error(`[error] ${c.req.method} ${c.req.path}: ${(e as Error).stack || e}`); return fail(c, 'server', 500); });
@@ -154,8 +155,8 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
     }
     return c.body(new Uint8Array(f.data), 200, head);
   });
-  knowledgeRoutes(app, { sql, ai, budget, as, held, jobs });
-  usageRoutes(app, { sql });
+  knowledgeRoutes(app, { sql, ai, budget, as, held, jobs, store });
+  usageRoutes(app, { sql, store });
   lessonRoutes(app, { sql, ai, budget, files, as, held, jobs });
   editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });

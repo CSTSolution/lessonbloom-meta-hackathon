@@ -41,6 +41,8 @@ export const MSG = {
   pictureFailed: { vi: 'Chưa vẽ được hình phù hợp. Cô thử lại nhé.', en: 'No suitable picture this time. Please try again.' },
   retryAdd: { vi: 'Sách này đọc trên trình duyệt nên máy chủ không giữ tệp. Cô xoá nguồn này rồi thêm lại tệp nhé.', en: 'This book was read in your browser, so the server kept no file. Remove this source and add the file again.' },
   creditsHeld: { vi: 'Một phần lượt đang được giữ cho việc đang làm (bài đang soạn hoặc sách đang đọc). Xong việc đó, phần không dùng sẽ được trả lại; cô thử lại sau ít phút nhé.', en: 'Some of your credits are held for work in progress (a lesson being made or a book being read). When it is done, what it did not use comes back; try again in a few minutes.' },
+  storageOff: { vi: 'Chưa bật nơi lưu tệp gốc. Cô thử lại sau nhé.', en: 'Keeping original files is not switched on yet. Please try again later.' },
+  storageFull: { vi: 'Đã hết dung lượng lưu tệp gốc của tài khoản (300 MB). Cô xoá bớt nguồn cũ rồi thử lại nhé.', en: 'Your space for original files is full (300 MB). Remove an old source, then try again.' },
   cannotStop: { vi: 'Việc này đang chạy và không dừng giữa chừng được. Cô chờ một chút nhé.', en: 'This job is running and cannot be stopped halfway. Please wait a moment.' },
   scanCredits: { vi: 'Cô chưa đủ lượt để đọc chừng ấy trang (cần dư 50% so với dự kiến). Cô chọn ít trang hơn hoặc nhập mã khuyến mãi nhé.', en: 'Not enough credits to read that many pages (you need 50% more than the estimate). Choose fewer pages or enter a promo code.' },
   scanPages: { vi: 'Chưa nhận đủ các trang. Cô thử gửi lại nhé.', en: 'Not all pages arrived. Please try sending them again.' },

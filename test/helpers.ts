@@ -6,17 +6,19 @@ import { config } from '../server/config.ts';
 import { migrate } from '../server/db/migrate.ts';
 import { pgliteSql } from '../server/db/sql.ts';
 import { Jobs } from '../server/jobs.ts';
+import type { Store } from '../server/storage.ts';
 
 // tests make their videos only when they ask for one
 config.autoVideo = false;
 // a lesson holds a smaller amount in tests, so a test can make several lessons on the sign-up credits
 config.guard.lessonCredits = 20;
 
-export async function testServer() {
+export async function testServer(opts: { store?: Store | null } = {}) {
   const sql = await pgliteSql();
   await migrate(sql);
   const ai = new MockProvider(), sent: { to: string; code: string; lang: string }[] = [], jobs = new Jobs(sql, 3);
-  const app = createApp({ sql, ai, jobs, mail: { async sendCode(to, code, lang) { sent.push({ to, code, lang }); } } });
+  const store = opts.store ?? null;
+  const app = createApp({ sql, ai, jobs, store, mail: { async sendCode(to, code, lang) { sent.push({ to, code, lang }); } } });
   const client = (ip = '203.0.113.7') => {
     let cookie = '';
     return async (method: string, path: string, body?: unknown, raw?: { type: string; data: Buffer }) => {
@@ -26,7 +28,7 @@ export async function testServer() {
       return { status: r.status, json: (await r.json().catch(() => null)) as any };
     };
   };
-  return { sql, ai, app, sent, client, jobs };
+  return { sql, ai, app, sent, client, jobs, store };
 }
 
 type Call = ReturnType<Awaited<ReturnType<typeof testServer>>['client']>;

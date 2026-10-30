@@ -11,9 +11,13 @@ import type { Sql } from '../db/sql.ts';
 import { Blocked, type Budget, guardedJson, requireOnTask } from '../guard/guard.ts';
 import type { JobCtl, Jobs } from '../jobs.ts';
 import { holdCredits as holdC, settleHold, spare } from '../credits.ts';
+import type { Store } from '../storage.ts';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { OCR_SCHEMA, SCAN_SYSTEM } from '../lesson/prompts.ts';
 import { fail, MSG } from '../http.ts';
 import { ingestBook, ingestPages, NotText } from './ingest.ts';
+import { readPdf } from './pdf.ts';
 import type { PdfPage } from './pdf.ts';
 import { citation, findSection, NoMatch, sourceOf } from './search.ts';
 
@@ -47,9 +51,10 @@ export async function sectionOf(sql: Sql, teacherId: string, areaId: string, sec
   return { section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to }, passages };
 }
 
+const pdftoppm = (args: string[]) => promisify(execFile)('pdftoppm', args, { timeout: 120e3 });
 class Unread extends Error { constructor(public why: 'stopped' | 'credits') { super(why); } }
 
-export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs }) {
+export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs; store?: Store | null }) {
   const { sql } = d;
 
   app.get('/api/t/areas', async (c) => {
@@ -103,7 +108,28 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       await sql.query(`update books set status = 'error', error = $2 where id = $1`, [id, e instanceof Unread ? e.why : e instanceof NotText ? 'scanned' : e instanceof Blocked ? 'blocked' : 'failed']);
     }
   };
-  const dropBook = async (id: string) => { await sql.query('delete from books where id = $1', [id]); await rm(scanDir(id), { recursive: true, force: true }); };
+  // her kept files (R2): deleted with the book
+  const dropFiles = async (bookId: string) => {
+    if (!d.store) return;
+    for (const f of await sql.query<{ key: string }>('select key from book_files where book_id = $1', [bookId])) await d.store.del(f.key).catch((e) => console.warn(`[files] ${f.key}: ${(e as Error).message}`));
+    await sql.query('delete from book_files where book_id = $1', [bookId]);
+  };
+  const dropBook = async (id: string) => { await dropFiles(id); await sql.query('delete from books where id = $1', [id]); await rm(scanDir(id), { recursive: true, force: true }); };
+  const usedBytes = async (teacherId: string) => Number((await sql.one<{ n: string }>('select coalesce(sum(bytes), 0) as n from book_files where teacher_id = $1', [teacherId]))?.n ?? 0);
+  const fileKey = (teacherId: string, bookId: string, name: string) => `t/${teacherId}/${bookId}/${name}`;
+  // the page pictures of a book just read, kept so she can see each original page (within her allowance)
+  const keepPages = async (teacherId: string, bookId: string, want: number[]) => {
+    if (!d.store) return;
+    let room = config.storage.quotaBytes - await usedBytes(teacherId);
+    for (const n of want) {
+      const data = await readFile(join(scanDir(bookId), `${n}.jpg`)).catch(() => null);
+      if (!data || data.length > room) continue;
+      const key = fileKey(teacherId, bookId, `p/${n}.jpg`);
+      try { await d.store.put(key, data, 'image/jpeg'); } catch (e) { console.warn(`[files] ${key}: ${(e as Error).message}`); continue; }
+      await sql.query(`insert into book_files (key, book_id, teacher_id, kind, page, bytes, type) values ($1, $2, $3, 'page', $4, $5, 'image/jpeg') on conflict (key) do update set bytes = excluded.bytes`, [key, bookId, teacherId, n, data.length]);
+      room -= data.length;
+    }
+  };
   const bookMine = (c: Context<Env>) => sql.one<{ id: string; area_id: string; title: string; status: string; source: string; pages: number }>(
     'select b.id, b.area_id, b.title, b.status, b.source, b.pages from books b join areas a on a.id = b.area_id where b.id = $1 and a.teacher_id = $2', [c.req.param('id'), c.get('teacher').id]);
   const newBook = async (c: Context<Env>, a: Area, title: string, source: 'text' | 'scan', pages: number) => {
@@ -140,6 +166,75 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (!id) return fail(c, 'limitReached', 429);
     await d.jobs.add(t.id, 'book', id, clip(b.title, 120) || 'Sách', () => d.as(t.id, () => readBook(id, () => ingestPages(sql, d.ai, a.id, id, pages)), undefined, id), () => dropBook(id));
     return c.json({ book: { id, status: 'processing' } });
+  });
+
+  // ---- her original file, kept privately in R2 (Son, 30 Oct) ----
+  // A PDF the browser could not open (a big one in Safari, #20), or the original of a big text PDF so it
+  // can be seen again: the browser sends it straight to R2 with a signed link; our server never relays it.
+  app.post('/api/t/areas/:id/books/original', async (c) => {
+    const t = c.get('teacher'), a = await areaOf(sql, t.id, c.req.param('id'));
+    if (!a) return fail(c, 'notFound', 404);
+    if (!d.store) return fail(c, 'storageOff', 503);
+    const b = await c.req.json<{ title?: string; size?: number; bookId?: string }>().catch(() => ({} as { title?: string; size?: number; bookId?: string }));
+    const size = Math.round(Number(b.size));
+    if (!(size > 200) || size > config.storage.maxFile) return fail(c, 'pdf', 413);
+    if (await usedBytes(t.id) + size > config.storage.quotaBytes) return fail(c, 'storageFull', 413);
+    // the original of a book already read in the browser, or a new book the server is to read
+    let id = String(b.bookId || '');
+    if (id) { if (!(await sql.one('select 1 from books bk join areas a on a.id = bk.area_id where bk.id = $1 and a.teacher_id = $2', [id, t.id]))) return fail(c, 'notFound', 404); }
+    else { const nid = await newBook(c, a, String(b.title || ''), 'text', 0); if (!nid) return fail(c, 'limitReached', 429); id = nid; await sql.query(`update books set source = 'pdf' where id = $1`, [id]); }
+    const key = fileKey(t.id, id, 'original.pdf');
+    await sql.query(`insert into book_files (key, book_id, teacher_id, kind, bytes, type) values ($1, $2, $3, 'original', 0, 'application/pdf') on conflict (key) do update set bytes = 0`, [key, id, t.id]);
+    return c.json({ book: { id }, url: await d.store.putUrl(key, 'application/pdf') });
+  });
+  // sent: its size is checked in R2; with `read`, the server reads it (text now; a scanned one after the estimate)
+  app.post('/api/t/books/:id/original/done', async (c) => {
+    const t = c.get('teacher'), bk = await bookMine(c);
+    if (!bk || !d.store) return fail(c, 'notFound', 404);
+    const key = fileKey(t.id, bk.id, 'original.pdf'), size = await d.store.size(key).catch(() => null);
+    if (!size) return fail(c, 'pdf', 400);
+    await sql.query('update book_files set bytes = $2 where key = $1', [key, size]);
+    const b = await c.req.json<{ read?: boolean }>().catch(() => ({} as { read?: boolean }));
+    if (!b.read) return c.json({ ok: true });
+    const pdf = await d.store.get(key);
+    const r = pdf ? await readPdf(pdf).catch(() => null) : null;
+    if (!pdf || !r || !r.pages.length) { await sql.query(`update books set status = 'error', error = 'failed' where id = $1`, [bk.id]); return fail(c, 'pdf', 400); }
+    await sql.query('update books set pages = $2 where id = $1', [bk.id, r.pages.length]);
+    if (r.scanned / r.pages.length <= 0.5) {
+      await d.jobs.add(t.id, 'book', bk.id, bk.title, () => d.as(t.id, () => readBook(bk.id, () => ingestPages(sql, d.ai, bk.area_id, bk.id, r.pages)), undefined, bk.id), () => dropBook(bk.id));
+      return c.json({ ok: true, text: true, pages: r.pages.length });
+    }
+    // scanned: she sees the estimate and chooses the pages, as in the browser
+    await sql.query(`update books set source = 'scan' where id = $1`, [bk.id]);
+    return c.json({ ok: true, text: false, pages: r.pages.length, estimate: scanEstimate(Math.min(r.pages.length, config.scan.maxPages), (await spare(sql, t.id)).spare) });
+  });
+  // a scanned original in R2: the chosen pages are drawn on the server (poppler), then read like a scan
+  app.post('/api/t/books/:id/original/scan', async (c) => {
+    const t = c.get('teacher'), bk = await bookMine(c);
+    if (!bk || bk.source !== 'scan' || bk.status !== 'processing' || !d.store) return fail(c, 'notFound', 404);
+    const b = await c.req.json<{ pages?: number[] }>().catch(() => ({} as { pages?: number[] }));
+    const want = [...new Set((Array.isArray(b.pages) ? b.pages : []).map((x) => Math.round(Number(x))).filter((x) => x >= 1 && x <= bk.pages))].sort((x, y) => x - y);
+    if (!want.length || want.length > config.scan.maxPages) return fail(c, 'scanPages', 400);
+    const est = scanEstimate(want.length, (await spare(sql, t.id)).spare);
+    if (!est.enough) return short(c, est);
+    if (await sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [bk.id])) return c.json({ ok: true });
+    await holdCredits(t.id, est.need, bk.id);
+    const hold = { used: 0 };
+    await d.jobs.add(t.id, 'book', bk.id, bk.title, async (job) => {
+      await d.held(t.id, hold, () => readBook(bk.id, async () => {
+        const pdf = await d.store!.get(fileKey(t.id, bk.id, 'original.pdf'));
+        if (!pdf) throw new Error('original missing');
+        const dir = scanDir(bk.id), src = join(dir, 'original.pdf');
+        await mkdir(dir, { recursive: true }); await writeFile(src, pdf);
+        for (const n of want) {
+          if (job.stopped) break;
+          await pdftoppm(['-jpeg', '-jpegopt', 'quality=78', '-singlefile', '-scale-to', '1754', '-f', String(n), '-l', String(n), src, join(dir, String(n))]);
+        }
+        await rm(src, { force: true });
+        await readScan(bk.area_id, bk.id, want, est.need, hold, job);
+      }), bk.id).finally(() => settle(t.id, bk.id, est.need, hold));
+    }, async () => { await settle(t.id, bk.id, est.need, hold); await dropBook(bk.id); }, est.need);
+    return c.json({ ok: true, estimate: est });
   });
 
   // ---- a scanned book: estimate, then the page pictures, then the reading (credit held first) ----
@@ -217,6 +312,8 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (!out.some((p) => p.text.trim())) throw new NotText();
     await ingestPages(sql, d.ai, areaId, bookId, out);
     await sql.query('update books set pages = $2 where id = $1', [bookId, out.length]);
+    const owner = await sql.one<{ teacher_id: string }>('select a.teacher_id from books b join areas a on a.id = b.area_id where b.id = $1', [bookId]);
+    if (owner) await keepPages(owner.teacher_id, bookId, want);
   };
   const holdCredits = (teacherId: string, n: number, ref: string) => holdC(sql, teacherId, n, ref);
   // what was held, less what the reading really cost, goes back (once); the page pictures are gone
@@ -291,6 +388,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
     if (!a) return fail(c, 'notFound', 404);
     const books = await sql.query<{ id: string }>('select id from books where area_id = $1', [a.id]);
+    for (const b of books) await dropFiles(b.id);
     await sql.query('delete from areas where id = $1', [a.id]);
     const { unlink } = await import('node:fs/promises');
     for (const b of books) await unlink(bookFile(b.id)).catch(() => {});
@@ -299,6 +397,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   app.delete('/api/t/books/:id', async (c) => {
     const ok = await sql.one('select 1 from books b join areas a on a.id = b.area_id where b.id = $1 and a.teacher_id = $2', [c.req.param('id'), c.get('teacher').id]);
     if (!ok) return fail(c, 'notFound', 404);
+    await dropFiles(c.req.param('id'));
     await sql.query('delete from books where id = $1', [c.req.param('id')]);
     const { unlink } = await import('node:fs/promises');
     await unlink(bookFile(c.req.param('id'))).catch(() => {});
@@ -314,9 +413,16 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const rows = await sql.query<{ page: number; text: string }>('select page, text from passages where section_id = $1 order by page, ord', [s.id]);
     const pages: { page: number; text: string }[] = [];
     for (const r of rows) { const last = pages.at(-1); if (last && last.page === r.page) last.text += `\n${r.text}`; else pages.push({ page: r.page, text: r.text }); }
-    const pdf = (bk?.source ?? 'pdf') === 'pdf' && await stat(bookFile(s.book_id)).then(() => true, () => false);
-    return c.json({ section: { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to }, book: { id: bk?.id, title: bk?.title, source: bk?.source ?? 'pdf' },
-      pages, original: pdf ? { kind: 'pdf', url: `/api/t/books/${s.book_id}/file` } : null });
+    // the original: a PDF kept on this server, or its original in R2, or the kept page pictures
+    let original: { kind: 'pdf'; url: string } | { kind: 'pages'; pages: Record<number, string> } | null = null;
+    if ((bk?.source ?? 'pdf') === 'pdf' && await stat(bookFile(s.book_id)).then(() => true, () => false)) original = { kind: 'pdf', url: `/api/t/books/${s.book_id}/file` };
+    else if (d.store) {
+      const files = await sql.query<{ key: string; kind: string; page: number | null }>(`select key, kind, page from book_files where book_id = $1 and bytes > 0 and (kind = 'original' or page between $2 and $3)`, [s.book_id, s.page_from, s.page_to]);
+      const orig = files.find((f) => f.kind === 'original'), pics = files.filter((f) => f.kind === 'page');
+      if (pics.length) original = { kind: 'pages', pages: Object.fromEntries(await Promise.all(pics.map(async (f) => [f.page, await d.store!.getUrl(f.key)]))) };
+      else if (orig) original = { kind: 'pdf', url: await d.store.getUrl(orig.key) };
+    }
+    return c.json({ section: { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to }, book: { id: bk?.id, title: bk?.title, source: bk?.source ?? 'pdf' }, pages, original });
   });
 
   // The knowledge map (Son, 30 Oct): her book → its parts → the lessons made from each part → the skills

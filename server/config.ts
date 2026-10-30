@@ -45,5 +45,8 @@ export const config = {
   // one job at a time per account; this many at once in the whole app (Meta's limits, our server)
   jobs: { concurrent: num('LB_JOBS_CONCURRENT', 3) },
   // reading a scanned page with Muse Spark: credits per page (measured live) and the margin she must have
+  // her original files in Cloudflare R2 (off until all four are set); a free allowance per account
+  r2: { endpoint: env('R2_ENDPOINT'), keyId: env('R2_ACCESS_KEY_ID'), secret: env('R2_SECRET_ACCESS_KEY'), bucket: env('R2_BUCKET') },
+  storage: { quotaBytes: num('LB_STORAGE_QUOTA_MB', 300) * 1e6, maxFile: 500e6 },
   scan: { pageCredits: num('LB_SCAN_PAGE_CREDITS', 0.9), margin: 1.5, maxPages: 200, pagesAtOnce: 3, maxImage: 1.5e6 },
 };

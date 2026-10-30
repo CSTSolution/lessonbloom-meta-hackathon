@@ -30,9 +30,10 @@ export function SourceView({ sectionId, onClose }: { sectionId: string; onClose:
   useEffect(() => { api.sectionSource(sectionId).then(setSrc).catch((e) => setErr(String(e?.message || e))); }, [sectionId]);
   useEffect(() => {
     if (!src?.original) return;
+    if (src.original.kind === 'pages') { setImgs(src.original.pages); return; }
     let alive = true;
     (async () => {
-      const blob = await fetch(src.original!.url).then((r) => r.blob());
+      const blob = await fetch((src.original as { url: string }).url).then((r) => r.blob());
       const doc = await openPdf(new File([blob], 'book.pdf', { type: 'application/pdf' }));
       for (let n = src.section.pageFrom; n <= Math.min(src.section.pageTo, doc.numPages, src.section.pageFrom + 11) && alive; n++) {
         const url = URL.createObjectURL(await pageJpeg(doc, n, 1100));

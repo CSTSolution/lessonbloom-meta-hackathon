@@ -9,7 +9,7 @@ RUN npm run build
 
 FROM node:22-bookworm-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg chromium fonts-noto-core fonts-noto-color-emoji ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg chromium poppler-utils fonts-noto-core fonts-noto-color-emoji ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production CHROMIUM_PATH=/usr/bin/chromium
 COPY package*.json ./

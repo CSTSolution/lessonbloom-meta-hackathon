@@ -4,8 +4,10 @@
 // 1 credit = US$0.01. Only her own rows; nothing here calls a model.
 import type { Hono } from 'hono';
 import type { Env } from './app.ts';
+import { config } from './config.ts';
 import { creditState, spare } from './credits.ts';
 import type { Sql } from './db/sql.ts';
+import type { Store } from './storage.ts';
 
 export const KINDS = ['lessons', 'pictures', 'books', 'photos', 'voice', 'advice', 'requests'] as const;
 export type UsageKind = (typeof KINDS)[number];
@@ -71,9 +73,10 @@ export async function usageOf(sql: Sql, teacherId: string, days: number) {
   };
 }
 
-export function usageRoutes(app: Hono<Env>, d: { sql: Sql }) {
+export function usageRoutes(app: Hono<Env>, d: { sql: Sql; store?: Store | null }) {
   app.get('/api/t/usage', async (c) => {
     const days = [7, 30, 90].includes(Number(c.req.query('days'))) ? Number(c.req.query('days')) : 30;
-    return c.json(await usageOf(d.sql, c.get('teacher').id, days));
+    const files = await d.sql.one<{ n: string }>('select coalesce(sum(bytes), 0) as n from book_files where teacher_id = $1', [c.get('teacher').id]);
+    return c.json({ ...(await usageOf(d.sql, c.get('teacher').id, days)), storage: { on: !!d.store, used: Number(files?.n ?? 0), quota: config.storage.quotaBytes } });
   });
 }

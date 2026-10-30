@@ -20,6 +20,7 @@ const T = {
     short: { lessons: 'Soạn bài', pictures: 'Hình', books: 'Đọc sách', photos: 'Ảnh', voice: 'Giọng nói', advice: 'Nhận xét', requests: 'Tìm bài' },
     byKind: 'Theo loại việc', share: 'Phần', each: 'Từng bài và từng sách', lesson: 'Bài', book: 'Sách', untitled: '(đã xoá)', open: 'Mở',
     log: 'Lượt vào và giữ chỗ', reason: { signup: 'Khi đăng ký', promo: 'Mã khuyến mãi', admin: 'LessonBloom tặng', hold: 'Giữ chỗ', refund: 'Trả lại phần chưa dùng' },
+    files: (u: number, q: number) => `Tệp gốc đang lưu: ${u} MB / ${q} MB (riêng tư, chỉ cô xem được)`,
     promo: 'Mã khuyến mãi', promoPh: 'Nhập mã', apply: 'Dùng mã', promoOk: (c: number) => `Đã thêm ${c} lượt.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
     hint: 'Một bài giữ 60 lượt (kèm hình) rồi trả lại phần không dùng; thường dùng 40–60. Đọc sách dạng ảnh khoảng 1 lượt một trang; sách có chữ gần như không tốn lượt.', back: '← Bài giảng',
   },
@@ -31,6 +32,7 @@ const T = {
     short: { lessons: 'Lessons', pictures: 'Pictures', books: 'Books', photos: 'Photos', voice: 'Voice', advice: 'Advice', requests: 'Finding' },
     byKind: 'By kind of work', share: 'Share', each: 'Each lesson and book', lesson: 'Lesson', book: 'Book', untitled: '(deleted)', open: 'Open',
     log: 'Credits in, held and given back', reason: { signup: 'When you joined', promo: 'Promo code', admin: 'From LessonBloom', hold: 'Held', refund: 'Given back (not used)' },
+    files: (u: number, q: number) => `Original files kept: ${u} MB of ${q} MB (private, only you can see them)`,
     promo: 'Promo code', promoPh: 'Enter a code', apply: 'Apply', promoOk: (c: number) => `Added ${pl(c, 'credit')}.`, promoDemo: 'Sign in with your email to use a promo code.',
     hint: 'A lesson holds 60 credits, pictures included, and gives back what it does not use; most use 40–60. A scanned book about 1 credit a page; a book with text costs almost nothing.', back: '← Lessons',
   },
@@ -54,6 +56,7 @@ export function Usage({ account }: { account: boolean }) {
         <div className="card"><span className="small muted">{t.period(days)}</span><b className="big">{num(u.period.credits, lang)}</b><span className="small muted">{t.calls(u.period.calls)}</span></div>
         <div className="card"><span className="small muted">{t.total}</span><b className="big">{num(u.total.credits, lang)}</b><span className="small muted">{t.calls(u.total.calls)}</span></div>
       </div>
+      {u.storage?.on && <p className="small muted">{t.files(Math.round(u.storage.used / 1e5) / 10, Math.round(u.storage.quota / 1e6))}</p>}
       <Promo t={t} account={account} onAdded={() => { setN(n + 1); window.dispatchEvent(new Event('lbm-credits')); }} />
       <div className="card stack" style={{ gap: 10 }}>
         <div className="row"><b className="grow">{t.chart}</b>{[7, 30, 90].map((d) => <button key={d} className={`pill ${d === days ? 'on' : ''}`} onClick={() => setDays(d)}>{t.days(d)}</button>)}</div>

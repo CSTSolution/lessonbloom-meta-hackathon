@@ -7,12 +7,12 @@ export type Level = 'basic' | 'good' | 'advanced';
 export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string; level?: 'mixed' | 'basic' | 'advanced'; make?: { video: boolean; cards: boolean } }
 export type UsageKind = 'lessons' | 'pictures' | 'books' | 'photos' | 'voice' | 'advice' | 'requests';
 export interface Usage {
-  credits: Credits; promised: number; days: number; total: { credits: number; calls: number }; period: { credits: number; calls: number };
+  credits: Credits; promised: number; days: number; storage?: { on: boolean; used: number; quota: number }; total: { credits: number; calls: number }; period: { credits: number; calls: number };
   kinds: Record<UsageKind, { credits: number; calls: number }>; daily: ({ day: string } & Record<UsageKind, number>)[];
   items: { kind: 'lesson' | 'book'; id: string; title: string; at: string; credits: number; calls: number; parts: Partial<Record<UsageKind, number>> }[];
   log: { at: string; reason: 'signup' | 'promo' | 'admin' | 'hold' | 'refund'; credits: number; days: number; ref: string; title: string }[];
 }
-export interface SectionSource { section: { id: string; title: string; pageFrom: number; pageTo: number }; book: { id: string; title: string; source: string }; pages: { page: number; text: string }[]; original: { kind: 'pdf'; url: string } | null }
+export interface SectionSource { section: { id: string; title: string; pageFrom: number; pageTo: number }; book: { id: string; title: string; source: string }; pages: { page: number; text: string }[]; original: { kind: 'pdf'; url: string } | { kind: 'pages'; pages: Record<number, string> } | null }
 export interface KnowledgeMap { area: { id: string; name: string }; books: { id: string; title: string; pages: number }[]; sections: { id: string; title: string; pageFrom: number; pageTo: number; bookId: string }[];
   lessons: { id: string; title: string; section: string; status: string; classes: number; skills: string[] }[]; skills: { id: string; name: string; kind: string; lessons: string[] }[] }
 export interface Skill { tag: string; name: string; kind: string }
@@ -53,6 +53,19 @@ async function call<T>(method: string, path: string, body?: unknown, raw?: Blob)
 
 // A file upload that reports how much has been sent (fetch cannot), with the same errors as call()
 export const MAX_PDF = 30e6;
+// A file sent straight to her private R2 space with a short-lived signed link (it never passes our server).
+export function putSigned(url: string, file: Blob, type: string, onProgress?: (share: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', url);
+    x.setRequestHeader('content-type', type);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(e.loaded / e.total); };
+    x.onload = () => (x.status >= 200 && x.status < 300 ? resolve() : reject(new ApiError('upload', 'Tải tệp lên không được. Cô thử lại nhé.', 'The file could not be uploaded. Please try again.', x.status)));
+    x.onerror = () => reject(new ApiError('network', 'Mất kết nối khi tải lên. Cô thử lại nhé.', 'The connection dropped while uploading. Please try again.', 0));
+    x.send(file);
+  });
+}
+
 function upload<T>(path: string, file: Blob, onProgress?: (share: number) => void): Promise<T> {
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
@@ -129,6 +142,9 @@ export const api = {
   scanPage: (bookId: string, n: number, jpeg: Blob) => call<{ ok: boolean }>('PUT', `/t/books/${bookId}/pages/${n}`, undefined, jpeg),
   sectionSource: (id: string) => call<SectionSource>('GET', `/t/sections/${id}/source`),
   knowledgeMap: (areaId: string) => call<KnowledgeMap>('GET', `/t/areas/${areaId}/map`),
+  originalStart: (areaId: string, size: number, title?: string, bookId?: string) => call<{ book: { id: string }; url: string }>('POST', `/t/areas/${areaId}/books/original`, { size, title, bookId }),
+  originalDone: (bookId: string, read: boolean) => call<{ ok: boolean; text?: boolean; pages?: number; estimate?: ScanEstimate }>('POST', `/t/books/${bookId}/original/done`, { read }),
+  originalScan: (bookId: string, pages: number[]) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/original/scan`, { pages }),
   retryBook: (bookId: string) => call<{ ok: boolean }>('POST', `/t/books/${bookId}/retry`),
   scanStart: (bookId: string) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/scan/start`),
   jobs: () => call<{ jobs: Job[] }>('GET', '/t/jobs'),
