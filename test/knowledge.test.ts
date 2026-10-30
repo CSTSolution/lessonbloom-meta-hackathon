@@ -32,6 +32,23 @@ test('a PDF becomes pages, then lessons (sections) with their pages, from the bo
   assert.ok(sections[1].paragraphs.some((p) => /36 cộng 27|36 \+ 27/.test(p.text) && !p.text.includes('\n')), 'wrapped lines are joined back into paragraphs');
 });
 
+test('a scanned textbook: "Bài 1" alone on its line takes its title from the next; the contents page starts no lesson', () => {
+  const pages = [
+    { page: 5, text: 'MỤC LỤC\nBài 1. Ôn tập các số đến 100 7\nBài 2. Tia số. Số liền trước, số liền sau 10\nBài 3. Các thành phần của phép cộng, phép trừ 14\nBài 4. Hơn, kém nhau bao nhiêu 18\nBài 5. Ôn tập phép cộng, phép trừ 20' },
+    { page: 7, text: 'Chủ đề 1\nÔN TẬP VÀ BỔ SUNG\nBài 1\nÔN TẬP CÁC SỐ ĐẾN 100\nLuyện tập\n1 Hoàn thành bảng sau (theo mẫu).\nChục Đơn vị Viết số Đọc số' },
+    { page: 8, text: '3 Hoàn thành bảng sau (theo mẫu).\nSố gồm 5 chục và 7 đơn vị.' },
+    { page: 20, text: 'Bài 5\nÔN TẬP PHÉP CỘNG, PHÉP TRỪ (không nhớ) TRONG PHẠM VI 100\nLuyện tập\n1 Tính nhẩm (theo mẫu).' },
+    { page: 21, text: 'Lesson 3:\nAt the zoo\n1 Look and say.' },
+  ];
+  const sections = sectionsFrom(paragraphs(pages));
+  assert.deepEqual(sections.map((s) => [s.title, s.pageFrom, s.pageTo]), [
+    ['', 5, 5],
+    ['Bài 1. Ôn tập các số đến 100', 7, 8],
+    ['Bài 5. Ôn tập phép cộng, phép trừ (không nhớ) trong phạm vi 100', 20, 20],
+    ['Lesson 3. At the zoo', 21, 21],
+  ]);
+});
+
 test('hybrid search: keywords, missing accents and lesson numbers all find the right section', async () => {
   const sql = await oneBook();
   const top = async (q: string) => (await candidates(sql, 'a1', q))[0]?.section ?? '';

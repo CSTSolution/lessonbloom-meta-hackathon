@@ -9,9 +9,37 @@ import type { Sql } from '../db/sql.ts';
 import { guardedJson, requireOnTask, wrapUser } from '../guard/guard.ts';
 import { readPdf, type PdfPage } from './pdf.ts';
 
-export const HEADING = /^(bài|tiết|chủ đề|chương|unit|lesson|chapter|module|topic)\s+(\d{1,3}|[ivxlc]{1,6})\b[\s:.\-–]*\S/iu;
+export const HEADING = /^(bài|tiết|chủ đề|chương|unit|lesson|chapter|module|topic)\s+(\d{1,3}|[ivxlc]{1,6})\b[\s:.\-–]*[^\s:.\-–]/iu;
+// "Bài 1" alone on its line, its title on the next (a printed textbook's lesson badge, as read from a scan)
+const BARE = /^(bài|tiết|chủ đề|chương|unit|lesson|chapter|module|topic)\s+(\d{1,3}|[ivxlc]{1,6})[\s:.\-–]*$/iu;
+// a page that lists this many lessons is the contents, not where they start (Son's SGK Toán 2, 30 Oct)
+const CONTENTS = 4;
 export const MAX_PASSAGE = 700;
 export interface Section { title: string; pageFrom: number; pageTo: number; paragraphs: { page: number; text: string }[] }
+
+// A title printed in capitals reads as a sentence: "ÔN TẬP CÁC SỐ ĐẾN 100" -> "Ôn tập các số đến 100".
+const sentence = (s: string) => {
+  const upper = (s.match(/\p{Lu}/gu) ?? []).length, lower = (s.match(/\p{Ll}/gu) ?? []).length;
+  return upper > 2 * lower ? s.charAt(0) + s.slice(1).toLocaleLowerCase('vi') : s;
+};
+
+// The page's lines, with each heading found (a bare "Bài 1" takes the next line as its title).
+function linesOf(text: string): { text: string; heading: boolean }[] {
+  const lines = text.split('\n').map((l) => l.trim()), out: { text: string; heading: boolean }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i], next = lines[i + 1] ?? '';
+    if (line.length <= 120 && HEADING.test(line)) { out.push({ text: line, heading: true }); continue; }
+    if (BARE.test(line)) {
+      const titled = next && next.length <= 100 && !HEADING.test(next) && !BARE.test(next) && /^\p{L}/u.test(next);
+      out.push({ text: titled ? `${line.replace(/[\s:.\-–]+$/, '')}. ${sentence(next)}` : line.replace(/[\s:.\-–]+$/, ''), heading: true });
+      if (titled) i++;
+      continue;
+    }
+    out.push({ text: line, heading: false });
+  }
+  // the contents page: its lesson lines are text, not lesson starts
+  return out.filter((l) => l.heading).length >= CONTENTS ? out.map((l) => ({ ...l, heading: false })) : out;
+}
 
 // Lines wrapped by the page width are joined back into paragraphs: a line that does not end a sentence
 // continues on the next one, unless the next line is a heading.
@@ -20,10 +48,9 @@ export function paragraphs(pages: PdfPage[]): { page: number; text: string; head
   for (const p of pages) {
     let cur: string | null = null;
     const flush = () => { if (cur?.trim()) out.push({ page: p.page, text: cur.trim(), heading: false }); cur = null; };
-    for (const raw of p.text.split('\n')) {
-      const line = raw.trim();
+    for (const { text: line, heading } of linesOf(p.text)) {
       if (!line) { flush(); continue; }
-      if (line.length <= 120 && HEADING.test(line)) { flush(); out.push({ page: p.page, text: line, heading: true }); continue; }
+      if (heading) { flush(); out.push({ page: p.page, text: line, heading: true }); continue; }
       cur = cur && !/[.!?:;]["”)]?$/.test(cur) ? `${cur} ${line}` : (flush(), line);
     }
     flush();
