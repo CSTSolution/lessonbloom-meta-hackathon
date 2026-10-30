@@ -1,10 +1,8 @@
 // Steps 3-5 after the agent: the assigner rewrites, simplifies and adds slides; edits items (rebuilt
-// and checked by code); asks for a similar item or a new kind; and makes the lesson video.
+// and checked by code); asks for a similar item or a new kind. The video's render runs alone: test/render.
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
-import { CHROMIUM, FFMPEG, spoken, wavSeconds } from '../server/lesson/video.ts';
+import { spoken, wavSeconds } from '../server/lesson/video.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
 test('slides: rewrite and simpler keep the slide; a new slide comes after the one she is on', async () => {
@@ -41,23 +39,6 @@ test('items: her edit is rebuilt and checked by code; similar and new kinds pass
   const tf = (await call('POST', `/api/t/lessons/${id}/items`, { skill: lesson.skills[0].tag, template: 'truefalse', level: 'good' })).json;
   assert.ok(tf.added.length && tf.added.every((x: any) => x.template === 'truefalse'));
   assert.equal(new Set(tf.items.map((x: any) => x.id)).size, tf.items.length, 'ids stay unique');
-});
-
-const canRender = existsSync(CHROMIUM) || (() => { try { execFileSync('which', ['chromium']); return true; } catch { return false; } })();
-const hasFfmpeg = (() => { try { execFileSync(FFMPEG, ['-version']); return true; } catch { return false; } })();
-test('the lesson video: one MP4 with a chapter per slide', { skip: !(canRender && hasFfmpeg) && 'no Chromium or ffmpeg here' }, async () => {
-  const s = await testServer(), call = s.client();
-  await call('POST', '/api/auth/demo', { lang: 'en' });
-  const { areaId } = await areaWithBook(call, 'maths2');
-  const { id } = await lessonFrom(call, areaId, 'Lesson 21 adding with regrouping');
-  assert.equal((await call('POST', `/api/t/lessons/${id}/video`, { subtitles: true })).status, 200);
-  let l: any;
-  for (let i = 0; i < 240; i++) { l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson; if (!String(l.video_status).startsWith('working')) break; await new Promise((r) => setTimeout(r, 500)); }
-  assert.equal(l.video_status, 'ready');
-  assert.equal(l.video.chapters.length, l.slides.length);
-  const r = await s.app.request(l.video.url, { headers: { range: 'bytes=0-99' } });
-  assert.equal(r.status, 206, 'seekable');
-  assert.equal((await r.arrayBuffer()).byteLength, 100);
 });
 
 test('WAV length from its header', () => {
