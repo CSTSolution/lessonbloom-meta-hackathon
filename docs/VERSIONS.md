@@ -3,7 +3,7 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
-## NEXT (30 Oct, night)
+## v1.0.20261030.2153 (30 Oct, night)
 
 - **A photo or page with no lesson heading becomes one part**, named after the source, so a lesson can
   always be made from it. (Chi #25)
