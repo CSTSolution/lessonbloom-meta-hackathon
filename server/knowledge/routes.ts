@@ -47,6 +47,8 @@ export async function sectionOf(sql: Sql, teacherId: string, areaId: string, sec
   return { section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to }, passages };
 }
 
+class Unread extends Error { constructor(public why: 'stopped' | 'credits') { super(why); } }
+
 export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string) => T; jobs: Jobs }) {
   const { sql } = d;
 
@@ -97,8 +99,8 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   // A book's reading, with its failure written on the book (scanned / blocked / failed).
   const readBook = async (id: string, work: () => Promise<unknown>) => {
     try { await work(); } catch (e) {
-      if (!(e instanceof NotText)) console.error(`[book] ${id}: ${String((e as Error)?.stack || e).slice(0, 800)}`);
-      await sql.query(`update books set status = 'error', error = $2 where id = $1`, [id, e instanceof NotText ? 'scanned' : e instanceof Blocked ? 'blocked' : 'failed']);
+      if (!(e instanceof NotText) && !(e instanceof Unread)) console.error(`[book] ${id}: ${String((e as Error)?.stack || e).slice(0, 800)}`);
+      await sql.query(`update books set status = 'error', error = $2 where id = $1`, [id, e instanceof Unread ? e.why : e instanceof NotText ? 'scanned' : e instanceof Blocked ? 'blocked' : 'failed']);
     }
   };
   const dropBook = async (id: string) => { await sql.query('delete from books where id = $1', [id]); await rm(scanDir(id), { recursive: true, force: true }); };
@@ -210,6 +212,8 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       out.push(...read);
     }
     await job.progress(`${out.length}/${want.length}`);
+    // the whole book or none of it (Son, 30 Oct): stopped, or the held credit would not cover the rest
+    if (out.length < want.length) throw new Unread(job.stopped ? 'stopped' : 'credits');
     if (!out.some((p) => p.text.trim())) throw new NotText();
     await ingestPages(sql, d.ai, areaId, bookId, out);
     await sql.query('update books set pages = $2 where id = $1', [bookId, out.length]);

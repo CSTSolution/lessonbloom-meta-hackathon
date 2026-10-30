@@ -133,3 +133,32 @@ test('a scanned book of one or two pages is read whole, and a short last batch i
     assert.deepEqual(read.sort((a, b) => a - b), pages, `every page read (${pages.length})`);
   }
 });
+
+test('a scanned book is read whole or not at all: stopped halfway, nothing is kept and the credit comes back', async () => {
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  const { area } = (await call('POST', '/api/t/areas', { name: 'Maths 2', subject: 'math', grade: 2 })).json;
+  const pages = [1, 2, 3, 4, 5, 6];
+  const made = (await call('POST', `/api/t/areas/${area.id}/books/scan`, { title: 'Half', pages })).json;
+  const jpeg = (n: number) => ({ type: 'image/jpeg', data: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(600, n)]) });
+  for (const n of pages) await call('PUT', `/api/t/books/${made.book.id}/pages/${n}`, undefined, jpeg(n));
+  let reads = 0;
+  // each page takes a moment, so the stop lands halfway
+  s.ai.answers.set('ocr', (r) => { reads++; return new Promise((ok) => setTimeout(() => ok({ usable: true, text: `Lesson ${(r.fixture as { page: number }).page}: Adding\n36 + 27 = 63.` }), 40)); });
+  const start = (await call('GET', '/api/t/me')).json.credits.left;
+  await call('POST', `/api/t/books/${made.book.id}/scan/start`);
+  // stop it while it reads (the first batch of three may already be done)
+  for (let i = 0; i < 200 && reads === 0; i++) await wait(2);
+  const job = (await call('GET', '/api/t/jobs')).json.jobs.find((j: any) => j.ref === made.book.id);
+  await call('POST', `/api/t/jobs/${job.id}/cancel`);
+  let book: any;
+  for (let i = 0; i < 300; i++) { book = (await call('GET', `/api/t/areas/${area.id}`)).json.books.find((b: any) => b.id === made.book.id); if (book.status !== 'processing') break; await wait(10); }
+  assert.ok(reads < pages.length, `stopped halfway (${reads} read)`);
+  {
+    assert.equal(book.status, 'error');
+    assert.equal(book.error, 'stopped');
+    assert.equal((await call('GET', `/api/t/areas/${area.id}`)).json.sections.length, 0, 'no part of the book is kept');
+  }
+  const left = (await call('GET', '/api/t/me')).json.credits.left;
+  assert.ok(left >= start - 1, 'what was held came back, less what was read');
+});
