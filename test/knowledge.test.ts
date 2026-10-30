@@ -39,13 +39,17 @@ test('a scanned textbook: "Bài 1" alone on its line takes its title from the ne
     { page: 8, text: '3 Hoàn thành bảng sau (theo mẫu).\nSố gồm 5 chục và 7 đơn vị.' },
     { page: 20, text: 'Bài 5\nÔN TẬP PHÉP CỘNG, PHÉP TRỪ (không nhớ) TRONG PHẠM VI 100\nLuyện tập\n1 Tính nhẩm (theo mẫu).' },
     { page: 21, text: 'Lesson 3:\nAt the zoo\n1 Look and say.' },
+    { page: 22, text: 'Bài 6 LUYỆN TẬP CHUNG\n1 Tính nhẩm.' },
+    { page: 23, text: 'Bài 10: LUYỆN TẬP CHUNG\n1 Số?' },
   ];
   const sections = sectionsFrom(paragraphs(pages));
   assert.deepEqual(sections.map((s) => [s.title, s.pageFrom, s.pageTo]), [
     ['', 5, 5],
-    ['Bài 1. Ôn tập các số đến 100', 7, 8],
-    ['Bài 5. Ôn tập phép cộng, phép trừ (không nhớ) trong phạm vi 100', 20, 20],
-    ['Lesson 3. At the zoo', 21, 21],
+    ['Bài 1: Ôn tập các số đến 100', 7, 8],
+    ['Bài 5: Ôn tập phép cộng, phép trừ (không nhớ) trong phạm vi 100', 20, 20],
+    ['Lesson 3: At the zoo', 21, 21],
+    ['Bài 6: Luyện tập chung', 22, 22],
+    ['Bài 10: Luyện tập chung', 23, 23],
   ]);
 });
 

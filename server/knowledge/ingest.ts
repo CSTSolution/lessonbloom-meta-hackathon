@@ -23,16 +23,21 @@ const sentence = (s: string) => {
   return upper > 2 * lower ? s.charAt(0) + s.slice(1).toLocaleLowerCase('vi') : s;
 };
 
+// One way to write a heading: "Bài 6 LUYỆN TẬP CHUNG" and "Bài 10: LUYỆN TẬP CHUNG" both read
+// "Bài 6: Luyện tập chung" (Chi, 30 Oct: the same book gave both).
+const titled = (head: string, title: string) => (title ? `${head}: ${sentence(title.trim())}` : head);
+const tidy = (line: string) => { const m = /^(\p{L}+(?:\s\p{L}+)?\s+(?:\d{1,3}|[ivxlc]{1,6}))\b[\s:.\-–]*(.*)$/iu.exec(line); return m ? titled(m[1], m[2]) : line; };
+
 // The page's lines, with each heading found (a bare "Bài 1" takes the next line as its title).
 function linesOf(text: string): { text: string; heading: boolean }[] {
   const lines = text.split('\n').map((l) => l.trim()), out: { text: string; heading: boolean }[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i], next = lines[i + 1] ?? '';
-    if (line.length <= 120 && HEADING.test(line)) { out.push({ text: line, heading: true }); continue; }
+    if (line.length <= 120 && HEADING.test(line)) { out.push({ text: tidy(line), heading: true }); continue; }
     if (BARE.test(line)) {
-      const titled = next && next.length <= 100 && !HEADING.test(next) && !BARE.test(next) && /^\p{L}/u.test(next);
-      out.push({ text: titled ? `${line.replace(/[\s:.\-–]+$/, '')}. ${sentence(next)}` : line.replace(/[\s:.\-–]+$/, ''), heading: true });
-      if (titled) i++;
+      const hasTitle = next && next.length <= 100 && !HEADING.test(next) && !BARE.test(next) && /^\p{L}/u.test(next);
+      out.push({ text: hasTitle ? titled(line.replace(/[\s:.\-–]+$/, ''), next) : line.replace(/[\s:.\-–]+$/, ''), heading: true });
+      if (hasTitle) i++;
       continue;
     }
     out.push({ text: line, heading: false });

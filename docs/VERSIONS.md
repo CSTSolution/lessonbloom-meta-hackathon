@@ -3,6 +3,21 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## NEXT (31 Oct)
+
+- **A lesson holds 90 credits** and usually uses about 65; the rest comes back (Son, 31 Oct: real lessons
+  cost ~64, the most seen 89). When work costs more than it held, the Usage page says "Charged extra
+  (over the hold)", not "Given back" with a minus. (Chi #23)
+- Drafts come first on the Lessons page and are open: a lesson just made is found there ("Drafts · not
+  assigned yet"). A lesson being made opens from the "Working on" list. A card no longer shows its title
+  twice.
+- The knowledge map is no longer hidden behind an open "View source".
+- The learning path says "✓ Path saved at 18:40" in green, "Not saved" in orange. (Chi #35)
+- The progress lines while a lesson is made say why items were turned down: "kept 2 · 5 rejected by the
+  checker (wrong answer, duplicate), written again". (Chi #36)
+- A lesson's title in a book reads one way: "Bài 6: Luyện tập chung" (with a colon, not in capitals),
+  for books added from now on.
+
 ## v1.0.20261030.2153 (30 Oct, night)
 
 - **A photo or page with no lesson heading becomes one part**, named after the source, so a lesson can

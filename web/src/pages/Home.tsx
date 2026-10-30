@@ -26,22 +26,22 @@ const T = {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
     teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string) => `Bài đang soạn dở: ${what}`, draftGo: 'Soạn tiếp', allClasses: 'Tất cả các lớp', all: 'Tất cả',
-    groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
+    groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Lượt dùng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
-    creditsHint: 'Một bài giữ 60 lượt (kèm hình), phần không dùng được trả lại.', usage: 'Xem lượt dùng chi tiết', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} lượt dùng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
+    creditsHint: 'Một bài giữ trước 90 lượt (kèm hình), thường dùng khoảng 65; phần không dùng được trả lại.', usage: 'Xem lượt dùng chi tiết', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} lượt dùng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
     notifications: 'Thông báo', profile: 'Hồ sơ', reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
   },
   en: {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
     teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string) => `A lesson you started: ${what}`, draftGo: 'Carry on', allClasses: 'All classes', all: 'All',
-    groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
+    groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
-    creditsHint: 'A lesson holds 60 credits (pictures included); what it does not use comes back.', usage: 'See usage in detail', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${pl(c, 'credit')}` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
+    creditsHint: 'A lesson holds 90 credits (pictures included) and usually uses about 65; the rest comes back.', usage: 'See usage in detail', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${pl(c, 'credit')}` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
     notifications: 'Notifications', profile: 'Profile', reminders: 'Reminder settings', criteria: 'Summary criteria', signOut: 'Sign out', role: { teacher: 'Teacher', parent: 'Parent' },
   },
 };
@@ -125,7 +125,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
   const [rows, setRows] = useState<LessonRow[] | null>(null), [classes, setClasses] = useState<{ id: string; name: string; grade?: number | null }[]>([]), [pick, setPick] = useState('');
   const [open, setOpen] = useState<'open' | 'draft' | 'done'>('open'), [week, setWeek] = useState<{ what: string; where: string }[]>([]), draft = readDraft();
   useEffect(() => {
-    api.lessons().then((r) => { setRows(r.lessons); if (!r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
+    api.lessons().then((r) => { setRows(r.lessons); if (r.lessons.some((l) => !l.given) || !r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
     api.classes().then((r) => setClasses(r.classes)).catch(() => {});
     api.summary().then((s) => setWeek(s.classes.flatMap((k) => [...new Set(k.mistakes.map((m) => m.what))].map((what) => ({ what, where: k.name }))))).catch(() => {});
   }, []);
@@ -147,7 +147,8 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
           {/* step 1 left half-done (to enter a code, say) is here to carry on with (Chi #30) */}
           {draft && <div className="banner row"><span className="grow small">{t.draft((draft.text || draft.match?.title || '…').slice(0, 80))}</span><button className="btn small primary" onClick={() => go('/new')}>{t.draftGo}</button></div>}
           {!rows.length && <div className="card"><p className="muted">{t.empty}</p></div>}
-          {rows.length > 0 && (['open', 'draft', 'done'] as const).map((g) => (
+          {/* drafts first, open when there are any: a lesson just made is found there, not thought lost (Chi, 30 Oct) */}
+          {rows.length > 0 && (['draft', 'open', 'done'] as const).map((g) => (
             <div key={g} className={`group card ${open === g ? 'on' : ''}`}>
               <button className="group-head" onClick={() => setOpen(g)} aria-expanded={open === g}>
                 <span className="caret">{open === g ? '▾' : '▸'}</span><span className="grow"><b>{t.groups[g]}</b><span className="small muted" style={{ display: 'block' }}>{t.n(groups[g].length)}</span></span>
@@ -155,7 +156,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
               </button>
               {open === g && groups[g].length > 0 && <div className="lessons" style={{ paddingTop: 10 }}>{groups[g].map((r, i) => (
                 <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
-                  <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example || r.setup.title.split(/[:·]/)[0].slice(0, 22)}</div>
+                  <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example || r.setup.title.trim().charAt(0).toUpperCase()}</div>
                   {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}
                   <b className="small">{r.setup.title}</b>
                   <span className="small muted">{r.status === 'ready' ? t.parts(r.slides, r.items, r.cards, r.video) : t.status[r.status as 'working' | 'error']}</span>
@@ -233,7 +234,7 @@ function JobsBox({ lang }: { lang: 'vi' | 'en' }) {
         {!jobs.length && <span className="small">{t.none}</span>}
         {jobs.map((j) => (
           <div key={j.id} className="row small" style={{ gap: 8 }}>
-            <span className="grow"><b>{j.kind === 'book' ? t.book : t.lesson}</b>: {j.title}<br />
+            <span className="grow"><b>{j.kind === 'book' ? t.book : t.lesson}</b>: {j.kind === 'lesson' ? <button className="link small" onClick={() => { setOpen(false); go(`/lesson/${j.ref}`); }}>{j.title}</button> : j.title}<br />
               <span className="muted">{j.status === 'queued' ? t.waiting(j.place) : j.status === 'running' ? `${t.running}${j.kind === 'book' && /^\d+\/\d+$/.test(j.progress) ? ` · ${t.page(j.progress)}` : ''}` : t[j.status]}</span></span>
             {(j.status === 'queued' || (j.status === 'running' && j.kind === 'book')) && <button className="btn small" onClick={async () => { await api.cancelJob(j.id).catch(() => {}); window.dispatchEvent(new Event('lbm-jobs')); }}>{j.status === 'queued' ? t.cancel : t.stop}</button>}
           </div>

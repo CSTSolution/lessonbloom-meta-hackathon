@@ -15,6 +15,19 @@ import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level
 import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides } from './writer.ts';
 
 const LEVEL_WORDS: Record<Level, { vi: string; en: string }> = { basic: { vi: 'cơ bản', en: 'basic' }, good: { vi: 'khá', en: 'good' }, advanced: { vi: 'nâng cao', en: 'advanced' } };
+// why the checker turned items down, in words a teacher reads (Chi #36): the issue codes of items.ts, grouped
+const WHY: { codes: string[]; vi: string; en: string }[] = [
+  { codes: ['S', 'K', 'Q', 'U'], vi: 'đáp án sai', en: 'wrong answer' },
+  { codes: ['dup'], vi: 'trùng', en: 'duplicate' },
+  { codes: ['scope', 'range', 'offlesson'], vi: 'ngoài phạm vi bài', en: 'outside the lesson' },
+  { codes: ['clue'], vi: 'không có một đáp án đúng', en: 'no single right answer' },
+  { codes: ['picture'], vi: 'hình không khớp', en: 'picture does not match' },
+  { codes: ['punct', 'lang', 'empty', 'long', 'shape'], vi: 'câu chữ chưa đạt', en: 'wording' },
+];
+const whyOf = (rej: { codes: string[] }[], lang: 'vi' | 'en') => {
+  const codes = new Set(rej.flatMap((x) => x.codes));
+  return WHY.filter((w) => w.codes.some((c) => codes.has(c))).map((w) => w[lang]).join(', ');
+};
 export const LIMITS = { maxTurns: 18, maxItemCalls: 14, maxItems: 30, minItems: 8, maxFixes: 6 };
 export type Say = (vi: string, en: string) => void | Promise<void>;
 export interface Built { skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; rejected: Rejected[]; agent: AgentNote }
@@ -113,8 +126,9 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         items.push(...r.kept.slice(0, room)); rejected.push(...r.rejected);
         // the teacher sees the skill's name and the level in words, never the internal tag (Chi, 29 Oct)
         const skillName = skills.find((k) => k.tag === a.skill)?.name || 'practice', lv = LEVEL_WORDS[a.level as Level] ?? LEVEL_WORDS.basic;
-        await say(`Bài luyện tập "${clip(skillName, 60)}" (${lv.vi}): giữ ${r.kept.length} câu${r.rejected.length ? `, bộ kiểm tra loại ${r.rejected.length} câu` : ''}.`,
-          `Practice "${clip(skillName, 60)}" (${lv.en}): kept ${r.kept.length}${r.rejected.length ? `, the checker rejected ${r.rejected.length}` : ''}.`);
+        const n = r.rejected.length, wv = whyOf(r.rejected, 'vi'), we = whyOf(r.rejected, 'en');
+        await say(`Bài luyện tập "${clip(skillName, 60)}" (${lv.vi}): giữ ${r.kept.length} câu${n ? ` · loại ${n} câu chưa đạt${wv ? ` (${wv})` : ''}, viết lại` : ''}.`,
+          `Practice "${clip(skillName, 60)}" (${lv.en}): kept ${r.kept.length}${n ? ` · ${n} rejected by the checker${we ? ` (${we})` : ''}, written again` : ''}.`);
         return { kept: r.kept.map((i) => ({ id: i.id, prompt: i.prompt })), rejected: r.rejected.map((x) => x.issues) };
       }
       case 'write_cards': {

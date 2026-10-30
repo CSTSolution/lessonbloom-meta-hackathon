@@ -94,7 +94,7 @@ export function Knowledge() {
             {book && (book.source ?? 'pdf') === 'pdf' && <a className="btn small" href={`/api/t/books/${book.id}/file`} target="_blank" rel="noreferrer">{t.view}</a>}
             <button className="btn small danger" onClick={() => { if (confirm(t.removeAsk)) void run('del', async () => { await api.deleteArea(a.id); setSel(''); await load(); }); }}>{t.remove}</button></div>
           {book && <BookStatus t={t} book={book} sections={sections.length} onChange={load} onAgain={async () => { await api.deleteArea(a.id).catch(() => {}); setSel(''); await load(); setAdding(true); }} />}
-          <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
+          <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => { setTab(k); setSource(''); }}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
           {source && <SourceView sectionId={source} onClose={() => setSource('')} />}
           {/* drawn again when the book's parts change (a book still being read when the map opened) */}
           {tab === 'map' && <KnowledgeMapView key={`${a.id}:${book?.status}:${sections.length}`} areaId={a.id} onSource={(id) => setSource(id)} />}

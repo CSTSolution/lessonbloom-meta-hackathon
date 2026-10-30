@@ -8,14 +8,14 @@ import { go } from '../router.ts';
 
 const T = {
   vi: {
-    title: 'Lộ trình học', lead: 'Mỗi bài học trong 1, 2 hoặc 3 tuần.', cls: 'Lớp', child: 'Con', src: 'Nguồn', save: 'Lưu lộ trình', saved: 'Đã lưu.', unsaved: 'Chưa lưu', saving: 'Đang lưu…', start: 'Bắt đầu từ',
+    title: 'Lộ trình học', lead: 'Mỗi bài học trong 1, 2 hoặc 3 tuần.', cls: 'Lớp', child: 'Con', src: 'Nguồn', save: 'Lưu lộ trình', saved: (at: string) => `Đã lưu lộ trình lúc ${at}`, unsaved: 'Chưa lưu', saving: 'Đang lưu…', start: 'Bắt đầu từ',
     n: (b: number, w: number) => `${b} bài · ${w} tuần`, wk: (n: number) => `${n} tuần`, st: { done: 'Đã học xong', current: 'Đang học', next: 'Tiếp theo', later: 'Sau' }, ended: (d: string) => `Xong ngày ${d}`, starts: (d: string) => `Bắt đầu ${d}`,
     week: (i: number, n: number) => `Tuần ${i} / ${n}`, left: (n: number, d: string) => `Còn ${n} ngày, hết ngày ${d}`, done: (d: number, n: number, p: boolean) => (p ? (d ? 'Con đã làm bài tập' : 'Con chưa làm bài tập') : `${d}/${n} em đã làm bài tập`), page: 'Tr.',
     reminders: 'Lời nhắc tình trạng', remLead: 'Tự gửi trên app.', toPupils: 'Nhắc học sinh', toChild: 'Nhắc con', toMe: 'Nhắc cô', seeAll: (n: number) => `Xem cả ${n} lời nhắc`, settings: 'Cài đặt lời nhắc',
     noClass: 'Cô tạo lớp trong mục Lớp học trước.', noChild: 'Thêm con trong mục Con của tôi trước.', noSrc: 'Cô thêm sách vào Kho kiến thức trước.', make: 'Tạo bài', lesson: 'Bài giảng',
   },
   en: {
-    title: 'Learning path', lead: 'Each lesson takes 1, 2 or 3 weeks.', cls: 'Class', child: 'Child', src: 'Source', save: 'Save path', saved: 'Saved.', unsaved: 'Not saved', saving: 'Saving…', start: 'Starts on',
+    title: 'Learning path', lead: 'Each lesson takes 1, 2 or 3 weeks.', cls: 'Class', child: 'Child', src: 'Source', save: 'Save path', saved: (at: string) => `Path saved at ${at}`, unsaved: 'Not saved', saving: 'Saving…', start: 'Starts on',
     n: (b: number, w: number) => `${pl(b, 'lesson')} · ${pl(w, 'week')}`, wk: (n: number) => `${n} wk`, st: { done: 'Done', current: 'Now', next: 'Next', later: 'Later' }, ended: (d: string) => `Done ${d}`, starts: (d: string) => `Starts ${d}`,
     week: (i: number, n: number) => `Week ${i} / ${n}`, left: (n: number, d: string) => `${pl(n, 'day')} left, ends ${d}`, done: (d: number, n: number, p: boolean) => (p ? (d ? 'Practice done' : 'Practice not done yet') : `${d}/${n} have done the practice`), page: 'p.',
     reminders: 'Status reminders', remLead: 'Sent in the app.', toPupils: 'To pupils', toChild: 'To your child', toMe: 'To you', seeAll: (n: number) => `See all ${n}`, settings: 'Reminder settings',
@@ -44,7 +44,7 @@ export function Path({ parent }: { parent: boolean }) {
   const [classes, setClasses] = useState<ClassRow[] | null>(null), [areas, setAreas] = useState<AreaRow[]>([]), [k, setK] = useState(''), [a, setA] = useState('');
   const [v, setV] = useState<PathView | null>(null), [weeks, setWeeks] = useState<Record<string, number>>({}), [start, setStart] = useState(''), [open, setOpen] = useState(''), [msg, setMsg] = useState(''), [allRem, setAllRem] = useState(false);
   // saved by itself shortly after each change (Chi #35); `gen` tells a late answer from the latest change
-  const [saving, setSaving] = useState<'' | 'dirty' | 'saving' | 'saved' | 'error'>(''), gen = useRef(0), timer = useRef(0), flush = useRef<(() => void) | null>(null);
+  const [at, setAt] = useState(''), [saving, setSaving] = useState<'' | 'dirty' | 'saving' | 'saved' | 'error'>(''), gen = useRef(0), timer = useRef(0), flush = useRef<(() => void) | null>(null);
   useEffect(() => () => { flush.current?.(); gen.current++; }, []);
   useEffect(() => {
     api.classes().then((r) => { setClasses(r.classes); setK(r.classes[0]?.id || ''); }).catch(() => setClasses([]));
@@ -60,7 +60,7 @@ export function Path({ parent }: { parent: boolean }) {
     try {
       await api.savePath(v.path.id, { start: st, steps: v.steps.map((s) => ({ sectionId: s.sectionId, weeks: w[s.sectionId] || 1 })) });
       // a newer change saves (and reloads) itself; otherwise reload, so the reminders follow the new dates
-      if (my === gen.current) { setSaving('saved'); load(); }
+      if (my === gen.current) { setSaving('saved'); setAt(new Date().toLocaleTimeString(lang === 'en' ? 'en-GB' : 'vi-VN', { hour: '2-digit', minute: '2-digit' })); load(); }
     } catch (e) { if (my === gen.current) { setSaving('error'); setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } }
   };
   const change = (w: Record<string, number>, st: string) => {
@@ -107,7 +107,7 @@ export function Path({ parent }: { parent: boolean }) {
               ); })}</div>}
             </div>
           ); })}
-          <div className="row" role="status"><span className="small muted grow">{msg || (saving === 'dirty' ? t.unsaved : saving === 'saving' ? t.saving : saving === 'saved' ? t.saved : '')}</span>
+          <div className="row" role="status"><span className="small grow" style={{ fontWeight: 600, color: msg ? undefined : saving === 'saved' ? 'var(--ok)' : saving === 'dirty' ? 'var(--sun)' : 'var(--ink-2)' }}>{msg || (saving === 'dirty' ? t.unsaved : saving === 'saving' ? t.saving : saving === 'saved' ? `✓ ${t.saved(at)}` : '')}</span>
             {saving === 'error' && <button className="btn primary" onClick={() => void save()}>{t.save}</button>}</div>
         </div>
         {/* the reminders are worked out on the server from the saved dates: faded until the save is back */}

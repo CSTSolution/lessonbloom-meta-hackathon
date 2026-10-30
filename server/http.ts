@@ -20,7 +20,7 @@ export const MSG = {
   setup: { vi: 'Cô kiểm tra lại môn, lớp và tên bài nhé.', en: 'Please check the subject, grade and title.' },
   lessonLimit: { vi: 'Hôm nay cô đã soạn đủ số bài cho phép. Cô quay lại vào ngày mai nhé.', en: 'You have made today\'s lessons. Please come back tomorrow.' },
   budget: { vi: 'Hôm nay LessonBloom đã dùng hết hạn mức AI. Cô thử lại vào ngày mai nhé.', en: 'LessonBloom has used today\'s AI allowance. Please try again tomorrow.' },
-  credits: { vi: 'Cô chưa đủ lượt dùng: một bài cần 60 lượt (giữ trước, kèm hình; phần không dùng được trả lại). Cô nhập mã khuyến mãi để có thêm; gói thuê bao có lượt dùng mới mỗi ngày.', en: 'Not enough credits: a lesson needs 60 (held first, pictures included; what it does not use comes back). Enter a promo code for more; subscribers get new credits every day.' },
+  credits: { vi: 'Cô chưa đủ lượt dùng: một bài giữ trước 90 lượt (kèm hình), thường dùng khoảng 65, phần không dùng được trả lại. Cô nhập mã khuyến mãi để có thêm; gói thuê bao có lượt dùng mới mỗi ngày.', en: 'Not enough credits: a lesson holds 90 first (pictures included), usually uses about 65, and gives back the rest. Enter a promo code for more; subscribers get new credits every day.' },
   split: { vi: 'Cô chọn trang tách nằm trong phần này và đặt tên cho phần mới.', en: 'Pick a page inside this part and name the new part.' },
   merge: { vi: 'Phần này là phần cuối, không có phần sau để gộp.', en: 'This is the last part: there is nothing after it to merge.' },
   children: { vi: 'Cô thêm tên gọi của ít nhất một con nhé.', en: 'Add at least one child\'s first name.' },
