@@ -6,7 +6,7 @@ import type { AI } from '../ai/types.ts';
 import type { Env } from '../app.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
-import { spare } from '../credits.ts';
+import { holdCredits, settleHold, spare } from '../credits.ts';
 import { Blocked, type Budget, credits, Limiter, requireOnTask } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import type { Files } from '../files.ts';
@@ -24,7 +24,7 @@ const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
 const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
 const lessonsPerDay = (kind: string) => (kind === 'demo' ? config.guard.lessonsDemoDay : config.guard.lessonsDay);
 
-export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T; jobs: Jobs }) {
+export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs }) {
   const lessons = new Lessons(d.sql);
   const perTeacher = new Limiter(10, 200);           // AI requests per teacher (per minute, per day)
 
@@ -104,20 +104,28 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
     const cr = await spare(d.sql, t.id);
-    if (cr.spare < config.guard.lessonCredits) return fail(c, cr.promised && cr.left >= config.guard.lessonCredits ? 'creditsLine' : 'credits', 429);
+    // short only because credit is held for work still running: say so (it comes back when that is done)
+    if (cr.left < config.guard.lessonCredits) return fail(c, cr.promised && cr.left + cr.promised >= config.guard.lessonCredits ? 'creditsHeld' : 'credits', 429);
     const source = sourceOf(m);
     // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
     const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
-    // one job at a time per account: it waits in her line if a book or another lesson is running
+    // a lesson holds its credits up front, pictures included (Son, 30 Oct); what it does not use comes back
+    // when it is all done (pictures and video too). One job at a time per account: it waits in her line.
+    const need = config.guard.lessonCredits, hold = { used: 0 };
+    await holdCredits(d.sql, t.id, need, id);
+    const settle = () => settleHold(d.sql, t.id, id, hold.used).catch((e) => console.error(`[lesson] ${id} settle: ${(e as Error).message}`));
     await d.jobs.add(t.id, 'lesson', id, setup.title,
       async () => {
-        // when its turn comes she must still have credit (and the app its budget), or it stops here
-        if (await d.budget.check(t.id)) { await lessons.step(id, 'Cô đã hết lượt dùng nên bài này chưa soạn. Cô nhập mã khuyến mãi rồi tạo lại nhé.', 'You ran out of credits, so this lesson was not made. Enter a promo code, then make it again.'); await lessons.fail(id); return; }
-        await new Promise<void>((ready) => { void d.as(t.id, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, passages: m.passages, sql: d.sql, onReady: ready }), id); });
+        // when its turn comes the app must still have its budget, or it stops here
+        const b = await d.budget.check(t.id);
+        if (b && b !== 'credits') { await lessons.step(id, 'Ứng dụng đang tạm dừng soạn bài. Cô thử lại sau nhé; lượt đã giữ được trả lại.', 'Making lessons is paused for now. Please try again later; the held credits came back.'); await lessons.fail(id); await settle(); return; }
+        await new Promise<void>((ready) => {
+          void d.held(t.id, hold, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, held: true, passages: m.passages, sql: d.sql, onReady: ready }), undefined, id).finally(settle);
+        });
       },
-      async () => { await d.sql.query(`delete from lessons where id = $1 and teacher_id = $2 and status = 'working'`, [id, t.id]); });
+      async () => { await d.sql.query(`delete from lessons where id = $1 and teacher_id = $2 and status = 'working'`, [id, t.id]); await settle(); }, need);
     return c.json({ id });
   });
 

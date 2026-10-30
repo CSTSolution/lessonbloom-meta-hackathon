@@ -17,15 +17,31 @@ export async function creditState(sql: Sql, teacherId: string): Promise<CreditSt
   return { balance, subscriber: !!t?.sub, planUntil: t?.plan_until ?? null, daily, left: balance + (daily?.left ?? 0) };
 }
 
-// Credit already promised to her line of jobs: about one lesson for each lesson waiting, and what a
-// running lesson has not used yet. New work counts only what is left after that, so a line of
-// lessons cannot run her below zero.
+// Work that holds credit up front (a lesson, a scanned book): the hold comes off her balance at once,
+// its calls are logged but not charged one by one, and at the end what was held, less what the work
+// really cost, comes back (once). If it cost more than was held, the rest is taken off then.
+export async function holdCredits(sql: Sql, teacherId: string, n: number, ref: string) {
+  await sql.query('update teachers set credits = credits - $2 where id = $1', [teacherId, n]);
+  await sql.query(`insert into credit_log (teacher_id, credits, reason, ref) values ($1, $2, 'hold', $3)`, [teacherId, -n, ref]);
+}
+export async function settleHold(sql: Sql, teacherId: string, ref: string, used: number) {
+  const h = await sql.one<{ n: string }>(`select -sum(credits) as n from credit_log where teacher_id = $1 and reason = 'hold' and ref = $2`, [teacherId, ref]);
+  if (!h?.n || await sql.one(`select 1 from credit_log where teacher_id = $1 and reason = 'refund' and ref = $2`, [teacherId, ref])) return;
+  const back = Number(h.n) - Math.ceil(used - 1e-9);
+  await sql.query('update teachers set credits = credits + $2 where id = $1', [teacherId, back]);
+  await sql.query(`insert into credit_log (teacher_id, credits, reason, ref) values ($1, $2, 'refund', $3)`, [teacherId, back, ref]);
+}
+// what held work has really used so far (its calls are logged with `held`)
+export async function heldUsed(sql: Sql, ref: string) {
+  return Number((await sql.one<{ n: string }>(`select coalesce(sum(usd), 0) * 100 as n from ai_usage where held and (lesson_id = $1 or book_id = $1)`, [ref]))?.n ?? 0);
+}
+
+// What she can spend on new work, and what is held right now for work in progress (already taken off).
 export async function spare(sql: Sql, teacherId: string) {
   const left = (await creditState(sql, teacherId)).left;
-  const r = await sql.one<{ n: string }>(`select coalesce(sum(greatest(0, $2::numeric - coalesce((select sum(u.usd) * 100 from ai_usage u where u.lesson_id = j.ref), 0))), 0) as n
-    from jobs j where j.teacher_id = $1 and j.kind = 'lesson' and j.status in ('queued', 'running')`, [teacherId, config.guard.lessonCredits]);
-  const promised = Math.ceil(Number(r?.n ?? 0) - 1e-9);
-  return { left, promised, spare: Math.max(0, left - promised) };
+  const r = await sql.one<{ n: string }>(`select coalesce(-sum(g.credits), 0) as n from credit_log g where g.teacher_id = $1 and g.reason = 'hold'
+    and not exists (select 1 from credit_log x where x.teacher_id = g.teacher_id and x.reason = 'refund' and x.ref = g.ref)`, [teacherId]);
+  return { left, promised: Math.round(Number(r?.n ?? 0)), spare: left };
 }
 
 // Takes one call's cost off: the day's allowance first (subscribers), then the balance (it may dip

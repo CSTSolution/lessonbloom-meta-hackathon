@@ -9,6 +9,7 @@ import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { migrate } from './db/migrate.ts';
 import { pgliteSql, pgSql } from './db/sql.ts';
+import { heldUsed, settleHold } from './credits.ts';
 import { smtpMailer } from './mail.ts';
 
 const sql = config.databaseUrl ? pgSql(config.databaseUrl) : await (async () => {
@@ -23,14 +24,11 @@ const stuck = await sql.query<{ id: string }>(`update lessons set status = 'erro
 await sql.query(`update lessons set video_status = 'error' where video_status like 'working%'`);
 await sql.query(`update lessons set pictures_pending = false where pictures_pending`);
 if (stuck.length) console.log(`[start] ${stuck.length} lesson(s) were interrupted by the restart`);
-// jobs that were running or waiting end as interrupted; a scanned book's held credit comes back whole
-// (what was already read is lost with the restart), and books still being read say so
-const ended = await sql.query<{ teacher_id: string; ref: string; hold: number }>(`update jobs set status = 'error', progress = 'interrupted', ended_at = now() where status in ('queued', 'running') returning teacher_id, ref, hold`);
-for (const j of ended.filter((x) => x.hold > 0)) {
-  if (await sql.one(`select 1 from credit_log where reason = 'refund' and ref = $1`, [j.ref])) continue;
-  await sql.query('update teachers set credits = credits + $2 where id = $1', [j.teacher_id, j.hold]);
-  await sql.query(`insert into credit_log (teacher_id, credits, reason, ref) values ($1, $2, 'refund', $3)`, [j.teacher_id, j.hold, j.ref]);
-}
+// jobs that were running or waiting end as interrupted, and every hold still open (a lesson, a scanned
+// book) is settled from what its calls really used; books still being read say so
+const ended = await sql.query(`update jobs set status = 'error', progress = 'interrupted', ended_at = now() where status in ('queued', 'running') returning id`);
+for (const h of await sql.query<{ teacher_id: string; ref: string }>(`select distinct g.teacher_id, g.ref from credit_log g where g.reason = 'hold'
+    and not exists (select 1 from credit_log x where x.teacher_id = g.teacher_id and x.reason = 'refund' and x.ref = g.ref)`)) await settleHold(sql, h.teacher_id, h.ref, await heldUsed(sql, h.ref));
 await sql.query(`update books set status = 'error', error = 'interrupted' where status = 'processing'`);
 if (ended.length) console.log(`[start] ${ended.length} job(s) were interrupted by the restart`);
 

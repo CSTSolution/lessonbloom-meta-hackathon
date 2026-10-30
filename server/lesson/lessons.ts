@@ -78,7 +78,7 @@ export function itemPage(it: Item, passages: { page: number; text: string }[]): 
   return best[0];
 }
 
-export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; passages?: { page: number; text: string }[]; sql?: Sql ; onReady?: () => void}) {
+export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; held?: boolean; passages?: { page: number; text: string }[]; sql?: Sql ; onReady?: () => void}) {
   try {
     const b = await buildLesson(ai, setup, source, (vi, en) => lessons.step(id, vi, en));
     if (pics?.passages) for (const s of b.slides) { const p = pageOf(s.source, pics.passages); if (p) s.page = p; }
@@ -93,7 +93,7 @@ export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Set
     if (setup.make && !setup.make.cards) b.cards = [];   // she asked for no flashcards
     await lessons.finish(id, b);
     pics?.onReady?.();   // the lesson is there: her next job may start while pictures and the video follow
-    if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides);
+    if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides, pics.held);
     // the video, made after the pictures (local voices, free) unless she asked for none
     if (pics?.sql && config.autoVideo && setup.make?.video !== false) {
       const l = await pics.sql.one<Lesson>('select * from lessons where id = $1', [id]);

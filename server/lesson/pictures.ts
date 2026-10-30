@@ -40,14 +40,16 @@ export async function illustrate(ai: AI, slide: Pick<Slide, 'id' | 'heading' | '
 const ext = (b: Buffer) => (b[0] === 0x89 ? 'png' : 'jpg') as 'png' | 'jpg';
 
 // The background job: up to MAX_PICTURES slides, the teaching slides first, two at a time.
-export async function drawPictures(ai: AI, lessons: Lessons, files: Files, budget: Budget, lessonId: string, teacherId: string, slides: Slide[]) {
+export async function drawPictures(ai: AI, lessons: Lessons, files: Files, budget: Budget, lessonId: string, teacherId: string, slides: Slide[], held = false) {
   const pick = [...slides].filter((s) => !s.image).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind)).slice(0, MAX_PICTURES);
   await lessons.picturesPending(lessonId, true);
   let drawn = 0, skipped = 0;
   const queue = [...pick];
   const worker = async () => {
     for (let s = queue.shift(); s; s = queue.shift()) {
-      if (await budget.check(teacherId)) { skipped++; continue; }
+      // paid from the lesson's held credit: her balance being low does not stop it, the app's caps do
+      const b = await budget.check(teacherId);
+      if (b && !(held && b === 'credits')) { skipped++; continue; }
       try {
         const png = await illustrate(ai, s);
         if (!png) { skipped++; continue; }

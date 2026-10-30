@@ -10,7 +10,7 @@ import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { Blocked, type Budget, guardedJson, requireOnTask } from '../guard/guard.ts';
 import type { JobCtl, Jobs } from '../jobs.ts';
-import { spare } from '../credits.ts';
+import { holdCredits as holdC, settleHold, spare } from '../credits.ts';
 import { OCR_SCHEMA, SCAN_SYSTEM } from '../lesson/prompts.ts';
 import { fail, MSG } from '../http.ts';
 import { ingestBook, ingestPages, NotText } from './ingest.ts';
@@ -49,7 +49,7 @@ export async function sectionOf(sql: Sql, teacherId: string, areaId: string, sec
 
 class Unread extends Error { constructor(public why: 'stopped' | 'credits') { super(why); } }
 
-export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string) => T; jobs: Jobs }) {
+export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs }) {
   const { sql } = d;
 
   app.get('/api/t/areas', async (c) => {
@@ -218,17 +218,10 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     await ingestPages(sql, d.ai, areaId, bookId, out);
     await sql.query('update books set pages = $2 where id = $1', [bookId, out.length]);
   };
-  const holdCredits = async (teacherId: string, n: number, ref: string) => {
-    await sql.query('update teachers set credits = credits - $2 where id = $1', [teacherId, n]);
-    await sql.query(`insert into credit_log (teacher_id, credits, reason, ref) values ($1, $2, 'hold', $3)`, [teacherId, -n, ref]);
-  };
-  // what was held, less what the reading really cost, goes back (once)
-  const settle = async (teacherId: string, bookId: string, need: number, hold: { used: number }) => {
-    if (!(await sql.one(`select 1 from credit_log where teacher_id = $1 and reason = 'hold' and ref = $2`, [teacherId, bookId]))) return;
-    if (await sql.one(`select 1 from credit_log where teacher_id = $1 and reason = 'refund' and ref = $2`, [teacherId, bookId])) return;
-    const back = Math.max(0, need - Math.ceil(hold.used));
-    await sql.query('update teachers set credits = credits + $2 where id = $1', [teacherId, back]);
-    await sql.query(`insert into credit_log (teacher_id, credits, reason, ref) values ($1, $2, 'refund', $3)`, [teacherId, back, bookId]);
+  const holdCredits = (teacherId: string, n: number, ref: string) => holdC(sql, teacherId, n, ref);
+  // what was held, less what the reading really cost, goes back (once); the page pictures are gone
+  const settle = async (teacherId: string, bookId: string, _need: number, hold: { used: number }) => {
+    await settleHold(sql, teacherId, bookId, hold.used);
     await rm(scanDir(bookId), { recursive: true, force: true });
   };
 

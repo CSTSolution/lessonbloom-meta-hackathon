@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createAdmin } from '../server/admin/admin.ts';
 import { config } from '../server/config.ts';
-import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, settled, testServer } from './helpers.ts';
 
 const KEY = 'test-admin-key-0123456789';
 
@@ -57,6 +57,7 @@ test('credits: 120 once at sign-up, taken off call by call; too few stops new wo
   const { id, match } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ');
   const l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson;
   assert.ok(l.credits > 0);
+  await settled(s.sql, id);
   const after = (await call('GET', '/api/t/me')).json.credits;
   assert.ok(after.balance < config.guard.signupCredits && after.balance >= config.guard.signupCredits - l.credits - 3, `${after.balance} after a lesson of ${l.credits}`);
   const t = (await call('GET', '/api/t/me')).json.teacher;

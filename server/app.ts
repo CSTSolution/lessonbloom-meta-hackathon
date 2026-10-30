@@ -38,7 +38,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
     void budget.record(u, w?.teacher ?? null, w?.lesson ?? null, !w?.hold, w?.book ?? null).catch((e) => console.error(`[usage] ${(e as Error).message}`));
   };
   const as = <T>(teacher: string, fn: () => T, lesson?: string, book?: string) => who.run({ teacher, lesson, book }, fn);
-  const held = <T>(teacher: string, hold: { used: number }, fn: () => T, book?: string) => who.run({ teacher, hold, book }, fn);
+  const held = <T>(teacher: string, hold: { used: number }, fn: () => T, book?: string, lesson?: string) => who.run({ teacher, hold, book, lesson }, fn);
   const jobs = deps.jobs ?? new Jobs(sql, config.jobs.concurrent);
 
   const app = new Hono<Env>();
@@ -156,7 +156,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
   });
   knowledgeRoutes(app, { sql, ai, budget, as, held, jobs });
   usageRoutes(app, { sql });
-  lessonRoutes(app, { sql, ai, budget, files, as, jobs });
+  lessonRoutes(app, { sql, ai, budget, files, as, held, jobs });
   editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });
   classRoutes(app, { sql, ai, files, reminder: path.pupilReminder });

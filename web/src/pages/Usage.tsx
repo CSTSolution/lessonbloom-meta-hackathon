@@ -14,25 +14,25 @@ const COLOR: Record<UsageKind, string> = { lessons: '#2a78d6', pictures: '#eb683
 const T = {
   vi: {
     title: 'Lượt dùng', lead: 'Một lượt bằng 0,01 USD giá Meta. Mỗi lần trợ lý làm việc đều được ghi lại ở đây.',
-    left: 'Còn lại', promised: (n: number) => `${n} lượt đang dành cho bài chờ trong hàng`, period: (d: number) => `Đã dùng ${d} ngày qua`, total: 'Đã dùng từ đầu', calls: (n: number) => `${n} lần gọi trợ lý`,
+    left: 'Còn lại', promised: (n: number) => `${n} lượt đang giữ cho việc đang làm (phần thừa sẽ trả lại)`, period: (d: number) => `Đã dùng ${d} ngày qua`, total: 'Đã dùng từ đầu', calls: (n: number) => `${n} lần gọi trợ lý`,
     days: (d: number) => `${d} ngày`, chart: 'Lượt dùng mỗi ngày', none: 'Chưa dùng lượt nào trong khoảng này.', sum: 'Tổng',
     kinds: { lessons: 'Soạn bài (slide, bài tập, thẻ nhớ, kiểm tra)', pictures: 'Hình minh hoạ', books: 'Đọc sách', photos: 'Đọc ảnh bài học, bài làm', voice: 'Nói yêu cầu', advice: 'Lộ trình, nhận xét, gợi ý', requests: 'Tìm bài trong sách, kiểm tra yêu cầu' },
     short: { lessons: 'Soạn bài', pictures: 'Hình', books: 'Đọc sách', photos: 'Ảnh', voice: 'Giọng nói', advice: 'Nhận xét', requests: 'Tìm bài' },
     byKind: 'Theo loại việc', share: 'Phần', each: 'Từng bài và từng sách', lesson: 'Bài', book: 'Sách', untitled: '(đã xoá)', open: 'Mở',
-    log: 'Lượt vào và giữ chỗ', reason: { signup: 'Khi đăng ký', promo: 'Mã khuyến mãi', admin: 'LessonBloom tặng', hold: 'Giữ chỗ để đọc sách', refund: 'Trả lại phần chưa dùng' },
+    log: 'Lượt vào và giữ chỗ', reason: { signup: 'Khi đăng ký', promo: 'Mã khuyến mãi', admin: 'LessonBloom tặng', hold: 'Giữ chỗ', refund: 'Trả lại phần chưa dùng' },
     promo: 'Mã khuyến mãi', promoPh: 'Nhập mã', apply: 'Dùng mã', promoOk: (c: number) => `Đã thêm ${c} lượt.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
-    hint: 'Một bài khoảng 35 lượt (kèm hình). Đọc sách dạng ảnh khoảng 1 lượt một trang; sách có chữ gần như không tốn lượt.', back: '← Bài giảng',
+    hint: 'Một bài giữ 60 lượt (kèm hình) rồi trả lại phần không dùng; thường dùng 40–60. Đọc sách dạng ảnh khoảng 1 lượt một trang; sách có chữ gần như không tốn lượt.', back: '← Bài giảng',
   },
   en: {
     title: 'Credits and usage', lead: 'One credit is US$0.01 of Meta\'s price. Every time the assistant works, it is recorded here.',
-    left: 'Left', promised: (n: number) => `${n} kept for lessons waiting in your line`, period: (d: number) => `Used in the last ${d} days`, total: 'Used in all', calls: (n: number) => pl(n, 'assistant call'),
+    left: 'Left', promised: (n: number) => `${n} held for work in progress (the rest comes back)`, period: (d: number) => `Used in the last ${d} days`, total: 'Used in all', calls: (n: number) => pl(n, 'assistant call'),
     days: (d: number) => `${d} days`, chart: 'Credits used each day', none: 'No credits used in this period.', sum: 'Total',
     kinds: { lessons: 'Making lessons (slides, practice, flashcards, checks)', pictures: 'Pictures', books: 'Reading books', photos: 'Reading photos of lessons and homework', voice: 'Spoken requests', advice: 'Paths, comments and advice', requests: 'Finding the lesson in your book, checking requests' },
     short: { lessons: 'Lessons', pictures: 'Pictures', books: 'Books', photos: 'Photos', voice: 'Voice', advice: 'Advice', requests: 'Finding' },
     byKind: 'By kind of work', share: 'Share', each: 'Each lesson and book', lesson: 'Lesson', book: 'Book', untitled: '(deleted)', open: 'Open',
-    log: 'Credits in, held and given back', reason: { signup: 'When you joined', promo: 'Promo code', admin: 'From LessonBloom', hold: 'Held to read a book', refund: 'Given back (not used)' },
+    log: 'Credits in, held and given back', reason: { signup: 'When you joined', promo: 'Promo code', admin: 'From LessonBloom', hold: 'Held', refund: 'Given back (not used)' },
     promo: 'Promo code', promoPh: 'Enter a code', apply: 'Apply', promoOk: (c: number) => `Added ${pl(c, 'credit')}.`, promoDemo: 'Sign in with your email to use a promo code.',
-    hint: 'A lesson uses about 35 credits, pictures included. A scanned book about 1 credit a page; a book with text costs almost nothing.', back: '← Lessons',
+    hint: 'A lesson holds 60 credits, pictures included, and gives back what it does not use; most use 40–60. A scanned book about 1 credit a page; a book with text costs almost nothing.', back: '← Lessons',
   },
 };
 type Dict = (typeof T)['en'];

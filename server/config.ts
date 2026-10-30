@@ -36,7 +36,7 @@ export const config = {
     // credits (1 credit = $0.01 of Meta list price; a lesson with its pictures is about 34)
     signupCredits: num('LB_SIGNUP_CREDITS', 120),           // once, when an assigner joins: about 3 lessons
     subscriberDayCredits: num('LB_SUBSCRIBER_DAY_CREDITS', 200), // subscribers, every Vietnam day, used before the balance
-    lessonCredits: 35,                            // credits a teacher needs left to start a lesson (one lesson's worth)
+    lessonCredits: num('LB_LESSON_CREDITS', 60),  // held to make a lesson, pictures included (Son, 30 Oct; a real one is ~40-62); the rest comes back
     demoPerIpDay: num('LB_DEMO_PER_IP_DAY', 3),  // each demo comes with the sign-up credits
     codesPerEmailDay: 5, codesPerIpDay: 20, codeGapSeconds: 60,
     lessonsDemoDay: num('LB_LESSONS_DEMO_DAY', 3), lessonsDay: num('LB_LESSONS_DAY', 10),

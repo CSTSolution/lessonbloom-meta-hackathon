@@ -35,8 +35,8 @@ export async function usageOf(sql: Sql, teacherId: string, days: number) {
         ${mine.replace('from ai_usage u', 'from ai_usage u left join books b on b.id = u.book_id left join lessons l on l.id = u.lesson_id')} and ${since} and (u.book_id is not null or u.lesson_id is not null)
         group by 1, 2, 5`, [teacherId, days]),
     sql.query<{ at: string; reason: string; credits: number; days: number; ref: string; title: string | null }>(
-      `select g.at, g.reason, g.credits, g.days, case when g.reason in ('promo') then g.ref else '' end as ref, b.title
-        from credit_log g left join books b on b.id = g.ref where g.teacher_id = $1 order by g.at desc, g.id desc limit 60`, [teacherId]),
+      `select g.at, g.reason, g.credits, g.days, case when g.reason in ('promo') then g.ref else '' end as ref, coalesce(b.title, l.setup->>'title') as title
+        from credit_log g left join books b on b.id = g.ref left join lessons l on l.id = g.ref where g.teacher_id = $1 order by g.at desc, g.id desc limit 60`, [teacherId]),
     // what she started with: her balance now, plus what was taken off call by call, less what came in or
     // was held and given back (accounts from before 29 Oct joined with 100, newer ones with 120)
     sql.one<{ created_at: string; start: string }>(`select t.created_at, t.credits + coalesce((select sum(u.usd) * 100 from ai_usage u where u.teacher_id = t.id and not u.held), 0)
