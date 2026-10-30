@@ -8,12 +8,12 @@ const T = {
   vi: {
     title: 'Cài đặt lời nhắc', lead: 'Chọn lời nhắc gửi cho người học và cho bạn.', save: 'Lưu', saved: 'Đã lưu.', pupils: 'Cho người học', me: 'Cho người giao bài', on: (n: number, k: number) => `${n}/${k} đang bật`,
     session: 'Nhắc buổi học', sessionSub: 'Ngày có buổi học (bắt đầu và giữa bài).', at: 'Lúc', cards: 'Nhắc ôn thẻ nhớ', cardsSub: 'Sau 2–3 ngày.', start: 'Ngày bắt đầu bài', twoDays: 'Còn 2 ngày', twoDaysSub: 'Kèm gợi ý kéo dài 1 tuần nếu chưa kịp.', end: 'Hết thời gian bài', endSub: 'Tóm tắt dạng đã vững, đang luyện, gợi ý bài tiếp.',
-    preview: 'Xem trước lời nhắc', kind: 'Nhắc buổi học', sample: (n: string) => `Hôm nay là buổi học của ${n}! Con ôn phép cộng có nhớ và 8 thẻ nhớ nhé.`, open: 'Bắt đầu buổi học', merge: 'Trùng ngày học và ngày ôn: gộp làm một.', rules: '🔒 Chỉ trên app · tối đa 1 lần/ngày · không sau 20:00.', child: 'An',
+    preview: 'Xem trước lời nhắc', kind: 'Nhắc buổi học', sample: (n: string) => `Hôm nay là buổi học của ${n}! Con ôn phép cộng có nhớ và 8 thẻ nhớ nhé.`, open: 'Bắt đầu buổi học', merge: 'Trùng ngày học và ngày ôn: gộp làm một.', rules: 'Chỉ trên app · tối đa 1 lần/ngày · không sau 20:00.', child: 'An',
   },
   en: {
     title: 'Reminder settings', lead: 'Choose the reminders for learners and for you.', save: 'Save', saved: 'Saved.', pupils: 'For learners', me: 'For you', on: (n: number, k: number) => `${n}/${k} on`,
     session: 'Session reminder', sessionSub: 'On lesson days (the start and the middle).', at: 'At', cards: 'Flashcard review', cardsSub: 'After 2–3 days.', start: 'A lesson starts', twoDays: '2 days left', twoDaysSub: 'With a suggestion to add a week if needed.', end: 'Time is up', endSub: 'What is mastered, what is practised, what next.',
-    preview: 'Preview', kind: 'Session reminder', sample: (n: string) => `Today is ${n}'s lesson! Practise adding with carrying and 8 flashcards.`, open: 'Start the session', merge: 'A lesson day and a review day together become one reminder.', rules: '🔒 In the app only · at most once a day · never after 20:00.', child: 'An',
+    preview: 'Preview', kind: 'Session reminder', sample: (n: string) => `Today is ${n}'s lesson! Practise adding with carrying and 8 flashcards.`, open: 'Start the session', merge: 'A lesson day and a review day together become one reminder.', rules: 'In the app only · at most once a day · never after 20:00.', child: 'An',
   },
 };
 

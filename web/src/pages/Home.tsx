@@ -93,7 +93,7 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
       <JobsBox lang={lang} />
       <button className="btn ghost small" aria-label={lang === 'vi' ? 'Thông báo' : 'Notifications'} onClick={() => go('/notifications')}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg></button>
       {credits && <button className="btn ghost small" title={t.creditsHint} onClick={() => setOpen(!open)}>{t.credits(credits)}</button>}
-      <button className="row link" style={{ gap: 6, color: 'inherit' }} onClick={() => setOpen(!open)}><span className="avatar">{name.trim().slice(0, 1).toUpperCase()}</span><span className="small">{name}</span></button>
+      <button className="row link" style={{ gap: 6, color: 'inherit' }} onClick={() => setOpen(!open)}><span className="avatar">{name.trim().slice(0, 1).toUpperCase()}</span><span className="small me-name">{name}</span></button>
       {open && <div className="menu">
         <span className="small muted">{teacher.role ? t.role[teacher.role] : ''}{teacher.kind === 'demo' ? ` · ${t.demo}` : teacher.email ? ` · ${teacher.email}` : ''}</span>
         {credits && <CreditBox credits={credits} account={teacher.kind === 'account'} onChange={setCredits} t={t} />}

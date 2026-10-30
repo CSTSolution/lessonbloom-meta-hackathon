@@ -100,7 +100,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (!setup0) return fail(c, 'setup');
     // her request steers the lesson inside the section (Chi: only what the material points to); the section stays the only source
     const ask = request && request.toLowerCase() !== m.section.title.toLowerCase() && request.length > m.section.title.length + 10 ? request.slice(0, 200) : '';
-    const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
+    const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(t.role === 'parent' ? { forParent: true } : {}), ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
     const cr = await spare(d.sql, t.id);

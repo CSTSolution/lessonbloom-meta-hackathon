@@ -6,7 +6,7 @@ import { guardedJson, wrapUser } from '../guard/guard.ts';
 import { buildEnglish, buildMath, checkItem, contextOf, type RawEnglish, type RawMath } from './items.ts';
 import {
   CARDS_SCHEMA, CARDS_SYSTEM, ENG_ITEMS_SCHEMA, ENG_ITEMS_SYSTEM, fill, INTAKE_SCHEMA, INTAKE_SYSTEM, langName, MATH_ITEMS_SCHEMA, MATH_ITEMS_SYSTEM,
-  maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
+  audienceLine, maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
 } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 
@@ -77,7 +77,7 @@ export async function planLesson(ai: AI, setup: Setup, source: string) {
 
 export async function writeSlides(ai: AI, setup: Setup, source: string, outline: { kind: string; heading: string }[]): Promise<Slide[]> {
   const r = await guardedJson<{ slides: Omit<Slide, 'id'>[] }>(ai, {
-    endpoint: 'slides', creative: true, system: fill(SLIDES_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), maxWords: maxWords(setup.grade) }),
+    endpoint: 'slides', creative: true, system: fill(SLIDES_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), maxWords: maxWords(setup.grade), audience: audienceLine(setup.forParent) }),
     prompt: `${material(setup, source)}\n\nOUTLINE:\n${wrapUser(JSON.stringify(outline))}`, schema: SLIDES_SCHEMA, fixture: { setup, source, outline } }, { maxChars: 40000 });
   return (r.slides || []).slice(0, 14).map((s, i) => ({
     id: `sl${pad(i + 1)}`, kind: s.kind, heading: clip(s.heading, 90), bullets: (s.bullets || []).map((b) => clip(b, 160)).filter(Boolean).slice(0, 4),

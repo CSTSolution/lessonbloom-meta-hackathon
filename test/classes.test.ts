@@ -71,3 +71,11 @@ test('assigning needs the confirm box; pupils join by code, practise, and the as
   const read = readable(first.prompt, 'vi');
   assert.ok(!/[+=]/.test(read) && !new RegExp(`(?<!\\d)${first.answer}(?!\\d)`).test(read), read);
 });
+
+test('hints: one away from the answer is a counting slip, not the wrong sign (Chi #24)', async () => {
+  const { hintOf } = await import('../server/classes/check.ts');
+  const it = { subject: 'math', template: 'compute', op: '+', a: 9, b: 8, answer: '17' } as any;
+  assert.match(hintOf(it, '18', 'vi'), /Gần đúng rồi/);
+  assert.match(hintOf(it, '16', 'en'), /So close/);
+  assert.doesNotMatch(hintOf(it, '7', 'en'), /So close/);
+});

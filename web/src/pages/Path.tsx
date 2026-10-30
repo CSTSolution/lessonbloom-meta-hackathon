@@ -68,7 +68,7 @@ export function Path({ parent }: { parent: boolean }) {
                     <div className="row small"><b className="grow">{t.week(Math.min(s.weeks, Math.floor((Date.now() + 7 * 3600e3 - Date.parse(`${s.start}T00:00:00Z`)) / 6048e5) + 1), s.weeks)}</b><span className="muted">{t.left(Math.max(0, Math.round((Date.parse(`${s.end}T00:00:00Z`) - Date.parse(new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10) + 'T00:00:00Z')) / 864e5)), dm(s.end))}</span></div>
                     {v.progress && <><span className="meter" style={{ width: '100%' }}><i style={{ width: `${v.progress.pupils ? (100 * v.progress.done) / v.progress.pupils : 0}%` }} /></span><span className="small muted">{t.done(v.progress.done, v.progress.pupils, parent)}</span></>}
                   </div>}
-                  <div className="row small">{lessons.map((l) => <button key={l.id} className="link small" onClick={() => go(`/lesson/${l.id}`)}>📘 {l.title}</button>)}
+                  <div className="row small">{lessons.map((l) => <button key={l.id} className="link small" onClick={() => go(`/lesson/${l.id}`)}>{l.title}</button>)}
                     {!lessons.length && s.status !== 'done' && <button className="link small" onClick={() => go(`/new?area=${a}&section=${s.sectionId}`)}>+ {t.make}</button>}</div>
                 </div>
               ); })}</div>}

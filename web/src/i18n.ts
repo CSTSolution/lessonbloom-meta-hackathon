@@ -8,6 +8,8 @@ const fromBrowser = (): Lang => 'en';
 let current: Lang = (() => { try { const v = localStorage.getItem(KEY); return v === 'en' || v === 'vi' ? v : fromBrowser(); } catch { return fromBrowser(); } })();
 const subs = new Set<(l: Lang) => void>();
 export const getLang = () => current;
+// whether this browser has a language chosen by hand (the toggle); if not, a page may pick the right one
+export const langChosen = () => { try { return !!localStorage.getItem(KEY); } catch { return false; } };
 // English counts: "1 lesson", "2 lessons" (Vietnamese has no plural)
 export const pl = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export function setLang(l: Lang) { current = l; try { localStorage.setItem(KEY, l); } catch { /* private mode */ } document.documentElement.lang = l; subs.forEach((f) => f(l)); }

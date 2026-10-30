@@ -25,6 +25,7 @@ const NUDGE: Record<string, { vi: string; en: string }> = {
   borrow: { vi: 'Hàng đơn vị chưa đủ để trừ: con mượn 1 chục nhé.', en: 'The ones are too small: take 1 ten first.' },
   flip: { vi: 'Ở hàng đơn vị, con lấy số trên trừ số dưới nhé.', en: 'In the ones, take the bottom digit from the top one.' },
   op: { vi: 'Con xem lại dấu của phép tính nhé.', en: 'Look again at the sign.' },
+  close: { vi: 'Gần đúng rồi! Con tính lại thật cẩn thận nhé.', en: 'So close! Work it out again carefully.' },
   plus: { vi: 'Con cộng hàng đơn vị trước, rồi đến hàng chục.', en: 'Add the ones first, then the tens.' },
   minus: { vi: 'Con trừ hàng đơn vị trước, rồi đến hàng chục.', en: 'Subtract the ones first, then the tens.' },
   times: { vi: 'Con đọc lại bảng nhân nhé.', en: 'Say the times table again.' },
@@ -34,7 +35,9 @@ function mathNudge(it: Item & { subject: 'math' }, given: string, lang: 'vi' | '
   const g = Number(String(given).trim()), right = Number(it.answer);
   let k = it.op === '+' ? 'plus' : it.op === '-' ? 'minus' : it.op === '×' ? 'times' : 'share';
   if (it.template !== 'truefalse' && Number.isFinite(g)) {
-    if (it.op === '+' && g === right - 10) k = 'carry';
+    // one away from the answer is a slip in counting, not the wrong sign (Chi #24: 18 for 17)
+    if (Math.abs(g - right) === 1) k = 'close';
+    else if (it.op === '+' && g === right - 10) k = 'carry';
     else if (it.op === '-' && g === right + 10) k = 'borrow';
     else if (it.op === '-' && it.a % 10 < it.b % 10 && g % 10 === (it.b % 10) - (it.a % 10)) k = 'flip';
     else if ((it.op === '+' && g === it.a - it.b) || (it.op === '-' && g === it.a + it.b)) k = 'op';

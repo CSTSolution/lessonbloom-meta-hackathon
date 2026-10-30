@@ -15,6 +15,7 @@ export interface Setup {
   note?: string;                  // her wishes for this lesson ("use market examples")
   level?: 'mixed' | 'basic' | 'advanced';   // the class's level (Chi's step 2): how the practice leans
   make?: { video: boolean; cards: boolean }; // what to make besides slides and practice (Chi's step 2)
+  forParent?: boolean;            // made by a parent for their own child at home (Chi #24): no "class", no "teacher"
 }
 
 // A skill ("dạng bài") with a kind from a fixed list, so code can check items against it (Chi's rule Q).

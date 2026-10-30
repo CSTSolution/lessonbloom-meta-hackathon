@@ -38,7 +38,7 @@ Only what is in the section.`;
 
 export const SLIDES_SYSTEM = `You write the slides of a lesson for Vietnamese primary pupils (grade {{grade}}, age 6-11) from ONE section of the assigner's own book (a teacher or a parent), following the outline.
 For each slide: heading (big, short), 1-4 bullets (short sentences a child can read, at most {{maxWords}} words each), example (a worked example when it helps, e.g. "36 + 27 = 63"), notes (what the teacher says, 1-3 sentences), source (the exact words in the book section this slide comes from, copied), narration (what the video voice says, 1-3 friendly sentences), imagePrompt (a simple picture with no text, letters or numbers).
-Language: {{lang}}. Only facts from the book section; nothing from general knowledge. Practice is "bài luyện tập", never a test; no scores.`;
+Language: {{lang}}. Only facts from the book section; nothing from general knowledge. Practice is "bài luyện tập", never a test; no scores.{{audience}}`;
 export const SLIDES_SCHEMA = { type: 'object', properties: { slides: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string', enum: SLIDE_KINDS }, heading: str, bullets: strs, example: str, notes: str, source: str, narration: str, imagePrompt: str }, required: ['kind', 'heading', 'bullets', 'notes', 'source', 'narration', 'imagePrompt'] } } }, required: ['slides'] };
 
 export const MATH_ITEMS_SYSTEM = `You supply the NUMBERS for maths practice items for grade {{grade}}; the app writes the question text and works out every answer itself.
@@ -74,3 +74,7 @@ export const REVIEW_SCHEMA = { type: 'object', properties: { flags: { type: 'arr
 export const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => String(v[k] ?? ''));
 export const slideCount = (minutes: number) => (minutes <= 15 ? 7 : minutes <= 25 ? 9 : 11);
 export const maxWords = (grade: number) => (grade <= 2 ? 12 : grade === 3 ? 16 : 20);
+
+// who uses the lesson: a teacher with a class (the default), or a parent with their own child at home
+export const audienceLine = (forParent?: boolean) => (forParent ? `
+This lesson is used by a parent with their own child at home, not in a class: notes are short tips for the parent (what to say or do with the child), narration speaks to the child directly. Never mention a class, classmates or a teacher.` : '');

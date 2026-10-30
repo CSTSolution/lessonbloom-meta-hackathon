@@ -5,7 +5,7 @@
 // flashcards and the pairs game. A VI/EN switch on every screen; kind words only.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../api.ts';
-import { useLang } from '../i18n.ts';
+import { langChosen, setLang, useLang } from '../i18n.ts';
 import { LangToggle } from '../pages/LangToggle.tsx';
 import { go, usePath } from '../router.ts';
 
@@ -15,11 +15,11 @@ const PAIRS = 4;  // pairs in the game (Chi's design: "Tìm 4 cặp", 8 cards fi
 const S = {
   vi: {
     hiKid: 'Chào con!', joinSub: 'Nhập mã lớp cô đưa, rồi chọn tên con nhé.', codeLabel: 'Mã lớp', next: 'Tiếp', who: 'Con là ai?', notMe: 'Đổi lớp', noName: 'Không thấy tên con? Hỏi cô giáo nhé.',
-    hello: (n: string, k: string) => `Chào ${n} · ${k}`, todayIs: (t: string) => `Bài hôm nay: ${t}`, nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!', leave: 'Thoát', remind: 'Nhớ nhé!',
+    hello: (n: string, k: string) => (k && k !== n ? `Chào ${n} · ${k}` : `Chào ${n}`), todayIs: (t: string) => `Bài hôm nay: ${t}`, nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!', leave: 'Thoát', remind: 'Nhớ nhé!',
     video: 'Xem video', slides: 'Xem bài', seen: 'đã xem', cards: 'Thẻ nhớ', nCards: (n: number) => `${n} thẻ`, doneMark: 'đã xong', practise: 'Làm bài tập', nItems: (n: number) => `${n} câu`, pairs: 'Lật thẻ', nPairs: (n: number) => `Tìm ${n} cặp`,
     gotSoFar: 'Con đã đi được', back: 'Quay lại', done: 'Xong', subject: { math: 'Toán', english: 'Tiếng Anh' } as Record<string, string>,
     qOf: (k: number, n: number) => `Câu ${k}/${n}`, pick: 'Con chọn câu trả lời đúng nhé', listenQ: 'Nghe câu hỏi', almost: 'Gần đúng rồi! Thử lại nhé', notThis: 'Chưa đúng rồi. Mình sang câu khác nhé', right: 'Đúng rồi, giỏi quá!',
-    retry: 'Thử lại', nextQ: 'Câu tiếp theo', check: 'Kiểm tra', clear: 'Xoá', type: 'Con viết số vào đây', tr: 'Đúng', fa: 'Sai',
+    retry: 'Thử lại', nextQ: 'Câu tiếp theo', check: 'Kiểm tra', clear: 'Xoá', type: 'Đáp số', tr: 'Đúng', fa: 'Sai',
     roundDone: (n: number) => `Con làm xong ${n} câu rồi!`, roundSub: 'Con nghỉ một chút, hoặc làm tiếp nhé.', more: (n: number) => `Làm tiếp ${n} câu`, toLesson: 'Về trang bài học',
     finish: 'Con làm xong rồi!', finishSub: 'Con đã cố gắng rất nhiều. Đây là gợi ý cho con:',
     sCardsTag: 'Ôn lại', sCards: 'Ôn thẻ nhớ', sCardsSub: 'Ôn lại một chút là con nhớ lâu hơn.', sPairsTag: 'Trò chơi', sPairs: 'Lật thẻ tìm cặp', sPairsSub: 'Ghép phép tính với kết quả.', sWatchTag: 'Xem lại', sWatch: 'Xem lại bài', sWatchSub: 'Xem lại cách làm trong bài.', go: 'Làm ngay',
@@ -28,11 +28,11 @@ const S = {
   },
   en: {
     hiKid: 'Hi there!', joinSub: 'Type the class code from your teacher, then tap your name.', codeLabel: 'Class code', next: 'Next', who: 'Who are you?', notMe: 'Change class', noName: "Can't see your name? Ask your teacher.",
-    hello: (n: string, k: string) => `Hi ${n} · ${k}`, todayIs: (t: string) => `Today: ${t}`, nothing: 'Nothing for today yet. Come back later!', leave: 'Leave', remind: 'Remember!',
+    hello: (n: string, k: string) => (k && k !== n ? `Hi ${n} · ${k}` : `Hi ${n}`), todayIs: (t: string) => `Today: ${t}`, nothing: 'Nothing for today yet. Come back later!', leave: 'Leave', remind: 'Remember!',
     video: 'Watch the video', slides: 'Look at the lesson', seen: 'watched', cards: 'Flashcards', nCards: (n: number) => `${n} cards`, doneMark: 'done', practise: 'Practise', nItems: (n: number) => `${n} questions`, pairs: 'Find the pairs', nPairs: (n: number) => `Find ${n} pairs`,
     gotSoFar: "How far you've got", back: 'Back', done: 'Done', subject: { math: 'Maths', english: 'English' } as Record<string, string>,
     qOf: (k: number, n: number) => `Question ${k}/${n}`, pick: 'Pick the right answer', listenQ: 'Listen to the question', almost: 'Almost! Try again', notThis: "Not this time. Let's go on", right: "That's right, well done!",
-    retry: 'Try again', nextQ: 'Next question', check: 'Check', clear: 'Clear', type: 'Write the number here', tr: 'True', fa: 'False',
+    retry: 'Try again', nextQ: 'Next question', check: 'Check', clear: 'Clear', type: 'Your answer', tr: 'True', fa: 'False',
     roundDone: (n: number) => `You did ${n} questions!`, roundSub: 'Take a little break, or carry on.', more: (n: number) => `Do ${n} more`, toLesson: 'Back to the lesson',
     finish: 'All done!', finishSub: 'You worked really hard. Here is what to do next:',
     sCardsTag: 'Go over', sCards: 'Go over the flashcards', sCardsSub: 'A quick look helps you remember.', sPairsTag: 'Game', sPairs: 'Find the pairs', sPairsSub: 'Match each card with its partner.', sWatchTag: 'Look again', sWatch: 'Look at the lesson again', sWatchSub: 'See how it is done once more.', go: 'Go',
@@ -85,7 +85,8 @@ function Frame({ tone = '', title, sub, onBack, t, children }: { tone?: string; 
 export function Pupil() {
   const path = usePath(), lang = useLang() as L, t = S[lang];
   const [today, setToday] = useState<Today | null | undefined>(undefined);
-  const load = () => p<Today>('GET', '/today').then(setToday).catch(() => setToday(null));
+  // a child's phone opens in the language of the lessons given (Chi #24), unless it was switched by hand
+  const load = () => p<Today>('GET', '/today').then((d) => { const l = d?.lessons?.[0]?.lang; if (l && !langChosen() && l !== lang) setLang(l); setToday(d); }).catch(() => setToday(null));
   useEffect(() => {
     const link = /^\/p\/([\w-]+)$/.exec(path)?.[1];
     if (link) { p('POST', '/link', { link }).then(() => { go('/hoc'); void load(); }).catch(() => { go('/hoc'); setToday(null); }); return; }

@@ -162,6 +162,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .p-link { background: none; border: 0; color: var(--ink-2); font: inherit; font-size: 16px; cursor: pointer; padding: 8px 10px; min-height: 44px; min-width: 44px; }
 .p-pill { align-self: center; display: inline-flex; gap: 6px; align-items: center; min-height: 40px; padding: 6px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font: inherit; font-size: 15px; color: var(--ink); cursor: pointer; }
 .p-input { min-height: 60px; border-radius: 16px; border: 2px solid var(--leaf); font: inherit; font-size: 26px; font-weight: 700; padding: 8px 16px; text-align: center; background: var(--card); color: var(--ink); width: 100%; }
+.p-input.p-num::placeholder { font-size: 16px; font-weight: 500; }
 .p-input.code { letter-spacing: 6px; text-transform: uppercase; } .p-input.p-num { flex: 0 0 170px; width: 170px; max-width: 100%; }
 .p-names { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .p-name { min-height: 52px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); font: inherit; font-size: 18px; font-weight: 700; color: var(--ink); cursor: pointer; }
@@ -222,6 +223,8 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .source-text { white-space: pre-wrap; font: inherit; font-size: 13px; margin: 4px 0 0; max-height: 520px; overflow: auto; background: var(--paper); border-radius: 6px; padding: 8px 10px; }
 .map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
 .map-node { cursor: pointer; }
+/* a laptop-width window: the five tabs stay on one line (Chi #24) */
+@media (max-width: 1180px) { .top { gap: 10px; padding: 10px 14px; } .tabs { flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; } .me { flex: none; } .tabs button { padding: 6px 7px; font-size: 13px; white-space: nowrap; } .me-name { display: none; } .top .brand-name { display: none; } }
 /* the client's version next to the logo */
 .version { font-size: 11px; color: var(--ink-2); font-weight: 500; margin-left: 6px; white-space: nowrap; align-self: center; }
 /* Credits and usage */
