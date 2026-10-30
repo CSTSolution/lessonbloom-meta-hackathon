@@ -10,7 +10,7 @@ export async function shrink(f: File, max = 1600): Promise<{ data: string; type:
 
 // A photo of a book page as a JPEG for the reading (#18): long side `max` px, at most 1.4 MB. HEIC from
 // an iPhone opens where the browser can decode it (Safari); elsewhere it throws and the page says so.
-export async function photoJpeg(f: File, max = 1600): Promise<Blob> {
+export async function photoJpeg(f: File, max = 1754): Promise<Blob> {
   let src: CanvasImageSource & { width: number; height: number };
   try { src = await createImageBitmap(f); } catch {
     const url = URL.createObjectURL(f);

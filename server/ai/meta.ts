@@ -50,7 +50,7 @@ export const EFFORT: Partial<Record<Endpoint, 'minimal' | 'low' | 'medium'>> = {
 
 // A ceiling on each answer (reasoning included), well above the largest seen live, so a runaway answer
 // ends instead of running until the connection is cut. An answer cut at the ceiling is tried again.
-const MAX_OUT: Partial<Record<Endpoint, number>> = { precheck: 2000, errortag: 2000, critic: 4000, intake: 4000, toc: 6000, rerank: 6000, cards: 6000, items: 8000, comments: 8000, check: 10000, slides: 16000 };
+const MAX_OUT: Partial<Record<Endpoint, number>> = { precheck: 2000, errortag: 2000, critic: 4000, intake: 4000, toc: 6000, rerank: 6000, cards: 6000, items: 8000, comments: 8000, check: 10000, ocr: 12000, slides: 16000 };   // ocr: a page may hold two dense book pages
 
 export class MetaProvider implements AI {
   name = 'meta';

@@ -26,8 +26,10 @@ export async function hasText(doc: PDFDocumentProxy): Promise<boolean> {
 }
 
 // One page as a JPEG about 1,240 px wide (enough for Muse Spark to read small print), under 1.4 MB.
-export async function pageJpeg(doc: PDFDocumentProxy, n: number, width = 1240): Promise<Blob> {
-  const page = await doc.getPage(n), base = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: width / base.width });
+// The long side is `long` px (A4 at 150 dpi): a portrait page is 1240 wide as before; a wide page (a
+// sideways scan, two pages side by side) is drawn larger so its small text stays readable.
+export async function pageJpeg(doc: PDFDocumentProxy, n: number, long = 1754): Promise<Blob> {
+  const page = await doc.getPage(n), base = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: long / Math.max(base.width, base.height) });
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
   const ctx = canvas.getContext('2d')!;
