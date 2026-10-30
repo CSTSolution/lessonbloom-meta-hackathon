@@ -3,11 +3,15 @@
 // drawn as a JPEG picture for a scanned book (read on the server, page by page).
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
+// pdf.js's legacy build runs in more browsers (Safari included) than its newest-browsers build, and the
+// file's bytes are passed in directly (no blob link to fetch), so a PDF that is fine opens everywhere.
 export async function openPdf(file: File): Promise<PDFDocumentProxy> {
-  const pdfjs = await import('pdfjs-dist');
-  pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
-  return pdfjs.getDocument({ url: URL.createObjectURL(file), disableFontFace: true }).promise;
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
+  return pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), disableFontFace: true }).promise;
 }
+// the first bytes of a real PDF
+export const looksLikePdf = async (file: File) => (await file.slice(0, 1024).text()).includes('%PDF-');
 
 export async function pageText(doc: PDFDocumentProxy, n: number): Promise<string> {
   const page = await doc.getPage(n), tc = await page.getTextContent();

@@ -4,7 +4,7 @@
 // Private to the assigner (textbook copyright); the demo uses the team's own sample books.
 import { useEffect, useRef, useState } from 'react';
 import { api, MAX_PDF, ApiError, type AreaRow, type BookRow, type Job, type ScanEstimate, type SectionRow } from '../api.ts';
-import { hasText, openPdf, pageJpeg, pageText } from '../pdf.ts';
+import { hasText, looksLikePdf, openPdf, pageJpeg, pageText } from '../pdf.ts';
 import { photoJpeg } from '../photo.ts';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
@@ -155,23 +155,23 @@ function BookStatus({ t, book, sections, onChange, onAgain }: { t: (typeof T)['v
 // page is drawn as a picture and sent; the reading runs in her line of jobs (one at a time).
 const R = {
   vi: { file: 'Tệp PDF (bao nhiêu MB cũng được) hoặc ảnh chụp các trang sách (JPG, PNG, WEBP, HEIC)', wrong: 'Kho kiến thức nhận một tệp PDF, hoặc ảnh chụp các trang sách (JPG, PNG, WEBP, HEIC).', mixed: 'Cô chọn một tệp PDF, hoặc chỉ chọn ảnh, đừng chọn lẫn cả hai nhé.',
-    photos: (n: number) => `${n} ảnh trang sách · mỗi ảnh là một trang`, first: 'Ảnh đầu tiên là trang số', photoBad: (name: string) => `Không mở được ảnh "${name}" trên trình duyệt này. Ảnh HEIC từ iPhone: cô mở bằng Safari, hoặc gửi ảnh dạng JPG nhé.`, tooMany: (n: number) => `Tối đa ${n} ảnh mỗi lần.`, retry: 'Thử lại', opening: 'Đang mở tệp trên máy của cô…', info: (n: number, text: boolean) => `${n} trang · ${text ? 'sách có chữ' : 'sách dạng ảnh (scan)'}`, notPdf: 'Không mở được tệp này. Cô chọn tệp PDF nhé.',
+    photos: (n: number) => `${n} ảnh trang sách · mỗi ảnh là một trang`, first: 'Ảnh đầu tiên là trang số', photoBad: (name: string) => `Không mở được ảnh "${name}" trên trình duyệt này. Ảnh HEIC từ iPhone: cô mở bằng Safari, hoặc gửi ảnh dạng JPG nhé.`, tooMany: (n: number) => `Tối đa ${n} ảnh mỗi lần.`, retry: 'Thử lại', opening: 'Đang mở tệp trên máy của cô…', info: (n: number, text: boolean) => `${n} trang · ${text ? 'sách có chữ' : 'sách dạng ảnh (scan)'}`, notPdf: 'Tệp này không phải PDF. Cô chọn tệp PDF hoặc ảnh trang sách nhé.', raw: 'Trình duyệt này không mở được PDF ngay tại đây, nên tệp sẽ được tải lên và đọc trên máy chủ (như trước). Nếu là sách scan, cô mở bằng Chrome hoặc gửi ảnh các trang nhé.', browserBig: 'Trình duyệt này không mở được PDF này, và tệp lớn hơn 30 MB nên không tải lên nguyên tệp được. Cô thử Chrome hoặc Edge, hoặc gửi ảnh các trang nhé.',
     from: 'Từ trang', to: 'đến trang', max: (n: number) => `tối đa ${n} trang mỗi lần`,
     est: (e: ScanEstimate) => `${e.pages} trang · dự kiến khoảng ${e.predicted} lượt · cần có ít nhất ${e.need} lượt (dư 50%) · cô còn ${e.have} lượt`,
     read: (n: number, need: number) => `Đọc ${n} trang (giữ ${need} lượt, trả lại phần thừa)`, short: (n: number) => `Còn thiếu ${n} lượt.`, fit: (n: number) => `Chỉ đọc ${n} trang đầu`, promo: 'Có mã khuyến mãi thì nhập ở menu tên (góc phải) để có thêm lượt.',
     textOut: (k: number, n: number) => `Đang lấy chữ trang ${k}/${n}…`, sending: (k: number, n: number) => `Đang gửi trang ${k}/${n}…`, queued: 'Đã đưa vào hàng đợi. Xem tiến độ ở ô "Đang làm" trên thanh trên.', add: 'Thêm vào kho' },
   en: { file: 'A PDF (any size) or photos of the book pages (JPG, PNG, WEBP, HEIC)', wrong: 'Knowledge takes one PDF, or photos of book pages (JPG, PNG, WEBP, HEIC).', mixed: 'Choose one PDF, or only photos, not both.',
-    photos: (n: number) => `${pl(n, 'photo')} of book pages · each photo is one page`, first: 'The first photo is page', photoBad: (name: string) => `The photo "${name}" could not be opened in this browser. For HEIC photos from an iPhone, use Safari or send them as JPG.`, tooMany: (n: number) => `Up to ${n} photos at a time.`, retry: 'Try again', opening: 'Opening the file on your computer…', info: (n: number, text: boolean) => `${n} pages · ${text ? 'a book with text' : 'a scanned book (pictures)'}`, notPdf: 'This file could not be opened. Please choose a PDF.',
+    photos: (n: number) => `${pl(n, 'photo')} of book pages · each photo is one page`, first: 'The first photo is page', photoBad: (name: string) => `The photo "${name}" could not be opened in this browser. For HEIC photos from an iPhone, use Safari or send them as JPG.`, tooMany: (n: number) => `Up to ${n} photos at a time.`, retry: 'Try again', opening: 'Opening the file on your computer…', info: (n: number, text: boolean) => `${pl(n, 'page')} · ${text ? 'a book with text' : 'a scanned book (pictures)'}`, notPdf: 'This file is not a PDF. Please choose a PDF or photos of the book pages.', raw: 'This browser cannot open the PDF here, so the file is uploaded and read on our server (as before). If it is a scanned book, open the app in Chrome or send photos of the pages.', browserBig: 'This browser cannot open this PDF, and it is over 30 MB, so it cannot be uploaded whole. Try Chrome or Edge, or send photos of the pages.',
     from: 'From page', to: 'to page', max: (n: number) => `up to ${n} pages at a time`,
-    est: (e: ScanEstimate) => `${e.pages} pages · about ${e.predicted} credits · you need at least ${e.need} (50% more) · you have ${e.have}`,
-    read: (n: number, need: number) => `Read ${n} pages (holds ${need} credits, the rest comes back)`, short: (n: number) => `${n} credits short.`, fit: (n: number) => `Read only the first ${n} pages`, promo: 'If you have a promo code, enter it in the menu under your name (top right) for more credits.',
+    est: (e: ScanEstimate) => `${pl(e.pages, 'page')} · about ${pl(e.predicted, 'credit')} · you need at least ${e.need} (50% more) · you have ${e.have}`,
+    read: (n: number, need: number) => `Read ${pl(n, 'page')} (holds ${pl(need, 'credit')}, the rest comes back)`, short: (n: number) => `${pl(n, 'credit')} short.`, fit: (n: number) => `Read only the first ${pl(n, 'page')}`, promo: 'If you have a promo code, enter it in the menu under your name (top right) for more credits.',
     textOut: (k: number, n: number) => `Reading the text of page ${k}/${n}…`, sending: (k: number, n: number) => `Sending page ${k}/${n}…`, queued: 'Added to your line of jobs. See it under "Working on" in the top bar.', add: 'Add to the library' },
 };
 
 function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: string) => void }) {
   const lang = useLang(), r = R[lang];
   const [f, setF] = useState({ name: '', subject: 'math', grade: 2 }), [file, setFile] = useState<File | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [sent, setSent] = useState<number | null>(null);
-  const [info, setInfo] = useState<{ pages: number; text: boolean } | null>(null), [opening, setOpening] = useState(false), [range, setRange] = useState({ from: 1, to: 1 }), [est, setEst] = useState<ScanEstimate | null>(null), [step, setStep] = useState('');
+  const [info, setInfo] = useState<{ pages: number; text: boolean; raw?: boolean } | null>(null), [opening, setOpening] = useState(false), [range, setRange] = useState({ from: 1, to: 1 }), [est, setEst] = useState<ScanEstimate | null>(null), [step, setStep] = useState('');
   const doc = useRef<PDFDocumentProxy | null>(null), [photos, setPhotos] = useState<File[] | null>(null);
   const msg = (e: unknown) => (e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error)?.message || e));
   const run = async (fn: () => Promise<string | undefined>) => { setBusy(true); setErr(''); try { onDone(await fn()); } catch (e) { setErr(msg(e)); } finally { setBusy(false); setStep(''); setSent(null); } };
@@ -195,7 +195,14 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
     if (!x) return;
     setOpening(true);
     try { const d = await openPdf(x); doc.current = d; const text = await hasText(d); setInfo({ pages: d.numPages, text }); setRange({ from: 1, to: Math.min(d.numPages, config.maxPages) }); }
-    catch { setErr(r.notPdf); } finally { setOpening(false); }
+    catch (e) {
+      console.warn('[pdf] could not open in this browser:', e);
+      // not a PDF at all; or a real PDF this browser could not open here: then upload it as it is (up to
+      // 30 MB) and the server reads it, as before 29 Oct; bigger, it says what to do instead
+      if (!(await looksLikePdf(x).catch(() => false))) setErr(r.notPdf);
+      else if (x.size <= MAX_PDF) setInfo({ pages: 0, text: true, raw: true });
+      else setErr(r.browserBig);
+    } finally { setOpening(false); }
   };
   const count = Math.max(0, range.to - range.from + 1);
   useEffect(() => { if (!info || info.text || count < 1) { setEst(null); return; } const h = setTimeout(() => { api.scanEstimate(count).then((x) => setEst(x.estimate)).catch(() => setEst(null)); }, 250); return () => clearTimeout(h); }, [info, range.from, range.to]);
@@ -240,7 +247,7 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
         <label className="field">{t.form.grade}<select value={f.grade} onChange={(e) => setF({ ...f, grade: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map((g) => <option key={g} value={g}>{t.grade(g)}</option>)}</select></label>
       </div>
       {opening && <p className="small muted" role="status">{r.opening}</p>}
-      {info && (photos ? <p className="small"><b>{r.photos(photos.length)}</b></p> : <p className="small"><b>{file?.name}</b> · {r.info(info.pages, info.text)}</p>)}
+      {info && (photos ? <p className="small"><b>{r.photos(photos.length)}</b></p> : info.raw ? <p className="banner blue small"><b>{file?.name}</b> · {r.raw}</p> : <p className="small"><b>{file?.name}</b> · {r.info(info.pages, info.text)}</p>)}
       {info && !info.text && <div className="card stack" style={{ gap: 8, background: 'var(--leaf-2)' }}>
         {photos ? <div className="row small"><label>{r.first} <input type="number" min={1} max={2000} value={range.from} style={{ width: 80 }} onChange={(e) => { const v = Math.max(1, Math.min(2000, Number(e.target.value) || 1)); setRange({ from: v, to: v + photos.length - 1 }); }} /></label></div>
         : <div className="row small">
