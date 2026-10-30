@@ -215,6 +215,8 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .menu { position: absolute; right: 0; top: 40px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); padding: 12px; min-width: 260px; display: grid; gap: 8px; z-index: 10; }
 .page { max-width: 1040px; margin: 0 auto; padding: 24px 24px 60px; }
 .page.narrow { max-width: 760px; }
+/* the client's version next to the logo */
+.version { font-size: 11px; color: var(--ink-2); font-weight: 500; margin-left: 6px; white-space: nowrap; align-self: center; }
 /* Credits and usage */
 .usage-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .usage-tiles .card { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; }

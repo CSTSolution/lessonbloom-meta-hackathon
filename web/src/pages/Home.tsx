@@ -19,6 +19,7 @@ import { Profile } from './Profile.tsx';
 import { Reminders } from './Reminders.tsx';
 import { SignupRole } from './SignupRole.tsx';
 import { Usage } from './Usage.tsx';
+import { VERSION } from '../version.ts';
 
 const T = {
   vi: {
@@ -59,7 +60,7 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
   return (
     <div>
       <header className="top">
-        <button className="brand link" style={{ color: 'inherit' }} onClick={() => go('/')} aria-label="LessonBloom"><img src="/favicon.svg" alt="" /><span className="brand-name">LessonBloom</span></button>
+        <button className="brand link" style={{ color: 'inherit' }} onClick={() => go('/')} aria-label="LessonBloom"><img src="/favicon.svg" alt="" /><span className="brand-name">LessonBloom</span></button><span className="version" title={VERSION}>{VERSION}</span>
         <nav className="tabs">{tabs.map((k) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => go(k)}>{k === '/classes' && parent ? t.kids : t.nav[k]}</button>)}</nav>
         <Me teacher={teacher} t={t} onSignOut={onSignOut} />
       </header>

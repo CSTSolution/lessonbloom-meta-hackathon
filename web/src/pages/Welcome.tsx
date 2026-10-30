@@ -1,4 +1,5 @@
 // The welcome page: what LessonBloom does in three steps, and the way in (try it now, or an email code).
+import { VERSION } from '../version.ts';
 import { useState } from 'react';
 import { api, ApiError, type Teacher } from '../api.ts';
 import { getLang, useLang, useT } from '../i18n.ts';
@@ -38,7 +39,7 @@ export function Welcome({ onSignedIn }: { onSignedIn: (t: Teacher) => void }) {
   return (
     <div className="welcome">
       <section className="story">
-        <div className="row"><div className="brand grow"><img src="/favicon.svg" alt="" />LessonBloom</div><LangToggle /></div>
+        <div className="row"><div className="brand grow"><img src="/favicon.svg" alt="" />LessonBloom<span className="version">{VERSION}</span></div><LangToggle /></div>
         <h1>{t.title}</h1>
         <p className="muted" style={{ fontSize: 18 }}>{t.lead}</p>
         <div className="flow">{t.steps.map(([n, h, d]) => <div key={n}><b>{n}</b><strong>{h}</strong><p className="muted small">{d}</p></div>)}</div>
