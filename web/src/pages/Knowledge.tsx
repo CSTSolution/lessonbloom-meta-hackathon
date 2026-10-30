@@ -94,7 +94,8 @@ export function Knowledge() {
           {book && <BookStatus t={t} book={book} sections={sections.length} onChange={load} onAgain={async () => { await api.deleteArea(a.id).catch(() => {}); setSel(''); await load(); setAdding(true); }} />}
           <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
           {source && <SourceView sectionId={source} onClose={() => setSource('')} />}
-          {tab === 'map' && <KnowledgeMapView areaId={a.id} onSource={(id) => setSource(id)} />}
+          {/* drawn again when the book's parts change (a book still being read when the map opened) */}
+          {tab === 'map' && <KnowledgeMapView key={`${a.id}:${book?.status}:${sections.length}`} areaId={a.id} onSource={(id) => setSource(id)} />}
           {tab === 'parts' && <>
           <p className="small muted">{t.partsLead}</p>
           {pickMerge === 'pick' && <p className="banner blue">{t.mergeHint}</p>}
