@@ -3,7 +3,7 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
-## NEXT (31 Oct)
+## v1.0.20261030.2225 (30 Oct, late)
 
 - **A lesson holds 90 credits** and usually uses about 65; the rest comes back (Son, 31 Oct: real lessons
   cost ~64, the most seen 89). When work costs more than it held, the Usage page says "Charged extra
