@@ -197,12 +197,14 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   const readScan = async (areaId: string, bookId: string, want: number[], need: number, hold: { used: number }, job: JobCtl) => {
     const dir = scanDir(bookId), out: PdfPage[] = [], per = config.scan.pageCredits;
     for (let i = 0; i < want.length; i += config.scan.pagesAtOnce) {
-      if (job.stopped || hold.used + per * config.scan.margin * config.scan.pagesAtOnce > need) break;
       const batch = want.slice(i, i + config.scan.pagesAtOnce);
+      // what these pages may cost (with the margin), for the pages really left: a short last batch,
+      // or a book of one or two pages, is not stopped by room for pages it does not have
+      if (job.stopped || hold.used + per * config.scan.margin * batch.length > need) break;
       await job.progress(`${i}/${want.length}`);
       const read = await Promise.all(batch.map(async (n) => {
         const data = await readFile(join(dir, `${n}.jpg`));
-        const r = await guardedJson<{ usable: boolean; text: string }>(d.ai, { endpoint: 'ocr', system: SCAN_SYSTEM, prompt: 'One page of the book.', images: [{ data, mime: 'image/jpeg' }], schema: OCR_SCHEMA, fixture: { page: n } }).catch(() => ({ usable: false, text: '' }));
+        const r = await guardedJson<{ usable: boolean; text: string }>(d.ai, { endpoint: 'ocr', system: SCAN_SYSTEM, prompt: 'One page of the book.', images: [{ data, mime: 'image/jpeg' }], schema: OCR_SCHEMA, fixture: { page: n } }).catch((e) => { console.warn(`[scan] ${bookId} page ${n}: ${String((e as Error)?.message).slice(0, 200)}`); return { usable: false, text: '' }; });
         return { page: n, text: r.usable ? String(r.text || '').slice(0, 20000) : '' };
       }));
       out.push(...read);

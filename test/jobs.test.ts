@@ -115,3 +115,21 @@ test('a big text PDF: the browser sends only the text; it becomes lessons in her
   assert.deepEqual((await call('GET', `/api/t/areas/${area.id}`)).json.sections.map((x: any) => x.title), ['Unit 1: Hello', 'Unit 2: Colours']);
   assert.equal((await call('POST', `/api/t/areas/${area.id}/books/text`, { title: 'x', pages: [{ page: 1, text: ' ' }] })).status, 400, 'no text, no book');
 });
+
+test('a scanned book of one or two pages is read whole, and a short last batch is not skipped', async () => {
+  for (const pages of [[7], [7, 8], [3, 4, 5, 6, 7]]) {
+    const s = await testServer(), call = s.client();
+    await call('POST', '/api/auth/demo', { lang: 'en' });
+    const { area } = (await call('POST', '/api/t/areas', { name: 'Maths 2', subject: 'math', grade: 2 })).json;
+    const made = (await call('POST', `/api/t/areas/${area.id}/books/scan`, { title: 'Short', pages })).json;
+    const jpeg = (n: number) => ({ type: 'image/jpeg', data: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(600, n)]) });
+    for (const n of pages) await call('PUT', `/api/t/books/${made.book.id}/pages/${n}`, undefined, jpeg(n));
+    const read: number[] = [];
+    s.ai.answers.set('ocr', (r) => { const page = (r.fixture as { page: number }).page; read.push(page); return { usable: true, text: `Lesson ${page}: Adding within 100\n36 + 27 = 63.` }; });
+    assert.equal((await call('POST', `/api/t/books/${made.book.id}/scan/start`)).status, 200);
+    let book: any;
+    for (let i = 0; i < 300; i++) { book = (await call('GET', `/api/t/areas/${area.id}`)).json.books.find((b: any) => b.id === made.book.id); if (book.status !== 'processing') break; await wait(10); }
+    assert.equal(book.status, 'ready', `${pages.length} pages`);
+    assert.deepEqual(read.sort((a, b) => a - b), pages, `every page read (${pages.length})`);
+  }
+});
