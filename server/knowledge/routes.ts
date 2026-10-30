@@ -1,7 +1,7 @@
 // The knowledge area: an assigner's own books (PDF), private to her. Upload, see the contents, open a
 // book at a page, and find the section a lesson should come from.
 import type { Context, Hono } from 'hono';
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, stat, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AI } from '../ai/types.ts';
 import type { Env } from '../app.ts';
@@ -303,6 +303,43 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const { unlink } = await import('node:fs/promises');
     await unlink(bookFile(c.req.param('id'))).catch(() => {});
     return c.json({ ok: true });
+  });
+
+  // "View source" (Son, 30 Oct): one part of her book as it was read, page by page, and where its original
+  // can be seen (an uploaded PDF kept on the server; kept page pictures once they are stored)
+  app.get('/api/t/sections/:id/source', async (c) => {
+    const s = await sectionMine(c);
+    if (!s) return fail(c, 'notFound', 404);
+    const bk = await sql.one<{ id: string; title: string; source: string | null }>('select id, title, source from books where id = $1', [s.book_id]);
+    const rows = await sql.query<{ page: number; text: string }>('select page, text from passages where section_id = $1 order by page, ord', [s.id]);
+    const pages: { page: number; text: string }[] = [];
+    for (const r of rows) { const last = pages.at(-1); if (last && last.page === r.page) last.text += `\n${r.text}`; else pages.push({ page: r.page, text: r.text }); }
+    const pdf = (bk?.source ?? 'pdf') === 'pdf' && await stat(bookFile(s.book_id)).then(() => true, () => false);
+    return c.json({ section: { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to }, book: { id: bk?.id, title: bk?.title, source: bk?.source ?? 'pdf' },
+      pages, original: pdf ? { kind: 'pdf', url: `/api/t/books/${s.book_id}/file` } : null });
+  });
+
+  // The knowledge map (Son, 30 Oct): her book → its parts → the lessons made from each part → the skills
+  // each lesson teaches (a skill taught in several lessons is one node), and where each lesson is assigned.
+  app.get('/api/t/areas/:id/map', async (c) => {
+    const t = c.get('teacher'), a = await areaOf(sql, t.id, c.req.param('id'));
+    if (!a) return fail(c, 'notFound', 404);
+    const sections = await sql.query<{ id: string; title: string; page_from: number; page_to: number; book_id: string }>(
+      `select s.id, s.title, s.page_from, s.page_to, s.book_id from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
+    const lessons = await sql.query<{ id: string; title: string; section: string; status: string; skills: { tag: string; name: string; kind: string }[]; classes: number }>(
+      `select l.id, l.setup->>'title' as title, l.refs->0->>'sectionId' as section, l.status, l.skills,
+          (select count(distinct x.class_id) from assignments x where x.lesson_id = l.id)::int as classes
+        from lessons l where l.teacher_id = $1 and l.area_id = $2 and l.status <> 'error' order by l.created_at`, [t.id, a.id]);
+    const books = await sql.query<{ id: string; title: string; pages: number }>('select id, title, pages from books where area_id = $1 order by created_at', [a.id]);
+    const skills = new Map<string, { id: string; name: string; kind: string; lessons: string[] }>();
+    for (const l of lessons) for (const k of l.skills ?? []) {
+      const key = String(k.name || k.tag).trim().toLowerCase(), x = skills.get(key) ?? { id: `k${skills.size + 1}`, name: k.name || k.tag, kind: k.kind, lessons: [] };
+      if (!x.lessons.includes(l.id)) x.lessons.push(l.id);
+      skills.set(key, x);
+    }
+    return c.json({ area: { id: a.id, name: a.name }, books, sections: sections.map((s) => ({ id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to, bookId: s.book_id })),
+      lessons: lessons.map((l) => ({ id: l.id, title: l.title, section: l.section, status: l.status, classes: l.classes, skills: (l.skills ?? []).map((k) => skills.get(String(k.name || k.tag).trim().toLowerCase())!.id) })),
+      skills: [...skills.values()] });
   });
 
   // What should this lesson teach? Her request (typed, read from a photo, or spoken) is matched to one

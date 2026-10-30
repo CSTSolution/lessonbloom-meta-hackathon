@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, MAX_PDF, ApiError, type AreaRow, type BookRow, type Job, type ScanEstimate, type SectionRow } from '../api.ts';
 import { hasText, looksLikePdf, openPdf, pageJpeg, pageText } from '../pdf.ts';
 import { photoJpeg } from '../photo.ts';
+import { KnowledgeMapView, SourceView } from './Sources.tsx';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 const config = { maxPages: 200 };   // pages a scanned book reads at a time (the server's limit too)
@@ -18,7 +19,7 @@ const T = {
     sources: (n: number) => `${n} nguồn`, reading: (n: number) => `${n} đang đọc`, ready: 'Sẵn sàng', grade: (g: number) => `Lớp ${g}`, pages: (n: number) => `${n} trang`,
     status: { processing: 'Đang đọc tài liệu…', ready: 'Sẵn sàng', error: 'Lỗi' }, errors: { interrupted: 'Việc đọc sách bị ngắt khi máy chủ khởi động lại; lượt đã giữ được trả lại. Cô xoá nguồn này rồi thêm lại nhé.', scanned: 'Tài liệu là ảnh chụp. Cô xoá nguồn này rồi thêm lại tệp: app sẽ đọc từng trang ảnh (có dự kiến lượt trước).', failed: 'Chưa đọc được tệp này.', stopped: 'Cô đã dừng việc đọc, nên sách không được thêm; lượt chưa dùng đã được trả lại.', credits: 'Lượt đã giữ không đủ để đọc hết sách, nên sách không được thêm (app không giữ một phần sách); lượt chưa dùng đã được trả lại.', unreadable: 'Không đọc được chữ trên các trang này. Cô xem ảnh có rõ, đúng chiều không, rồi xoá và thêm lại nhé.', blocked: 'Nội dung không dùng được.' },
     view: 'Xem tài liệu', remove: 'Xoá khỏi kho', removeAsk: 'Xoá nguồn này khỏi kho? Bài đã soạn vẫn còn.', parts: (n: number) => `Phạm vi kiến thức (${n})`, partsLead: 'Mỗi bài chỉ chọn một phạm vi làm giới hạn kiến thức.',
-    page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
+    page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', source: 'Xem nguồn', mapTab: 'Bản đồ kiến thức', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
     splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Thêm sách PDF hoặc dùng sách mẫu.',
     st: { waiting: (n: number) => `Đang chờ (thứ ${n} trong hàng): sẽ đọc khi xong việc đang làm.`, reading: 'Đang đọc sách: tách bài, đọc chữ từng trang…', readingPage: (p: string) => `Đang đọc sách · trang ${p}`, leave: 'Cô có thể rời trang; đọc xong sẽ có thông báo ở chuông.',
       done: (title: string, n: number, p: number) => `Đã thêm: ${title} · ${n} bài · ${p} trang.`, retry: 'Thử lại', again: 'Xoá và thêm lại' },
@@ -29,7 +30,7 @@ const T = {
     sources: (n: number) => `${pl(n, 'source')}`, reading: (n: number) => `${n} reading`, ready: 'Ready', grade: (g: number) => `Grade ${g}`, pages: (n: number) => `${pl(n, 'page')}`,
     status: { processing: 'Reading…', ready: 'Ready', error: 'Error' }, errors: { interrupted: 'Reading was interrupted by a server restart; the held credits were given back. Remove this source and add it again.', scanned: 'The file is scanned pictures. Remove this source and add the file again: the app will read each page picture (with a credit estimate first).', failed: 'This file could not be read.', stopped: 'You stopped the reading, so the book was not added; the unused credits came back.', credits: 'The held credits were not enough to read the whole book, so it was not added (LessonBloom keeps no part of a book); the unused credits came back.', unreadable: 'No text could be read on these pages. Check the pictures are clear and the right way up, then remove and add them again.', blocked: 'This content cannot be used.' },
     view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
-    page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
+    page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', source: 'View source', mapTab: 'Knowledge map', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
     splitAt: 'Split from page', newTitle: 'New part name', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Add a PDF book or use a sample book.',
     st: { waiting: (n: number) => `Waiting (number ${n} in your line): it is read when the job before is done.`, reading: 'Reading the book: finding the lessons, reading each page…', readingPage: (p: string) => `Reading the book · page ${p}`, leave: 'You can leave this page; the bell tells you when it is done.',
       done: (title: string, n: number, p: number) => `Added: ${title} · ${pl(n, 'lesson')} · ${pl(p, 'page')}.`, retry: 'Try again', again: 'Remove and add again' },
@@ -41,12 +42,14 @@ export function Knowledge() {
   const t = useT(T), lang = useLang();
   const [areas, setAreas] = useState<AreaRow[] | null>(null), [subject, setSubject] = useState<'' | 'math' | 'english'>(''), [grade, setGrade] = useState(0);
   const [fold, setFold] = useState<Record<string, boolean>>({}), [sel, setSel] = useState(''), [sections, setSections] = useState<SectionRow[]>([]), [all, setAll] = useState(false), [adding, setAdding] = useState(false);
+  const [tab, setTab] = useState<'parts' | 'map'>('parts'), [source, setSource] = useState('');
   const [edit, setEdit] = useState<{ id: string; mode: 'rename' | 'split'; title: string; page: number } | null>(null), [pickMerge, setPickMerge] = useState(''), [err, setErr] = useState(''), [busy, setBusy] = useState('');
   const load = () => api.areas().then((r) => { setAreas(r.areas); setSel((s) => s || r.areas[0]?.id || ''); }).catch(() => setAreas([]));
   const loadSections = () => sel ? api.area(sel).then((r) => setSections(r.sections)).catch(() => setSections([])) : Promise.resolve();
   useEffect(() => { void load(); }, []);
   useEffect(() => { if (!areas?.some((a) => a.books.some((b) => b.status === 'processing'))) return; const id = setTimeout(load, 2000); return () => clearTimeout(id); }, [areas]);
   useEffect(() => { void loadSections(); setAll(false); setEdit(null); setPickMerge(''); }, [sel, areas]);
+  useEffect(() => { setSource(''); }, [sel]);
   const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); setErr(''); try { await fn(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(''); } };
   if (!areas) return null;
   const shown = areas.filter((a) => (!subject || a.subject === subject) && (!grade || a.grade === grade));
@@ -86,7 +89,11 @@ export function Knowledge() {
             {book && (book.source ?? 'pdf') === 'pdf' && <a className="btn small" href={`/api/t/books/${book.id}/file`} target="_blank" rel="noreferrer">{t.view}</a>}
             <button className="btn small danger" onClick={() => { if (confirm(t.removeAsk)) void run('del', async () => { await api.deleteArea(a.id); setSel(''); await load(); }); }}>{t.remove}</button></div>
           {book && <BookStatus t={t} book={book} sections={sections.length} onChange={load} onAgain={async () => { await api.deleteArea(a.id).catch(() => {}); setSel(''); await load(); setAdding(true); }} />}
-          <div><b>{t.parts(sections.length)}</b><p className="small muted">{t.partsLead}</p></div>
+          <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
+          {source && <SourceView sectionId={source} onClose={() => setSource('')} />}
+          {tab === 'map' && <KnowledgeMapView areaId={a.id} onSource={(id) => setSource(id)} />}
+          {tab === 'parts' && <>
+          <p className="small muted">{t.partsLead}</p>
           {pickMerge === 'pick' && <p className="banner blue">{t.mergeHint}</p>}
           {parts.map((s, i) => (
             <div key={s.id} className={`list-row ${s.lessons ? 'hl' : ''} ${pickMerge === 'pick' ? 'sel' : ''}`} style={pickMerge === 'pick' ? { cursor: 'pointer' } : undefined} onClick={() => { if (pickMerge === 'pick' && i < sections.length - 1) void run('merge', async () => { await api.mergeSection(s.id); setPickMerge(''); await loadSections(); }); }}>
@@ -99,6 +106,7 @@ export function Knowledge() {
                 </form>
               ) : <>
                 <span className="grow"><b className="small">{s.title}</b><span className="small muted" style={{ display: 'block' }}>{t.page(s.page_from === s.page_to ? `${s.page_from}` : `${s.page_from}–${s.page_to}`)}{s.lessons ? <> · <b className="ok-text">{t.used(s.lessons)}</b></> : ''}</span></span>
+                <button className="btn small" onClick={(e) => { e.stopPropagation(); setSource(s.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>{t.source}</button>
                 <button className="btn small" onClick={(e) => { e.stopPropagation(); setEdit({ id: s.id, mode: 'rename', title: s.title, page: 0 }); }}>{t.rename}</button>
                 <button className="btn small" disabled={s.page_to <= s.page_from} onClick={(e) => { e.stopPropagation(); setEdit({ id: s.id, mode: 'split', title: '', page: s.page_from + 1 }); }}>{t.split}</button>
                 <button className="btn primary small" onClick={(e) => { e.stopPropagation(); go(`/new?area=${a.id}&section=${s.id}`); }}>{t.make}</button>
@@ -107,6 +115,7 @@ export function Knowledge() {
           ))}
           <div className="row">{sections.length > 6 && !all && <button className="link small" onClick={() => setAll(true)}>{t.seeAll(sections.length)}</button>}<span className="grow" />
             {sections.length > 1 && <button className="btn small" onClick={() => setPickMerge(pickMerge ? '' : 'pick')}>{pickMerge ? t.cancel : t.merge}</button>}</div>
+          </>}
           {err && <p className="note">{err}</p>}
         </div>}
       </div>}

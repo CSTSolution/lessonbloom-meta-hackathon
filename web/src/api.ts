@@ -12,6 +12,9 @@ export interface Usage {
   items: { kind: 'lesson' | 'book'; id: string; title: string; at: string; credits: number; calls: number; parts: Partial<Record<UsageKind, number>> }[];
   log: { at: string; reason: 'signup' | 'promo' | 'admin' | 'hold' | 'refund'; credits: number; days: number; ref: string; title: string }[];
 }
+export interface SectionSource { section: { id: string; title: string; pageFrom: number; pageTo: number }; book: { id: string; title: string; source: string }; pages: { page: number; text: string }[]; original: { kind: 'pdf'; url: string } | null }
+export interface KnowledgeMap { area: { id: string; name: string }; books: { id: string; title: string; pages: number }[]; sections: { id: string; title: string; pageFrom: number; pageTo: number; bookId: string }[];
+  lessons: { id: string; title: string; section: string; status: string; classes: number; skills: string[] }[]; skills: { id: string; name: string; kind: string; lessons: string[] }[] }
 export interface Skill { tag: string; name: string; kind: string }
 export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number }
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; redone?: string[]; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
@@ -124,6 +127,8 @@ export const api = {
   scanEstimate: (pages: number) => call<{ estimate: ScanEstimate }>('POST', '/t/scan/estimate', { pages }),
   scanCreate: (areaId: string, title: string, pages: number[]) => call<{ book: { id: string }; estimate: ScanEstimate }>('POST', `/t/areas/${areaId}/books/scan`, { title, pages }),
   scanPage: (bookId: string, n: number, jpeg: Blob) => call<{ ok: boolean }>('PUT', `/t/books/${bookId}/pages/${n}`, undefined, jpeg),
+  sectionSource: (id: string) => call<SectionSource>('GET', `/t/sections/${id}/source`),
+  knowledgeMap: (areaId: string) => call<KnowledgeMap>('GET', `/t/areas/${areaId}/map`),
   retryBook: (bookId: string) => call<{ ok: boolean }>('POST', `/t/books/${bookId}/retry`),
   scanStart: (bookId: string) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/scan/start`),
   jobs: () => call<{ jobs: Job[] }>('GET', '/t/jobs'),

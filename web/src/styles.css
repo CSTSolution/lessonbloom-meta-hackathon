@@ -215,6 +215,13 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .menu { position: absolute; right: 0; top: 40px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); padding: 12px; min-width: 260px; display: grid; gap: 8px; z-index: 10; }
 .page { max-width: 1040px; margin: 0 auto; padding: 24px 24px 60px; }
 .page.narrow { max-width: 760px; }
+/* View source and the knowledge map */
+.source-view { border-color: var(--leaf); }
+.source-page { display: grid; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; } .source-page.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.source-page figure { margin: 0; } .source-page img { width: 100%; border: 1px solid var(--line); border-radius: 6px; display: block; }
+.source-text { white-space: pre-wrap; font: inherit; font-size: 13px; margin: 4px 0 0; max-height: 520px; overflow: auto; background: var(--paper); border-radius: 6px; padding: 8px 10px; }
+.map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
+.map-node { cursor: pointer; }
 /* the client's version next to the logo */
 .version { font-size: 11px; color: var(--ink-2); font-weight: 500; margin-left: 6px; white-space: nowrap; align-self: center; }
 /* Credits and usage */
@@ -281,6 +288,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 /* phones (Chi, 29 Oct): the five tabs on one line that scrolls sideways, the bar on two rows at most,
    and wide tables as one card per row */
 @media (max-width: 600px) {
+  .source-page.two { grid-template-columns: 1fr; }
   .usage-tiles { gap: 8px; } .usage-tiles .card { padding: 10px 12px; } .usage-tiles .big { font-size: 22px; }
   .top { gap: 8px; padding: 8px 12px; } .top .brand-name { display: none; } .me { margin-left: auto; gap: 6px; }
   .tabs { order: 3; width: 100%; margin: 0; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
