@@ -79,3 +79,56 @@ test('hints: one away from the answer is a counting slip, not the wrong sign (Ch
   assert.match(hintOf(it, '16', 'en'), /So close/);
   assert.doesNotMatch(hintOf(it, '7', 'en'), /So close/);
 });
+
+test('a repeat assignment warns first; Unassign takes it off the lists and keeps the answers (Chi #34)', async () => {
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'toan2');
+  const { id: lessonId, lesson } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ');
+  const k = (await call('POST', '/api/t/classes', { name: '2B' })).json.class;
+  await call('POST', `/api/t/classes/${k.id}/pupils`, { names: 'An' });
+  const a = (await call('POST', `/api/t/lessons/${lessonId}/assign`, { classId: k.id, confirmed: true })).json.assignment;
+  // the same lesson to the same class again: a warning with the first date, nothing added
+  const dup = await call('POST', `/api/t/lessons/${lessonId}/assign`, { classId: k.id, confirmed: true });
+  assert.equal(dup.status, 409);
+  assert.equal(dup.json.code, 'alreadyAssigned');
+  assert.ok(dup.json.at && /2B/.test(dup.json.error) && /2B/.test(dup.json.errorEn));
+  assert.equal((await call('GET', `/api/t/classes/${k.id}`)).json.assignments.length, 1, 'the warning adds nothing');
+  // "Assign again" on purpose
+  const b = (await call('POST', `/api/t/lessons/${lessonId}/assign`, { classId: k.id, confirmed: true, again: true })).json.assignment;
+  assert.ok(b.id && b.id !== a.id);
+
+  // what the row's status is worked out from (web statusOf): nothing yet → Just assigned, seen or
+  // started → In progress, every learner done → Done
+  const row = async (id: string) => (await call('GET', `/api/t/classes/${k.id}`)).json.assignments.find((x: any) => x.id === id);
+  assert.deepEqual([(await row(a.id)).seen, (await row(a.id)).started, (await row(a.id)).done], [0, 0, 0]);
+  const kid = s.client('198.51.100.71'), room = (await kid('GET', `/api/p/class/${k.code}`)).json;
+  await kid('POST', '/api/p/enter', { code: k.code, pupilId: room.pupils[0].id });
+  await kid('POST', `/api/p/a/${a.id}/seen`, { what: 'slides' });
+  assert.equal((await row(a.id)).seen, 1);
+  await kid('POST', `/api/p/a/${a.id}/answer`, { itemId: lesson.items[0].id, answer: lesson.items[0].answer });
+  assert.deepEqual([(await row(a.id)).started, (await row(a.id)).done], [1, 0]);
+  for (const it of lesson.items) await kid('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer });
+  assert.equal((await row(a.id)).done, 1);
+  // Unassign: only the assigner's own
+  const other = s.client('198.51.100.72');
+  await other('POST', '/api/auth/demo');
+  assert.equal((await other('DELETE', `/api/t/assignments/${a.id}`)).status, 404, 'not hers');
+  assert.equal((await call('DELETE', `/api/t/assignments/${a.id}`)).json.ok, true);
+  assert.equal((await call('DELETE', `/api/t/assignments/${a.id}`)).status, 404, 'already removed');
+  // gone from the child's Today, the class view, the class count and the lesson's list
+  const today = (await kid('GET', '/api/p/today')).json.lessons.map((x: any) => x.id);
+  assert.ok(!today.includes(a.id) && today.includes(b.id));
+  assert.equal((await kid('GET', `/api/p/a/${a.id}`)).status, 404, 'no more answers on it');
+  assert.deepEqual((await call('GET', `/api/t/classes/${k.id}`)).json.assignments.map((x: any) => x.id), [b.id]);
+  assert.equal((await call('GET', '/api/t/classes')).json.classes.find((x: any) => x.id === k.id).assignments, 1);
+  assert.deepEqual((await call('GET', `/api/t/lessons/${lessonId}/assignments`)).json.assignments.map((x: any) => x.id), [b.id]);
+  // the lesson and the answers stay; the summary still counts them
+  assert.equal((await call('GET', `/api/t/lessons/${lessonId}`)).status, 200);
+  assert.equal(Number((await s.sql.one<{ n: string }>('select count(*) as n from answers where assignment_id = $1', [a.id]))?.n), lesson.items.length + 1);
+  const sum = (await call('GET', `/api/t/summary?classId=${k.id}`)).json.classes.find((x: any) => x.id === k.id);
+  assert.ok(sum.skills.length > 0, 'the summary still counts what was done');
+  // with b still on the list a repeat warns; once b is removed too, assigning is quiet again
+  await call('DELETE', `/api/t/assignments/${b.id}`);
+  assert.ok((await call('POST', `/api/t/lessons/${lessonId}/assign`, { classId: k.id, confirmed: true })).json.assignment.id);
+});

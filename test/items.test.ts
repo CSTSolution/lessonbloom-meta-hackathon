@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { askedThing, buildEnglish, buildMath, checkItem, type CheckContext, type RawEnglish, type RawMath } from '../server/lesson/items.ts';
+import type { Item } from '../server/lesson/types.ts';
 
 const vi2: CheckContext = { subject: 'math', grade: 2, lang: 'vi', source: '', skills: [
   { tag: 'tru_co_nho', name: 'Trừ có nhớ', kind: 'sub_borrow' }, { tag: 'cong_co_nho', name: 'Cộng có nhớ', kind: 'add_carry' },
@@ -70,9 +71,50 @@ test('U: the numbers come from the story and the unit names what was asked', () 
 
 test('English: words from outside the lesson, gaps, options and language', () => {
   assert.ok(eng({ sentence: 'I have a ___.', options: ['book', 'hat', 'giraffe'], answer: 'giraffe' }).includes('offlesson'));
-  assert.deepEqual(eng({ sentence: 'I have a ___.', options: ['book', 'hat', 'girl'], answer: 'book' }), []);
+  // "I have a ___." with book / hat / girl: any of them fits (Chi #31); the sentence names what decides it
+  assert.deepEqual(eng({ sentence: 'The girl reads a ___.', options: ['book', 'hat', 'girl'], answer: 'book' }), []);
   assert.ok(eng({ sentence: 'I have a book.', options: ['book', 'hat', 'girl'], answer: 'book' }).includes('S'), 'no gap');
   assert.ok(eng({ sentence: 'I have a ___.', options: ['book', 'book', 'hat'], answer: 'book' }).includes('shape'), 'answer twice among the options');
   assert.ok(eng({ prompt: 'Chọn từ còn thiếu trong câu này nhé', sentence: 'I have a ___.', options: ['book', 'hat', 'girl'], answer: 'book' }).includes('lang'));
   assert.ok(eng({ prompt: '', sentence: 'I have a ___.', options: ['book', 'hat', 'girl'], answer: 'book' }).includes('empty'));
+});
+
+// Chi #31, English 3 Unit 6 Colours: 23 items, "0 written again", all 9 fill items had no single right answer.
+const unit6: CheckContext = { subject: 'english', grade: 3, lang: 'en', source: 'Unit 6: Colours. New words: red, blue, green, yellow, pink, orange. What colour is it? It is red. My favourite colour is yellow.', skills: [
+  { tag: 'colour_words', name: 'Colour words', kind: 'vocabulary' }, { tag: 'what_colour', name: "Asking 'What colour is it?'", kind: 'sentence_pattern' }] };
+const colour = (r: Partial<RawEnglish>, ctx: CheckContext = unit6, id = 'ex01') => checkItem(buildEnglish({ template: 'fill', skill: 'colour_words', level: 'basic', prompt: 'Choose the missing word.', explain: 'A colour.', ...r } as RawEnglish, id), ctx).map((i) => i.code);
+
+test('English fill (Chi #31): the sentence makes exactly one option right', () => {
+  assert.ok(colour({ sentence: 'It is ___.', options: ['red', 'blue', 'green'], answer: 'red' }).includes('clue'), 'no picture, no thing: any colour fits');
+  assert.ok(colour({ sentence: 'This is ___.', options: ['red', 'blue', 'green'], answer: 'blue' }).includes('clue'));
+  assert.ok(colour({ sentence: 'Mai: It is ___.', options: ['red', 'blue', 'green'], answer: 'red' }).includes('clue'), 'a speaker name is not a clue');
+  assert.ok(colour({ sentence: 'My favourite colour is ___.', options: ['yellow', 'red', 'blue'], answer: 'yellow' }).includes('clue'), 'an opinion: a child picking red is not wrong');
+  assert.ok(colour({ sentence: 'I like ___.', options: ['yellow', 'red', 'blue'], answer: 'red' }).includes('clue'));
+  assert.deepEqual(colour({ sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }), []);
+  assert.deepEqual(colour({ sentence: 'The banana is ___.', options: ['red', 'yellow', 'blue'], answer: 'yellow' }), []);
+  assert.deepEqual(colour({ sentence: 'The apple is ___.', options: ['red', 'blue', 'yellow'], answer: 'red' }), [], 'only red of these fits an apple');
+  assert.ok(colour({ sentence: 'The apple is ___.', options: ['red', 'green', 'blue'], answer: 'red' }).includes('clue'), 'apples are red or green: two options fit');
+  assert.ok(colour({ sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'red' }).includes('clue'), 'the sentence says blue, the answer says red');
+  assert.ok(colour({ sentence: 'My pencil is ___.', options: ['red', 'blue', 'green'], answer: 'green' }).includes('clue'), 'a pencil can be any colour');
+  // a grammar gap: the grammar decides, so the sample's own pattern still passes
+  assert.deepEqual(colour({ skill: 'what_colour', sentence: 'What colour ___ it?', options: ['is', 'are', 'am'], answer: 'is' }), []);
+});
+
+test('English match (Chi #31): a colour word takes its own swatch, never a thing of that colour', () => {
+  const match = (pairs: { word: string; emoji: string }[]) => colour({ template: 'match', prompt: 'Match each word to its picture.', pairs });
+  assert.deepEqual(match([{ word: 'red', emoji: '🔴' }, { word: 'blue', emoji: '🟦' }, { word: 'green', emoji: '🟢' }]), []);
+  assert.ok(match([{ word: 'red', emoji: '🔴' }, { word: 'blue', emoji: '🔵' }, { word: 'pink', emoji: '🌸' }]).includes('picture'), '🌸 is a flower; pink has no swatch');
+  assert.ok(match([{ word: 'red', emoji: '🍎' }, { word: 'blue', emoji: '🔵' }, { word: 'green', emoji: '🟢' }]).includes('picture'), 'an apple is not the colour red');
+  assert.ok(match([{ word: 'red', emoji: '🔵' }, { word: 'blue', emoji: '🔴' }, { word: 'green', emoji: '🟢' }]).includes('picture'), 'the swatch must be that colour');
+  assert.deepEqual(match([{ word: 'white', emoji: '⬜️' }, { word: 'black', emoji: '⚫' }, { word: 'red', emoji: '🟥' }]).filter((c) => c === 'picture'), [], 'with or without the emoji variation mark');
+});
+
+test('levels (Chi #31): a good or advanced item never repeats a basic one', () => {
+  const basic = buildEnglish({ template: 'fill', skill: 'colour_words', level: 'basic', prompt: 'Choose the missing word.', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue', explain: 'The sky is blue.' }, 'ex01');
+  const withLesson: CheckContext = { ...unit6, items: [basic] as Item[] };
+  assert.ok(colour({ level: 'good', prompt: 'Fill in the gap.', sentence: 'The sky is ___ .', options: ['green', 'blue', 'yellow'], answer: 'blue' }, withLesson, 'ex05').includes('dup'), 'a new instruction and option order is still the same question');
+  assert.deepEqual(colour({ level: 'good', sentence: 'The banana is ___.', options: ['red', 'yellow', 'blue'], answer: 'yellow' }, withLesson, 'ex05'), []);
+  assert.deepEqual(colour({ level: 'basic', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex01'), [], 'the basic item itself passes');
+  assert.ok(!colour({ level: 'advanced', template: 'listen', say: 'blue', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex06').includes('dup'), 'another template is another question');
+  assert.ok(!colour({ level: 'good', skill: 'what_colour', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex07').includes('dup'), 'levels belong to one skill');
 });

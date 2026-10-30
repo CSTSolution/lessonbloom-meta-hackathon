@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { classLabel, clock, DEFAULT_CRITERIA, labelOf, mistakeOf, schoolDay } from '../server/path/labels.ts';
-import { layout } from '../server/path/routes.ts';
+import { firstPlan, layout } from '../server/path/routes.ts';
 import type { Item } from '../server/lesson/types.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
@@ -19,6 +19,20 @@ test('labels by code: 80 / 50 / the same mistake 3 times in 2 sessions; a class 
   assert.equal(schoolDay('2026-10-31'), '2026-10-30', 'Saturday moves to Friday');
   const steps = layout('2026-10-19', [{ section_id: 'a', title: 'A', page_from: 1, page_to: 2, topic: 'T', weeks: 1 }, { section_id: 'b', title: 'B', page_from: 3, page_to: 4, topic: 'T', weeks: 2 }, { section_id: 'c', title: 'C', page_from: 5, page_to: 6, topic: 'T', weeks: 1 }], '2026-10-28');
   assert.deepEqual(steps.map((s) => [s.status, s.start, s.end]), [['done', '2026-10-19', '2026-10-25'], ['current', '2026-10-26', '2026-11-08'], ['next', '2026-11-09', '2026-11-15']]);
+});
+
+test('the path starts in the book\'s page order; 1/2/3 weeks move every later lesson (Chi #35)', () => {
+  // Chi's book: the parts came in this order, and "Comparing and ordering" was the lesson assigned
+  const book = [{ id: 'cmp', book_id: 'b', page_from: 6, ord: 1 }, { id: 'est', book_id: 'b', page_from: 10, ord: 2 }, { id: 'num', book_id: 'b', page_from: 1, ord: 3 }];
+  assert.deepEqual(firstPlan(book, undefined, '2026-10-30'), { order: ['num', 'cmp', 'est'], start: '2026-10-26' }, 'no lesson assigned: page order, from this Monday');
+  const f = firstPlan(book, 'cmp', '2026-10-30');
+  assert.deepEqual(f, { order: ['num', 'cmp', 'est'], start: '2026-10-23' }, 'the assigned lesson is current today; the one before it comes before');
+  const row = (id: string, weeks: number) => ({ section_id: id, title: id, page_from: book.find((x) => x.id === id)!.page_from, page_to: 0, topic: 'T', weeks });
+  const at = (w: number) => layout(f.start, [row('num', 1), row('cmp', w), row('est', 1)], '2026-10-30').map((s) => [s.sectionId, s.status, s.start, s.end]);
+  assert.deepEqual(at(1), [['num', 'done', '2026-10-23', '2026-10-29'], ['cmp', 'current', '2026-10-30', '2026-11-05'], ['est', 'next', '2026-11-06', '2026-11-12']]);
+  assert.deepEqual(at(3).slice(1), [['cmp', 'current', '2026-10-30', '2026-11-19'], ['est', 'next', '2026-11-20', '2026-11-26']], '3 weeks: its end and the next start move on 2 weeks');
+  // two books in one source: each book in its own page order, the first book first
+  assert.deepEqual(firstPlan([{ id: 'a9', book_id: 'x', page_from: 9, ord: 1 }, { id: 'a1', book_id: 'x', page_from: 1, ord: 2 }, { id: 'b2', book_id: 'y', page_from: 1, ord: 1 }], undefined, '2026-10-30').order, ['a1', 'a9', 'b2']);
 });
 
 test('a parent: children at sign-up become "Con của tôi", each with a private link', async () => {
@@ -43,10 +57,20 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   // the path: put the lesson's part first, now
   let p = (await call('GET', `/api/t/path?classId=${k.id}&areaId=${areaId}`)).json;
   assert.ok(p.steps.length > 1 && p.steps.every((x: any) => x.topic), 'every part has a chapter');
+  // not saved yet: the book's page order, the assigned lesson current today (Chi #35)
+  const pageOf = (x: any) => Number(String(x.pages).split('–')[0]), byPage = (xs: any[]) => xs.every((x, i) => !i || pageOf(xs[i - 1]) <= pageOf(x));
+  assert.ok(byPage(p.steps), `page order: ${p.steps.map((x: any) => x.pages).join(', ')}`);
+  assert.equal(p.steps.find((x: any) => x.status === 'current')?.sectionId, lesson.refs[0].sectionId);
+  // a path made before in another order, never saved, follows the book again (in place: same path)
+  await s.sql.query('update path_steps set ord = -ord where path_id = $1', [p.path.id]);
+  const again = (await call('GET', `/api/t/path?classId=${k.id}&areaId=${areaId}`)).json;
+  assert.equal(again.path.id, p.path.id);
+  assert.deepEqual(again.steps.map((x: any) => x.sectionId), p.steps.map((x: any) => x.sectionId));
   const sec = lesson.refs[0].sectionId, order = [sec, ...p.steps.map((x: any) => x.sectionId).filter((x: string) => x !== sec)];
   const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   await call('PUT', `/api/t/path/${p.path.id}`, { start: today, steps: order.map((id: string, i: number) => ({ sectionId: id, weeks: i === 0 ? 2 : 1 })) });
   p = (await call('GET', `/api/t/path?classId=${k.id}&areaId=${areaId}`)).json;
+  assert.deepEqual(p.steps.map((x: any) => x.sectionId), order, 'the order she saved stays');
   assert.equal(p.steps[0].status, 'current');
   assert.equal(p.steps[0].weeks, 2);
   assert.equal(p.steps[1].status, 'next');

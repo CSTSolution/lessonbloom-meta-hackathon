@@ -62,8 +62,9 @@ test('credits: 120 once at sign-up, taken off call by call; too few stops new wo
   assert.ok(after.balance < config.guard.signupCredits && after.balance >= config.guard.signupCredits - l.credits - 3, `${after.balance} after a lesson of ${l.credits}`);
   const t = (await call('GET', '/api/t/me')).json.teacher;
   await s.sql.query(`update teachers set credits = $2 where id = $1`, [t.id, config.guard.lessonCredits - 1]);
-  const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: match.sectionId })).json;
-  assert.equal((await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'x', setup })).json.code, 'credits');
+  // one short of a lesson: the setup step already says so and spends nothing (Chi #30), and so does making it
+  assert.equal((await call('POST', '/api/t/intake', { areaId, sectionId: match.sectionId })).json.code, 'credits');
+  assert.equal((await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'x', setup: l.setup })).json.code, 'credits');
   await s.sql.query(`update teachers set credits = 0 where id = $1`, [t.id]);
   assert.equal((await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Bài 22' })).json.code, 'credits', 'no credits left: every AI step says so');
   // adding an email keeps the demo's balance: no second sign-up gift

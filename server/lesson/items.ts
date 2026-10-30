@@ -4,13 +4,15 @@
 // item can never miss its calculation (S) or carry a wrong answer.
 // Every rule returns issues tagged with the error class of the test reports:
 //   S calculation missing   K listening word on screen   Q wrong skill   U wrong unit / number not in the story
-// plus range, dup, offlesson, punct, lang, empty, long. An item with any issue never reaches anyone.
+// plus range, dup, offlesson, punct, lang, empty, long, clue (no single right answer), picture (a
+// colour matched to a thing, not a swatch). An item with any issue never reaches anyone.
 import type { EnglishItem, Item, Lang, Level, MathItem, Op, Setup, Skill, Subject } from './types.ts';
 
-export type Code = 'S' | 'K' | 'Q' | 'U' | 'scope' | 'range' | 'dup' | 'offlesson' | 'punct' | 'lang' | 'empty' | 'long' | 'shape';
+export type Code = 'S' | 'K' | 'Q' | 'U' | 'scope' | 'range' | 'dup' | 'offlesson' | 'punct' | 'lang' | 'empty' | 'long' | 'shape' | 'clue' | 'picture';
 export interface Issue { code: Code; msg: string }
 export interface Scope { max?: number; ops?: Op[] }
-export interface CheckContext { subject: Subject; grade: number; lang: Lang; skills: Skill[]; source: string; scope?: Scope }
+// items: the lesson's other items, so a good or advanced item cannot repeat a basic one (Chi #31)
+export interface CheckContext { subject: Subject; grade: number; lang: Lang; skills: Skill[]; source: string; scope?: Scope; items?: Item[] }
 
 // Chi's scope rule: the lesson stays inside its section of the book. "phạm vi 100" caps every number;
 // only the operations the section teaches are allowed (a section on addition gets no subtraction).
@@ -153,6 +155,45 @@ function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
 // words any sentence may use although the section does not print them
 const FUNCTION_WORDS = new Set(['a', 'an', 'the', 'is', 'are', 'am', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'these', 'those', 'and', 'or', 'of', 'to', 'in', 'on', 'at', 'with', 'what', 'do', 'does', 'have', 'has', 'can', 'not', 'yes', 'no', 's']);
 
+// Chi #31: an English fill item needs exactly one right option. These words make a sentence about
+// likes or opinions ("My favourite colour is ___."): the child's own choice cannot be marked wrong.
+const OPINION = new Set(['favourite', 'favourites', 'favorite', 'favorites', 'like', 'likes', 'love', 'loves', 'want', 'wants', 'prefer', 'prefers', 'think', 'thinks', 'best', 'enjoy', 'enjoys', 'hate', 'hates', 'wish']);
+// words that never tell which option is right ("Look! It is ___." says nothing)
+const NO_CLUE = new Set([...FUNCTION_WORDS, 'here', 'there', 'was', 'were', 'be', 'look', 'very', 'so', 'too', 'please', 'oh', 'wow', 'now', 'colour', 'color']);
+// Colour words, the plain swatch emoji for each (pink and grey have none), and things whose colour a
+// child knows, so "The sky is ___." settles blue. A thing with two colours (apple) settles neither.
+const SWATCH: Record<string, string[]> = { red: ['🟥', '🔴'], orange: ['🟧', '🟠'], yellow: ['🟨', '🟡'], green: ['🟩', '🟢'], blue: ['🟦', '🔵'], purple: ['🟪', '🟣'], brown: ['🟫', '🟤'], black: ['⬛', '⚫'], white: ['⬜', '⚪'], pink: [], grey: [], gray: [] };
+const COLOUR_OF: Record<string, string[]> = {
+  sky: ['blue'], sea: ['blue'], grass: ['green'], leaf: ['green'], leaves: ['green'], frog: ['green'], sun: ['yellow'], banana: ['yellow'], lemon: ['yellow'], chick: ['yellow'],
+  apple: ['red', 'green'], tomato: ['red'], tomatoes: ['red'], strawberry: ['red'], strawberries: ['red'], cherry: ['red'], cherries: ['red'], carrot: ['orange'], pumpkin: ['orange'],
+  snow: ['white'], milk: ['white'], cloud: ['white'], coal: ['black'], crow: ['black'], chocolate: ['brown'], pig: ['pink'], flamingo: ['pink'], grape: ['purple', 'green'],
+};
+const own = <T>(o: Record<string, T>, k: string): T | undefined => (Object.hasOwn(o, k) ? o[k] : undefined);
+const colourHints = (w: string) => own(COLOUR_OF, w) ?? own(COLOUR_OF, w.replace(/s$/, ''));
+
+// What the pupil is asked, without the instruction line: two items with the same one are the same item.
+export function questionOf(e: Item): string {
+  if (e.subject === 'math') return e.prompt;
+  if (e.template === 'match') return (e.pairs || []).map((p) => p.word.toLowerCase()).sort().join(', ');
+  if (e.template === 'order') return e.answer;
+  return `${e.template === 'fill' ? e.sentence : e.say} (${e.answer})`;
+}
+const sameQuestion = (a: Item, b: Item) => a.template === b.template && words(questionOf(a)).join(' ') === words(questionOf(b)).join(' ');
+
+// Chi #31: a fill item's sentence must make its answer the only right option.
+function fillClue(e: EnglishItem, out: Issue[]) {
+  const answer = e.answer.toLowerCase();
+  if (!answer || FUNCTION_WORDS.has(answer)) return;   // a grammar gap ("What colour ___ it?" -> is): the sentence's grammar decides
+  // the sentence without its gap and without a speaker label ("Mai: It is ___.")
+  const rest = words(String(e.sentence ?? '').replace(/^\s*\p{Lu}\p{L}*\s*:/u, '').replace(/_{2,}/g, ' '));
+  if (rest.some((w) => OPINION.has(w))) out.push({ code: 'clue', msg: 'a sentence about likes or opinions has no single right answer; write a sentence about a fact' });
+  if (!rest.some((w) => !NO_CLUE.has(w) && !/^\d+$/.test(w))) out.push({ code: 'clue', msg: `nothing in "${e.sentence}" tells which option is right; name the thing it is about ("The sky is ___.")` });
+  else if (own(SWATCH, answer) && (e.options || []).filter((o) => own(SWATCH, o.toLowerCase())).length >= 2) {
+    const fits = new Set(rest.flatMap((w) => colourHints(w) ?? []).filter((c) => (e.options || []).some((o) => o.toLowerCase() === c)));
+    if (fits.size !== 1 || !fits.has(answer)) out.push({ code: 'clue', msg: fits.size > 1 ? `more than one colour option fits "${e.sentence}"` : `nothing in "${e.sentence}" makes "${e.answer}" the only right colour; name a thing with one known colour ("The sky is ___." -> blue)` });
+  }
+}
+
 function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
   const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind, lesson = new Set(words(ctx.source));
   const inOptions = (o: string[] | undefined) => (o || []).filter((x) => x.toLowerCase() === e.answer.toLowerCase()).length === 1;
@@ -168,6 +209,7 @@ function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
     if ((String(e.sentence).match(/_{2,}/g) || []).length !== 1) out.push({ code: 'S', msg: 'the sentence needs exactly one ___ gap' });
     if (!inOptions(e.options)) out.push({ code: 'shape', msg: 'the answer must be exactly one of the options' });
     if (words(e.answer).some((w) => !lesson.has(w))) out.push({ code: 'offlesson', msg: `"${e.answer}" is not a word from the lesson` });
+    fillClue(e, out);
   }
   if (e.template === 'order') {
     const want = e.answer.replace(/[.!?]$/, '').split(/\s+/).map((x) => x.toLowerCase()).sort().join(' ');
@@ -181,6 +223,11 @@ function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
     if (p.length < 3 || new Set(p.map((x) => x.word.toLowerCase())).size !== p.length || new Set(p.map((x) => x.emoji)).size !== p.length) out.push({ code: 'shape', msg: 'needs 3-5 different word-picture pairs' });
     if (p.some((x) => e.prompt.includes(x.emoji)) || p.filter((x) => shown.includes(` ${x.word.toLowerCase()} `)).length >= 2) out.push({ code: 'K', msg: 'the question gives the pairs away' });
     for (const x of p) if (words(x.word).some((w) => !lesson.has(w))) out.push({ code: 'offlesson', msg: `"${x.word}" is not a word from the lesson` });
+    // a colour word takes its own swatch, never a thing of that colour: 🌸 reads as a flower, not pink (Chi #31)
+    for (const x of p) {
+      const sw = own(SWATCH, x.word.toLowerCase());
+      if (sw && !sw.includes(x.emoji.replace(/\uFE0F/g, ''))) out.push({ code: 'picture', msg: sw.length ? `"${x.word}" needs its plain colour swatch (${sw.join(' ')}), not ${x.emoji}` : `"${x.word}" has no plain colour swatch emoji; leave it out of matching` });
+    }
   }
   for (const o of e.options || []) if (!o) out.push({ code: 'empty', msg: 'an empty option' });
   if (new Set((e.options || []).map((o) => o.toLowerCase())).size !== (e.options || []).length) out.push({ code: 'dup', msg: 'repeated options' });
@@ -203,6 +250,9 @@ export function checkItem(e: Item, ctx: CheckContext): Issue[] {
     if (ctx.lang === 'en' && VI.test(instr)) out.push({ code: 'lang', msg: 'the question should be in English' });
   }
   if (e.subject === 'math') mathRules(e, ctx, out); else englishRules(e, ctx, out);
+  // Chi #31: the good and advanced levels were copies of the basic one; a harder level of a skill asks something new
+  // (English for now: the maths mock still writes the same word problem at every level)
+  if (e.subject === 'english' && e.level !== 'basic' && (ctx.items || []).some((o) => o.id !== e.id && o.level === 'basic' && o.skill === e.skill && sameQuestion(o, e))) out.push({ code: 'dup', msg: `the same question as a basic item; a ${e.level} item must be different and a step harder` });
   return out.filter((x, i) => out.findIndex((y) => y.code === x.code && y.msg === x.msg) === i);
 }
 

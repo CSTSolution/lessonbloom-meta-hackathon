@@ -48,5 +48,7 @@ export const config = {
   // her original files in Cloudflare R2 (off until all four are set); a free allowance per account
   r2: { endpoint: env('R2_ENDPOINT'), keyId: env('R2_ACCESS_KEY_ID'), secret: env('R2_SECRET_ACCESS_KEY'), bucket: env('R2_BUCKET') },
   storage: { quotaBytes: num('LB_STORAGE_QUOTA_MB', 300) * 1e6, maxFile: 500e6 },
-  scan: { pageCredits: num('LB_SCAN_PAGE_CREDITS', 0.9), margin: 1.5, maxPages: 200, pagesAtOnce: 3, maxImage: 1.5e6 },
+  // readCredits: each reading's fixed part (cutting the book into parts), so a one-page photo is not
+  // estimated at 1 and charged 2 (Chi #29)
+  scan: { pageCredits: num('LB_SCAN_PAGE_CREDITS', 0.9), readCredits: 0.5, margin: 1.5, maxPages: 200, pagesAtOnce: 3, maxImage: 1.5e6 },
 };

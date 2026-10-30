@@ -56,13 +56,14 @@ test('jobs: a waiting job can be cancelled (its cancel step runs); a running boo
   l2.open();
 });
 
-test('the estimate: pages x credits a page, and she must have 50% more; how many pages fit what she has', () => {
-  const per = config.scan.pageCredits, e = scanEstimate(100, 120);
-  assert.equal(e.predicted, Math.ceil(100 * per));
+test('the estimate: pages x credits a page plus the fixed part of a reading, and she must have 50% more; how many pages fit', () => {
+  const per = config.scan.pageCredits, fixed = config.scan.readCredits, e = scanEstimate(100, 120);
+  assert.equal(e.predicted, Math.ceil(100 * per + fixed));
   assert.equal(e.need, Math.ceil(e.predicted * 1.5));
   assert.equal(e.enough, 120 >= e.need);
-  assert.equal(e.fits, Math.floor(120 / (per * 1.5)));
+  assert.equal(e.fits, Math.floor((120 / 1.5 - fixed) / per));
   assert.ok(scanEstimate(20, 120).enough);
+  assert.equal(scanEstimate(1, 120).predicted, 2, 'one photo: about 2, what it really costs (Chi #29)');
 });
 
 test('a scanned book: estimate, pictures from the browser, credit held, read page by page, the rest given back', async () => {

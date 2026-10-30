@@ -20,9 +20,9 @@ const T = {
     status: { processing: 'Đang đọc tài liệu…', ready: 'Sẵn sàng', error: 'Lỗi' }, errors: { interrupted: 'Việc đọc sách bị ngắt khi máy chủ khởi động lại; lượt đã giữ được trả lại. Cô xoá nguồn này rồi thêm lại nhé.', scanned: 'Tài liệu là ảnh chụp. Cô xoá nguồn này rồi thêm lại tệp: app sẽ đọc từng trang ảnh (có dự kiến lượt trước).', failed: 'Chưa đọc được tệp này.', stopped: 'Cô đã dừng việc đọc, nên sách không được thêm; lượt chưa dùng đã được trả lại.', credits: 'Lượt đã giữ không đủ để đọc hết sách, nên sách không được thêm (app không giữ một phần sách); lượt chưa dùng đã được trả lại.', unreadable: 'Không đọc được chữ trên các trang này. Cô xem ảnh có rõ, đúng chiều không, rồi xoá và thêm lại nhé.', blocked: 'Nội dung không dùng được.' },
     view: 'Xem tài liệu', remove: 'Xoá khỏi kho', removeAsk: 'Xoá nguồn này khỏi kho? Bài đã soạn vẫn còn.', parts: (n: number) => `Phạm vi kiến thức (${n})`, partsLead: 'Mỗi bài chỉ chọn một phạm vi làm giới hạn kiến thức.',
     page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', source: 'Xem nguồn', mapTab: 'Bản đồ kiến thức', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
-    splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Thêm sách PDF hoặc dùng sách mẫu.', noneHere: (s: string) => `Chưa có nguồn ${s} nào. Bấm "+ Thêm nguồn kiến thức" hoặc chọn "Tất cả".`,
+    splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Tải sách của bạn: PDF hoặc ảnh trang sách.', orSample: 'Hoặc thử nhanh với sách mẫu do LessonBloom soạn:', noneHere: (s: string) => `Chưa có nguồn ${s} nào. Bấm "+ Thêm nguồn kiến thức" hoặc chọn "Tất cả".`,
     st: { waiting: (n: number) => `Đang chờ (thứ ${n} trong hàng): sẽ đọc khi xong việc đang làm.`, reading: 'Đang đọc sách: tách bài, đọc chữ từng trang…', readingPage: (p: string) => `Đang đọc sách · trang ${p}`, leave: 'Cô có thể rời trang; đọc xong sẽ có thông báo ở chuông.',
-      done: (title: string, n: number, p: number) => `Đã thêm: ${title} · ${n} bài · ${p} trang.`, retry: 'Thử lại', again: 'Xoá và thêm lại' },
+      done: (title: string, n: number, p: number) => `Đã thêm: ${title} · ${n} bài · ${p} trang.`, cost: (u: number, r: number) => ` Đã dùng ${u} lượt · trả lại ${r} lượt.`, retry: 'Thử lại', again: 'Xoá và thêm lại' },
     form: { title: 'Thêm nguồn kiến thức', name: 'Tên nguồn', namePh: 'Ví dụ: Toán 2 · Tập 1', subject: 'Môn', grade: 'Lớp', file: 'Tệp PDF có chữ (tối đa 30 MB)', tooBig: (mb: number) => `Tệp này ${mb} MB, quá 30 MB. Cô tách sách ra từng chương rồi tải từng phần nhé.`, sent: (p: number) => `Đang tải lên… ${p}%`, go: 'Tải lên', busy: 'Đang tải lên…', sample: 'Hoặc dùng sách mẫu (đội LessonBloom tự viết):', toan: 'Toán 2', maths: 'Maths 2 (tiếng Anh)', eng: 'Tiếng Anh 3' },
   },
   en: {
@@ -31,9 +31,9 @@ const T = {
     status: { processing: 'Reading…', ready: 'Ready', error: 'Error' }, errors: { interrupted: 'Reading was interrupted by a server restart; the held credits were given back. Remove this source and add it again.', scanned: 'The file is scanned pictures. Remove this source and add the file again: the app will read each page picture (with a credit estimate first).', failed: 'This file could not be read.', stopped: 'You stopped the reading, so the book was not added; the unused credits came back.', credits: 'The held credits were not enough to read the whole book, so it was not added (LessonBloom keeps no part of a book); the unused credits came back.', unreadable: 'No text could be read on these pages. Check the pictures are clear and the right way up, then remove and add them again.', blocked: 'This content cannot be used.' },
     view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
     page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', source: 'View source', mapTab: 'Knowledge map', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
-    splitAt: 'Split from page', newTitle: 'New part name', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Add a PDF book or use a sample book.', noneHere: (s: string) => `No ${s} sources yet. Press "+ Add a source" or choose "All".`,
+    splitAt: 'Split from page', newTitle: 'New part name', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Upload your book: a PDF or photos of its pages.', orSample: 'Or try it quickly with a sample book written by LessonBloom:', noneHere: (s: string) => `No ${s} sources yet. Press "+ Add a source" or choose "All".`,
     st: { waiting: (n: number) => `Waiting (number ${n} in your line): it is read when the job before is done.`, reading: 'Reading the book: finding the lessons, reading each page…', readingPage: (p: string) => `Reading the book · page ${p}`, leave: 'You can leave this page; the bell tells you when it is done.',
-      done: (title: string, n: number, p: number) => `Added: ${title} · ${pl(n, 'lesson')} · ${pl(p, 'page')}.`, retry: 'Try again', again: 'Remove and add again' },
+      done: (title: string, n: number, p: number) => `Added: ${title} · ${pl(n, 'lesson')} · ${pl(p, 'page')}.`, cost: (u: number, r: number) => ` Used ${pl(u, 'credit')} · ${r} given back.`, retry: 'Try again', again: 'Remove and add again' },
     form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file with text (up to 30 MB)', tooBig: (mb: number) => `This file is ${mb} MB, over 30 MB. Split the book into chapters and upload them one by one.`, sent: (p: number) => `Uploading… ${p}%`, go: 'Upload', busy: 'Uploading…', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Toán 2 (Vietnamese)', maths: 'Maths 2', eng: 'English 3' },
   },
 };
@@ -67,10 +67,12 @@ export function Knowledge() {
         {(['', 'math', 'english'] as const).map((s) => <button key={s} className={`pill ${subject === s ? 'on' : ''}`} onClick={() => { setSubject(s); setGrade(0); }}>{s ? t[s] : t.all}</button>)}
         {subject && grades.length > 1 && grades.map((g) => <button key={g} className={`pill ${grade === g ? 'on' : ''}`} onClick={() => setGrade(grade === g ? 0 : g)}>{t.grade(g)}</button>)}
       </div>
-      {!areas.length && !adding && <div className="card stack" style={{ gap: 8 }}><p className="muted">{t.none}</p>
-        {/* the sample books right here, not only inside "Add a source" (Chi, 29 Oct) */}
-        <div className="row">{(['maths2', 'english3', 'toan2'] as const).map((b) => <button key={b} className="btn small" disabled={!!busy} onClick={() => run('sample', async () => { const id = (await api.sampleArea(b)).area.id; await load(); setSel(id); })}>{b === 'maths2' ? t.form.maths : b === 'english3' ? t.form.eng : t.form.toan}</button>)}
-          <button className="btn small primary" onClick={() => setAdding(true)}>{t.form.title}</button></div></div>}
+      {/* empty: her own book first, one big button alone; the sample books below, smaller, so they do not
+          look like books she already has (Chi #27) */}
+      {!areas.length && !adding && <div className="card stack" style={{ gap: 12 }}><p>{t.none}</p>
+        <div><button className="btn primary lg" onClick={() => setAdding(true)}>{t.add}</button></div>
+        <p className="small muted" style={{ marginTop: 8 }}>{t.orSample}</p>
+        <div className="row">{(['maths2', 'english3', 'toan2'] as const).map((b) => <button key={b} className="btn small ghost" style={{ borderColor: 'var(--line)' }} disabled={!!busy} onClick={() => run('sample', async () => { const id = (await api.sampleArea(b)).area.id; await load(); setSel(id); })}>{b === 'maths2' ? t.form.maths : b === 'english3' ? t.form.eng : t.form.toan}</button>)}</div></div>}
       {areas.length > 0 && !shown.length && <div className="card"><p className="muted">{t.noneHere(subject ? t[subject] : '')}</p></div>}
       {shown.length > 0 && <div className="cols left">
         <div className="stack">
@@ -79,7 +81,7 @@ export function Knowledge() {
               <button className="group-head" onClick={() => setFold({ ...fold, [s]: !(fold[s] ?? !list.some((x) => x.id === sel)) })}><span className="caret">{(fold[s] ?? !list.some((x) => x.id === sel)) ? '▸' : '▾'}</span><span className="grow"><b>{t[s]}</b><span className="small muted" style={{ display: 'block' }}>{t.sources(list.length)}</span></span>{reading ? <span className="tag next">{t.reading(reading)}</span> : <span className="tag done">{t.ready}</span>}</button>
               {!(fold[s] ?? !list.some((x) => x.id === sel)) && list.map((x) => { const b = x.books[0]; return (
                 <button key={x.id} className={`list-row ${sel === x.id ? 'sel' : ''}`} style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => setSel(x.id)}>
-                  <span>📄</span><span className="grow"><b className="small">{x.name}</b><span className="small muted" style={{ display: 'block' }}>{t.grade(x.grade)}{b?.pages ? ` · ${t.pages(b.pages)}` : ''}</span>
+                  <span className="grow"><b className="small">{x.name}</b><span className="small muted" style={{ display: 'block' }}>{t.grade(x.grade)}{b?.pages ? ` · ${t.pages(b.pages)}` : ''}</span>
                     <span className={`small ${b?.status === 'ready' ? 'ok-text' : b?.status === 'error' ? 'danger' : ''}`} style={{ display: 'block', color: b?.status === 'processing' ? 'var(--sun)' : undefined }}>● {b ? t.status[b.status] : '—'}</span></span>
                 </button>
               ); })}
@@ -138,7 +140,7 @@ function BookStatus({ t, book, sections, onChange, onAgain }: { t: (typeof T)['v
     void tick();
     return () => { alive = false; clearTimeout(h); };
   }, [book.id, book.status]);
-  if (book.status === 'ready') return <p className="banner small">✓ {t.st.done(book.title, book.sections ?? sections, book.pages)}</p>;
+  if (book.status === 'ready') return <p className="banner small">✓ {t.st.done(book.title, book.sections ?? sections, book.pages)}{book.used != null ? t.st.cost(Number(book.used), Number(book.returned ?? 0)) : ''}</p>;
   if (book.status === 'processing') {
     const pg = job?.status === 'running' && /^(\d+)\/(\d+)$/.exec(job.progress);
     return (

@@ -97,7 +97,8 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
     c.set('teacher', t); c.set('token', token);
     await next();
   });
-  app.get('/api/t/me', async (c) => c.json({ teacher: publicTeacher(c.get('teacher')), budget: await budget.check(c.get('teacher').id), credits: await budget.credits(c.get('teacher').id) }));
+  // lessonCredits: what a new lesson holds, so the page can say before any step whether she has enough (Chi #30)
+  app.get('/api/t/me', async (c) => c.json({ teacher: publicTeacher(c.get('teacher')), budget: await budget.check(c.get('teacher').id), credits: await budget.credits(c.get('teacher').id), lessonCredits: config.guard.lessonCredits }));
   app.put('/api/t/me', async (c) => {
     const t = c.get('teacher'), b = await c.req.json<{ name?: string; lang?: string; role?: string; subject?: string }>().catch(() => ({} as { name?: string; lang?: string; role?: string; subject?: string }));
     const name = b.name === undefined ? undefined : String(b.name).replace(/\s+/g, ' ').trim().slice(0, 60);

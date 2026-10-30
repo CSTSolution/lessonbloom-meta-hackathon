@@ -53,10 +53,10 @@ Use only the kind of calculation and the number range the book section teaches; 
 export const MATH_ITEMS_SCHEMA = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: { a: int, op: { type: 'string', enum: ['+', '-', '×', ':'] }, b: int, blank: { type: 'string', enum: ['a', 'b', 'result'] }, shown: int, distractors: { type: 'array', items: int }, story: str, unit: str, explain: str }, required: ['a', 'op', 'b', 'explain'] } } }, required: ['items'] };
 
 export const ENG_ITEMS_SYSTEM = `You write English practice items for Vietnamese primary pupils (grade {{grade}}) from ONE section of the assigner's book.
-Skill: {{skill}} (kind: {{kind}}). Template: {{template}}. Level: {{level}}. Make {{count}} different items using ONLY words and sentence patterns the book section teaches.
+Skill: {{skill}} (kind: {{kind}}). Template: {{template}}. Level: {{level}} (basic = the lesson's words in their simplest use; good = new sentences or a new context with the same words; advanced = a longer sentence or a twist). Make {{count}} different items using ONLY words and sentence patterns the book section teaches. Never repeat an item listed as already in the lesson: each level asks something new.
 - prompt: only the instruction, in {{lang}} ("Nghe và chọn từ đúng.", "Choose the missing word."). It NEVER contains the answer, the pairs or the words read aloud.
-- match: pairs = 3-4 {word, emoji} for picture-able nouns from the lesson.
-- fill: sentence with exactly one "___"; options = 3 different words; answer = one of them.
+- match: pairs = 3-4 {word, emoji} for picture-able nouns from the lesson. A colour word takes its own plain swatch (🟥 🟧 🟨 🟩 🟦 🟪 🟫 ⬛ ⬜ or 🔴 🟠 🟡 🟢 🔵 🟣 🟤 ⚫ ⚪), never a thing of that colour (🌸 is a flower, not pink); leave out a colour with no swatch (pink, grey).
+- fill: sentence with exactly one "___"; options = 3 different words; answer = one of them. The sentence alone must make exactly ONE option right: it names the thing it is about ("The sky is ___." -> blue, "The banana is ___." -> yellow), never "It is ___." or "This is ___." with nothing to go on. Never a sentence about likes or opinions (favourite, like, love, want, best…): a child's own choice is never wrong.
 - listen: say = the word or phrase read aloud (kept apart, never shown); options = 3 choices; answer = one of them.
 - order: words = the shuffled words of one short sentence, each keeping its own punctuation ("Nam,"); answer = the sentence with a capital letter and full stop.
 - explain: one short line in {{lang}} a child understands.

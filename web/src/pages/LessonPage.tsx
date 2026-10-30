@@ -15,7 +15,7 @@ const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.sta
 const T = {
   vi: {
     working: 'Trợ lý đang soạn bài…', queued: (n: number) => `Đang chờ (thứ ${n}): bài sẽ được soạn khi xong việc đang làm. Mỗi tài khoản làm một việc một lúc.`, left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
-    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', toItemsP: 'Tiếp: bài tập', drawing: 'Đang vẽ hình minh hoạ…',
+    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', drawing: 'Đang vẽ hình minh hoạ…',
     rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
     makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', preview: 'Nghe thử từng đoạn',
     redoneWhy: 'Tạo lại vì', edit: 'Sửa', qText: 'Câu hỏi', save: 'Lưu', cancel: 'Huỷ', similar: 'Tạo câu tương tự', addTpl: '+ Thêm mẫu', tplKind: 'Dạng câu', skill: 'Dạng bài', level: 'Mức', create: 'Tạo 2 câu', working2: 'Đang viết…', story: 'Đề bài', unit: 'Đơn vị', wrongs: 'Đáp án sai (cách nhau bằng dấu phẩy)', shown: 'Kết quả ghi trong câu', opts: 'Lựa chọn (cách nhau bằng dấu phẩy)', ans: 'Đáp án', sentence: 'Câu có chỗ trống ___', sayIt: 'Từ được đọc to', words: 'Các từ (cách nhau bằng dấu phẩy)', codeAns: 'Đáp án do code tính.',
@@ -27,7 +27,7 @@ const T = {
   },
   en: {
     working: 'The agent is making your lesson…', queued: (n: number) => `Waiting (number ${n} in your line): the lesson is made once the job before it is done. Each account runs one job at a time.`, left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
-    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', toItemsP: 'Next: practice', drawing: 'Drawing the picture…',
+    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', drawing: 'Drawing the picture…',
     rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
     makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', preview: 'Listen to each part',
     redoneWhy: 'Written again because', edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
@@ -66,8 +66,8 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
           <ol className="steps">{l.steps.map((s, i) => <li key={i} className={i === l.steps.length - 1 && l.status === 'working' ? 'now' : ''}>{lang === 'en' ? s.en : s.vi}</li>)}</ol>
         </div>
       )}
-      {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(parent ? 5 : 4)} />}
-      {l.status === 'ready' && step === 4 && !parent && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
+      {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(4)} />}
+      {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
       {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} /></div>}
     </div>
@@ -115,7 +115,7 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
           <div className="card stack" style={{ gap: 4 }}><b className="small">{parent ? t.saysP : t.says}</b><p className="small">“{s.notes}”</p></div>
           {(s.page || refText) && <div className="card small">› <b>{t.src}:</b> {ref(refText, s.page)}</div>}
           {l.agent?.note && <details className="card small"><summary><b>◆ {t.note}</b></summary><p>{l.agent.note}</p>{!!l.agent.changes.length && <p className="muted">{t.changes}: {l.agent.changes.join(' · ')}</p>}{!l.pictures_pending && !!l.credits && <p className="muted">{t.cost(l.credits)}</p>}</details>}
-          <button className="btn primary" onClick={onNext}>{parent ? t.toItemsP : t.toVideo}</button>
+          <button className="btn primary" onClick={onNext}>{t.toVideo}</button>
         </div>
       </div>
       {/* the PDF export prints every slide */}
@@ -204,13 +204,13 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
               <div key={it.id} className="list-row" style={{ display: 'grid', gap: 6 }}>
                 <div className="row"><b className="small grow">{t.q(j + 1)} {it.prompt}</b><span className="tag next">{t.kind}: {skillName(it.skill)}</span><span className="tag">{t.levels[it.level]}</span></div>
                 {it.sentence && <p className="small">{it.sentence}</p>}
-                {it.say && <p className="small muted">🔊 “{it.say}”</p>}
+                {it.say && <p className="small muted">“{it.say}”</p>}
                 {it.options && <div className="opts">{it.options.map((o) => <span key={o} className={right(it, o) ? 'opt right' : 'opt'}>{o}</span>)}</div>}
                 {it.template === 'truefalse' && <div className="opts">{(['true', 'false'] as const).map((o) => <span key={o} className={right(it, o) ? 'opt right' : 'opt'}>{t.tf[o]}</span>)}</div>}
                 {it.pairs && <div className="opts">{it.pairs.map((p) => <span key={p.word} className="opt right">{p.word} {p.emoji}</span>)}</div>}
                 {it.words && <div className="opts">{it.words.map((w, x) => <span key={x} className="opt">{w}</span>)}</div>}
                 {(it.template === 'word' || it.template === 'fill' || it.template === 'order') && <p className="small"><b>{t.answer}:</b> {it.answer}{it.unit ? ` ${it.unit}` : ''}</p>}
-                <div className="row small"><details className="grow"><summary className="link">{t.details}</summary><p>💡 <b>{t.explain}:</b> {it.explain}</p>{!!it.redone?.length && <p className="muted">↻ <b>{t.redoneWhy}:</b> {it.redone.join('; ')}</p>}{refText && <p className="muted">{t.page}: {ref(refText, it.page)}</p>}</details>
+                <div className="row small"><details className="grow"><summary className="link">{t.details}</summary><p><b>{t.explain}:</b> {it.explain}</p>{!!it.redone?.length && <p className="muted">↻ <b>{t.redoneWhy}:</b> {it.redone.join('; ')}</p>}{refText && <p className="muted">{t.page}: {ref(refText, it.page)}</p>}</details>
                   <button className="btn small noprint" onClick={() => setEditing(editing === it.id ? '' : it.id)}>{t.edit}</button>
                   <button className="btn small noprint" disabled={!!busy} onClick={() => run(it.id, async () => onChange((await api.similarItem(l.id, it.id)).items))}>{busy === it.id ? t.working2 : t.similar}</button>
                   <button className="btn small danger noprint" onClick={async () => { if (confirm(t.removeAsk)) { await api.deleteItem(l.id, it.id); onChange(l.items.filter((x) => x.id !== it.id)); } }}>{t.remove}</button></div>

@@ -3,7 +3,7 @@
 // create endpoints call intake and readPhotos directly.
 import type { AI } from '../ai/types.ts';
 import { guardedJson, wrapUser } from '../guard/guard.ts';
-import { buildEnglish, buildMath, checkItem, contextOf, type RawEnglish, type RawMath } from './items.ts';
+import { buildEnglish, buildMath, checkItem, contextOf, questionOf, type RawEnglish, type RawMath } from './items.ts';
 import {
   CARDS_SCHEMA, CARDS_SYSTEM, ENG_ITEMS_SCHEMA, ENG_ITEMS_SYSTEM, fill, INTAKE_SCHEMA, INTAKE_SYSTEM, langName, MATH_ITEMS_SCHEMA, MATH_ITEMS_SYSTEM,
   audienceLine, maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
@@ -91,16 +91,20 @@ const MATH_T = ['mcq', 'fill', 'truefalse', 'word'], ENG_T = ['match', 'fill', '
 
 // One batch of items for one skill, template and level. Every item is built and checked by code;
 // a failing item is asked for again (up to 2 more times, told what was wrong), then dropped and logged.
-export async function writeItems(ai: AI, setup: Setup, source: string, skills: Skill[], req: ItemRequest, nextId: () => string): Promise<ItemResult> {
+// lesson: the items already made, so a good or advanced item never repeats a basic one (Chi #31).
+export async function writeItems(ai: AI, setup: Setup, source: string, skills: Skill[], req: ItemRequest, nextId: () => string, lesson: Item[] = []): Promise<ItemResult> {
   const skill = skills.find((s) => s.tag === req.skill);
   const math = setup.subject === 'math', template = (math ? MATH_T : ENG_T).includes(req.template) ? req.template : null;
   if (!skill || !template) return { kept: [], rejected: [{ skill: req.skill, template: req.template, level: req.level, codes: ['shape'], issues: ['unknown skill or template'] }] };
-  const ctx = contextOf(setup, skills, source), kept: Item[] = [], rejected: Rejected[] = [];
+  const ctx = { ...contextOf(setup, skills, source), items: lesson }, kept: Item[] = [], rejected: Rejected[] = [];
+  // the model sees the basic items it must not copy (kept apart from the fixed prompt, like the notes)
+  const taken = math || req.level === 'basic' ? [] : lesson.filter((i) => i.level === 'basic' && i.skill === skill.tag && i.template === template).map((i) => clip(questionOf(i), 120)).slice(0, 12);
+  const prompt = material(setup, source) + (taken.length ? `\n\nALREADY IN THE LESSON AT BASIC LEVEL (write different ones):\n${wrapUser(JSON.stringify(taken))}` : '');
   let want = Math.min(6, Math.max(1, Math.round(req.count) || 3)), avoid: string[] = [], before: string[] = [];
   for (let round = 0; round < 3 && want > 0; round++) {
     const sys = fill(math ? MATH_ITEMS_SYSTEM : ENG_ITEMS_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), skill: `${skill.tag} "${skill.name}"`, kind: skill.kind, template, level: req.level, count: want,
       avoid: avoid.length ? `\nThe last ones were refused by the checker; avoid: ${avoid.slice(0, 6).join('; ')}` : '' });
-    const r = await guardedJson<{ items: (RawMath | RawEnglish)[] }>(ai, { endpoint: 'items', creative: true, system: sys, prompt: material(setup, source), schema: math ? MATH_ITEMS_SCHEMA : ENG_ITEMS_SCHEMA, fixture: { setup, source, skill, template, level: req.level, count: want, round } });
+    const r = await guardedJson<{ items: (RawMath | RawEnglish)[] }>(ai, { endpoint: 'items', creative: true, system: sys, prompt, schema: math ? MATH_ITEMS_SCHEMA : ENG_ITEMS_SCHEMA, fixture: { setup, source, skill, template, level: req.level, count: want, round } });
     before = avoid; avoid = [];
     for (const raw of (r.items || []).slice(0, want)) {
       const id = nextId(), base = { ...raw, template, skill: skill.tag, level: req.level } as never;

@@ -108,7 +108,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         if (!skills.length) return { error: 'save_plan first' };
         if (itemCalls >= LIMITS.maxItemCalls || items.length >= LIMITS.maxItems) return { error: 'item limit reached; move on' };
         itemCalls++;
-        const r = await writeItems(ai, setup, source, skills, { skill: clip(a.skill, 40), template: clip(a.template, 20), level: (['basic', 'good', 'advanced'].includes(a.level) ? a.level : 'basic') as Level, count: Math.min(4, Number(a.count) || 3) }, nextId);
+        const r = await writeItems(ai, setup, source, skills, { skill: clip(a.skill, 40), template: clip(a.template, 20), level: (['basic', 'good', 'advanced'].includes(a.level) ? a.level : 'basic') as Level, count: Math.min(4, Number(a.count) || 3) }, nextId, items);
         const room = LIMITS.maxItems - items.length;
         items.push(...r.kept.slice(0, room)); rejected.push(...r.rejected);
         // the teacher sees the skill's name and the level in words, never the internal tag (Chi, 29 Oct)
@@ -191,12 +191,12 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   if (!slides.length) { slides = await writeSlides(ai, setup, source, outline); await say(`Đã viết ${slides.length} slide.`, `Wrote ${slides.length} slides.`); }
   for (const k of skills) for (const level of ['basic', 'good'] as Level[]) {
     if (items.length >= LIMITS.maxItems || items.some((i) => i.skill === k.tag && i.level === level)) continue;
-    const r = await writeItems(ai, setup, source, skills, { skill: k.tag, template: setup.subject === 'math' ? (level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill'), level, count: 3 }, nextId);
+    const r = await writeItems(ai, setup, source, skills, { skill: k.tag, template: setup.subject === 'math' ? (level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill'), level, count: 3 }, nextId, items);
     items.push(...r.kept); rejected.push(...r.rejected);
   }
   if (!cards.length) cards = await writeCards(ai, setup, source);
   // Last line of defence: every item passes the checks once more against the final skills.
-  items = items.filter((i) => !checkItem(i, ctx()).length).slice(0, LIMITS.maxItems);
+  items = items.filter((i) => !checkItem(i, { ...ctx(), items }).length).slice(0, LIMITS.maxItems);
   // Then the AI second review (Chi's doc 2): Muse Spark reads them once more; it can only drop.
   const rv = await reviewItems(ai, setup, source, skills, items, LIMITS.minItems);
   if (rv.rejected.length) { items = rv.kept; rejected.push(...rv.rejected); changes.push(setup.lang === 'en' ? `The AI review removed ${rv.rejected.length} item${rv.rejected.length === 1 ? '' : 's'}.` : `Bước AI rà soát bỏ ${rv.rejected.length} câu.`); }

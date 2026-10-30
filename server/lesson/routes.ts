@@ -83,6 +83,8 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string }>().catch(() => ({} as { areaId?: string; sectionId?: string }));
     const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
     if (!a || !m) return fail(c, 'notFound', 404);
+    // too few credits for the lesson itself: this step spends nothing either (Chi #30)
+    if ((await spare(d.sql, t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
     const g = await gate(c); if (g) return g;
     const source = sourceOf(m);
     try {

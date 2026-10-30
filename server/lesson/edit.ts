@@ -112,7 +112,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       next = buildEnglish(raw, it.id);
     }
     next.page = it.page;
-    const issues = checkItem(next, contextOf(l.setup, l.skills, l.source));
+    const issues = checkItem(next, { ...contextOf(l.setup, l.skills, l.source), items: l.items });
     if (issues.length) return c.json({ code: 'itemCheck', error: issues.map((i) => i.msg).join('; '), errorEn: issues.map((i) => i.msg).join('; '), issues }, 400);
     await saveItems(l.id, l.items.map((x) => (x.id === it.id ? next : x)));
     await logEdit(c, l.id, 'item_edit');
@@ -134,7 +134,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   const more = async (c: Context<Env>, l: Lesson, req: { skill: string; template: string; level: Item['level']; count: number; after?: string }) => {
     const g = await gate(c); if (g) return g;
     try {
-      const r = await d.as(c.get('teacher').id, () => writeItems(d.ai, l.setup, l.source, l.skills, req, newItemId(l.items)), l.id);
+      const r = await d.as(c.get('teacher').id, () => writeItems(d.ai, l.setup, l.source, l.skills, req, newItemId(l.items), l.items), l.id);
       if (!r.kept.length) return c.json({ code: 'itemCheck', error: 'Chưa viết được câu đạt kiểm tra, cô thử lại nhé.', errorEn: 'No item passed the checks; please try again.' }, 400);
       const page = l.items.find((x) => x.skill === req.skill && x.page)?.page ?? (l.refs?.[0] as { pageFrom?: number } | undefined)?.pageFrom;
       for (const it of r.kept) it.page = page;

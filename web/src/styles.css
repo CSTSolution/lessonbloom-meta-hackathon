@@ -213,7 +213,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .tabs button.on { background: var(--leaf-2); color: var(--leaf); font-weight: 600; }
 .me { display: flex; align-items: center; gap: 10px; position: relative; white-space: nowrap; }
 .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--sun-2); color: var(--sun); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
-.menu { position: absolute; right: 0; top: 40px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); padding: 12px; min-width: 260px; display: grid; gap: 8px; z-index: 10; }
+.menu { position: absolute; right: 0; top: 40px; width: 300px; max-width: calc(100vw - 32px); white-space: normal; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); padding: 12px; min-width: 260px; display: grid; gap: 8px; z-index: 10; }
 .page { max-width: 1040px; margin: 0 auto; padding: 24px 24px 60px; }
 .page.narrow { max-width: 760px; }
 /* View source and the knowledge map */

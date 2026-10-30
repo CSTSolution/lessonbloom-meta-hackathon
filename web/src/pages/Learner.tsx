@@ -55,7 +55,7 @@ export function Learner({ id, parent }: { id: string; parent: boolean }) {
         <div className="grow stack" style={{ gap: 4 }}>
           <div className="row"><h2>{v.pupil.name}</h2>{!parent && <span className="tag ai">{v.pupil.className}</span>}</div>
           {c ? <><span className="small">{t.now}: <b>{c.title}</b> · {lang === 'en' ? 'p.' : 'tr.'} {c.pages}</span>
-            <span className="small muted">📅 {t.weeks(c.weeks, dm(c.start), dm(c.end), c.week)} · {c.videoSeen ? '✓ ' + t.video : c.slidesSeen ? '✓ ' + t.slides : t.noVideo} · {t.left(c.itemsLeft)} · ⚑ {t.ends(dm(c.end))}</span></> : null}
+            <span className="small muted">{t.weeks(c.weeks, dm(c.start), dm(c.end), c.week)} · {c.videoSeen ? '✓ ' + t.video : c.slidesSeen ? '✓ ' + t.slides : t.noVideo} · {t.left(c.itemsLeft)} · ⚑ {t.ends(dm(c.end))}</span></> : null}
         </div>
         <button className="btn small" onClick={() => go('/path')}>{t.path}</button>
       </div>

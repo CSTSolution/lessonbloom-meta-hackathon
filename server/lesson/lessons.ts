@@ -27,9 +27,9 @@ export class Lessons {
     return this.sql.query<Pick<Lesson, 'id' | 'status' | 'setup' | 'created_at'> & { slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }>(
       `select l.id, l.status, l.setup, l.created_at, l.video_status = 'ready' as video, jsonb_array_length(l.slides) as slides, jsonb_array_length(l.items) as items, jsonb_array_length(l.cards) as cards,
          (select x->>'example' from jsonb_array_elements(l.slides) x where coalesce(x->>'example', '') <> '' limit 1) as example,
-         coalesce((select json_agg(distinct jsonb_build_object('id', k.id, 'name', k.name)) from assignments a join classes k on k.id = a.class_id where a.lesson_id = l.id), '[]') as classes,
-         exists (select 1 from assignments a where a.lesson_id = l.id and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date)) as open,
-         exists (select 1 from assignments a where a.lesson_id = l.id) as given
+         coalesce((select json_agg(distinct jsonb_build_object('id', k.id, 'name', k.name)) from assignments a join classes k on k.id = a.class_id where a.lesson_id = l.id and a.removed_at is null), '[]') as classes,
+         exists (select 1 from assignments a where a.lesson_id = l.id and a.removed_at is null and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date)) as open,
+         exists (select 1 from assignments a where a.lesson_id = l.id and a.removed_at is null) as given
        from lessons l where l.teacher_id = $1 order by l.created_at desc limit 100`, [teacherId]);
   }
   // lessons that could not be made do not use up the day's lessons

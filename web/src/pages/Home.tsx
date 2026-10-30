@@ -1,12 +1,12 @@
 // Signed in: Chi's layout. One top bar: the five tabs on one line (Bài giảng · Kho kiến thức · Lộ trình
 // học · Lớp học, for a parent "Con của tôi" · Tóm tắt học tập), the language, credits and the profile.
 // No role switch in the header: the role is chosen once at sign-up (SignupRole).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type Credits, type Job, type LessonRow, type Teacher } from '../api.ts';
 import { pl, setRole, useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
 import { Classes } from './Classes.tsx';
-import { Create } from './Create.tsx';
+import { Create, readDraft } from './Create.tsx';
 import { Criteria, Insights } from './Insights.tsx';
 import { Knowledge } from './Knowledge.tsx';
 import { LangToggle } from './LangToggle.tsx';
@@ -25,7 +25,7 @@ const T = {
   vi: {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
-    teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', allClasses: 'Tất cả các lớp', all: 'Tất cả',
+    teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string) => `Bài đang soạn dở: ${what}`, draftGo: 'Soạn tiếp', allClasses: 'Tất cả các lớp', all: 'Tất cả',
     groups: { open: 'Đang giao', draft: 'Bản nháp', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
@@ -36,7 +36,7 @@ const T = {
   en: {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
-    teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', allClasses: 'All classes', all: 'All',
+    teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string) => `A lesson you started: ${what}`, draftGo: 'Carry on', allClasses: 'All classes', all: 'All',
     groups: { open: 'Assigned', draft: 'Drafts', done: 'Done' }, n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
@@ -86,9 +86,18 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
   useEffect(() => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }, [path]);
   // a job that ends (a lesson made, a book read) changes her credits: ask again
   useEffect(() => { const f = () => { api.me().then((r) => setCredits(r.credits)).catch(() => {}); }; window.addEventListener('lbm-credits', f); return () => window.removeEventListener('lbm-credits', f); }, []);
-  const name = teacher.name || teacher.email || t.demo;
+  const name = teacher.name || teacher.email || t.demo, box = useRef<HTMLDivElement>(null);
+  // the menu closes by itself: a click outside it, Esc, or another page (Chi #30: it kept people stuck)
+  useEffect(() => { setOpen(false); }, [path]);
+  useEffect(() => {
+    if (!open) return;
+    const out = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', out); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', out); document.removeEventListener('keydown', esc); };
+  }, [open]);
   return (
-    <div className="me">
+    <div className="me" ref={box}>
       <LangToggle />
       <JobsBox lang={lang} />
       <button className="btn ghost small" aria-label={lang === 'vi' ? 'Thông báo' : 'Notifications'} onClick={() => go('/notifications')}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg></button>
@@ -114,7 +123,7 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
 function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
   const lang = useLang(), parent = teacher.role === 'parent';
   const [rows, setRows] = useState<LessonRow[] | null>(null), [classes, setClasses] = useState<{ id: string; name: string; grade?: number | null }[]>([]), [pick, setPick] = useState('');
-  const [open, setOpen] = useState<'open' | 'draft' | 'done'>('open'), [week, setWeek] = useState<{ what: string; where: string }[]>([]);
+  const [open, setOpen] = useState<'open' | 'draft' | 'done'>('open'), [week, setWeek] = useState<{ what: string; where: string }[]>([]), draft = readDraft();
   useEffect(() => {
     api.lessons().then((r) => { setRows(r.lessons); if (!r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
     api.classes().then((r) => setClasses(r.classes)).catch(() => {});
@@ -135,6 +144,8 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
             <p className="small muted">{parent ? t.kidsOf : t.teaches}: <b>{[!parent && subject, ...classes.map((k) => (parent && k.grade ? `${k.name} · ${t.grade(k.grade)}` : k.name))].filter(Boolean).join(', ') || '—'}</b> · <button className="link small" onClick={() => go('/profile')}>{t.change}</button></p>
           </div><button className="btn primary" onClick={() => go('/new')}>{t.make}</button></div>
           {classes.length > 0 && <div className="row">{[{ id: '', name: parent ? t.all : t.allClasses }, ...classes].map((k) => <button key={k.id} className={`pill ${pick === k.id ? 'on' : ''}`} onClick={() => setPick(k.id)}>{k.name}</button>)}</div>}
+          {/* step 1 left half-done (to enter a code, say) is here to carry on with (Chi #30) */}
+          {draft && <div className="banner row"><span className="grow small">{t.draft((draft.text || draft.match?.title || '…').slice(0, 80))}</span><button className="btn small primary" onClick={() => go('/new')}>{t.draftGo}</button></div>}
           {!rows.length && <div className="card"><p className="muted">{t.empty}</p></div>}
           {rows.length > 0 && (['open', 'draft', 'done'] as const).map((g) => (
             <div key={g} className={`group card ${open === g ? 'on' : ''}`}>

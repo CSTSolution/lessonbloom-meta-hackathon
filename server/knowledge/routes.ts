@@ -33,8 +33,8 @@ const scanDir = (id: string) => join(config.dataDir, 'scan', id);
 // Reading a scanned book costs credits: the estimate she sees before anything runs, and what she must
 // have (Son: 50% more than the estimate, since a page can cost more than expected).
 export function scanEstimate(pages: number, have: number) {
-  const per = config.scan.pageCredits, predicted = Math.ceil(pages * per), need = Math.ceil(predicted * config.scan.margin);
-  const fits = Math.max(0, Math.min(pages, Math.floor(have / (per * config.scan.margin))));
+  const per = config.scan.pageCredits, fixed = config.scan.readCredits, predicted = Math.ceil(pages * per + fixed), need = Math.ceil(predicted * config.scan.margin);
+  const fits = Math.max(0, Math.min(pages, Math.floor((have / config.scan.margin - fixed) / per)));
   return { pages, perPage: per, predicted, need, have, enough: have >= need, fits, maxPages: config.scan.maxPages };
 }
 
@@ -60,7 +60,10 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   app.get('/api/t/areas', async (c) => {
     const rows = await sql.query(`select a.id, a.name, a.subject, a.grade,
         coalesce(json_agg(json_build_object('id', b.id, 'title', b.title, 'status', b.status, 'pages', b.pages, 'error', b.error, 'source', b.source,
-          'sections', (select count(*) from sections s where s.book_id = b.id and s.title <> '—')) order by b.created_at) filter (where b.id is not null), '[]') as books
+          'sections', (select count(*) from sections s where s.book_id = b.id and s.title <> '—'),
+          -- what its reading cost and gave back, once the hold is settled (Chi #29)
+          'used', (select -sum(l.credits) from credit_log l where l.teacher_id = a.teacher_id and l.ref = b.id and l.reason in ('hold', 'refund') having count(*) filter (where l.reason = 'refund') > 0),
+          'returned', (select sum(l.credits) from credit_log l where l.teacher_id = a.teacher_id and l.ref = b.id and l.reason = 'refund')) order by b.created_at) filter (where b.id is not null), '[]') as books
       from areas a left join books b on b.area_id = a.id where a.teacher_id = $1 group by a.id order by a.created_at`, [c.get('teacher').id]);
     return c.json({ areas: rows });
   });
@@ -461,6 +464,8 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const b = await c.req.json<{ request?: string }>().catch(() => ({} as { request?: string }));
     const request = String(b.request ?? '').trim().slice(0, 2000);
     if (request.length < 3) return fail(c, 'requestShort');
+    // finding the part is the first step of a lesson: with too few credits for one, it spends nothing (Chi #30)
+    if ((await spare(sql, t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
     const spent = await d.budget.check(t.id);
     if (spent) return fail(c, spent === 'total' ? 'credit' : spent === 'credits' ? 'credits' : 'budget', 429);
     try {

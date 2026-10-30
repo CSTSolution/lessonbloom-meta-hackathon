@@ -14,6 +14,7 @@ const T = {
     kids: 'Học sinh', joined: 'Đã vào học', waiting: 'Chưa vào', addKids: '+ Thêm học sinh', kidsPh: 'Mỗi dòng một tên gọi, ví dụ:\nAn\nBình', save: 'Thêm',
     code: 'Mã lớp', onlyNames: 'Chỉ lưu tên gọi.', link: 'Đường dẫn vào lớp', print: 'In mã lớp', copy: 'Chép', copied: 'Đã chép', parentLink: 'Link riêng cho phụ huynh', remove: 'Xoá', rename: 'Đổi tên', del: 'Xoá lớp', delAsk: 'Xoá lớp này cùng bài đã giao và kết quả của các em?',
     empty: 'Cô tạo lớp đầu tiên, rồi thêm tên gọi các em.', noDue: 'Không hạn',
+    unassign: 'Bỏ giao', unassignAsk: (n: string) => `Bỏ bài này khỏi danh sách của lớp ${n}?\n\nBài giảng vẫn còn trong mục Bài giảng; kết quả các em đã làm vẫn có trong Tóm tắt.`,
   },
   en: {
     title: 'Your classes', lead: 'Pupils join with the class code; only first names are kept.', add: '+ Add class', namePh: 'Class name, e.g. 2A', create: 'Create', cancel: 'Cancel',
@@ -22,6 +23,7 @@ const T = {
     kids: 'Pupils', joined: 'Joined', waiting: 'Not yet', addKids: '+ Add pupils', kidsPh: 'One first name per line, e.g.:\nAn\nBinh', save: 'Add',
     code: 'Class code', onlyNames: 'First names only.', link: 'Link to join', print: 'Print class code', copy: 'Copy', copied: 'Copied', parentLink: 'Private link for parents', remove: 'Remove', rename: 'Rename', del: 'Delete class', delAsk: 'Delete this class with its assigned lessons and the pupils\' results?',
     empty: 'Create your first class, then add the pupils\' first names.', noDue: 'No due date',
+    unassign: 'Unassign', unassignAsk: (n: string) => `Remove this lesson from ${n}'s list?\n\nThe lesson stays in Lessons; what the pupils already did stays in the Summary.`,
   },
 };
 
@@ -30,8 +32,8 @@ export const copyText = async (s: string) => { try { await navigator.clipboard.w
 
 // a parent's "Con của tôi": one row per child, with the lessons given and the child's own link
 const P = {
-  vi: { title: 'Con của tôi', lead: 'Mỗi con một dòng: bài đã giao, dạng lỗi lặp lại và link riêng của con.', add: '+ Thêm con', namePh: 'Tên gọi của con', create: 'Thêm', empty: 'Cô thêm tên gọi của con để bắt đầu.', link: 'Link riêng của con', none: 'Chưa giao bài nào cho con.', del: 'Bỏ khỏi danh sách', delAsk: 'Bỏ con khỏi danh sách cùng bài đã giao và kết quả?', rename: 'Đổi tên gọi' },
-  en: { title: 'My children', lead: 'One row per child: lessons given, repeated mistakes and the child\'s own link.', add: '+ Add a child', namePh: "Child's first name", create: 'Add', empty: "Add your child's first name to start.", link: "Your child's link", none: 'Nothing assigned yet.', del: 'Remove', delAsk: 'Remove this child with the lessons given and the results?', rename: 'Rename' },
+  vi: { title: 'Con của tôi', lead: 'Mỗi con một dòng: bài đã giao, dạng lỗi lặp lại và link riêng của con.', add: '+ Thêm con', namePh: 'Tên gọi của con', create: 'Thêm', empty: 'Cô thêm tên gọi của con để bắt đầu.', link: 'Link riêng của con', none: 'Chưa giao bài nào cho con.', del: 'Bỏ khỏi danh sách', delAsk: 'Bỏ con khỏi danh sách cùng bài đã giao và kết quả?', rename: 'Đổi tên gọi', unassignAsk: (n: string) => `Bỏ bài này khỏi danh sách của ${n}?\n\nBài giảng vẫn còn trong mục Bài giảng; những gì con đã làm vẫn có trong Tóm tắt.` },
+  en: { title: 'My children', lead: 'One row per child: lessons given, repeated mistakes and the child\'s own link.', add: '+ Add a child', namePh: "Child's first name", create: 'Add', empty: "Add your child's first name to start.", link: "Your child's link", none: 'Nothing assigned yet.', del: 'Remove', delAsk: 'Remove this child with the lessons given and the results?', rename: 'Rename', unassignAsk: (n: string) => `Remove this lesson from ${n}'s list?\n\nThe lesson stays in Lessons; what your child already did stays in the Summary.` },
 };
 
 export function Classes({ parent = false }: { parent?: boolean }) {
@@ -91,8 +93,9 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
           {v.assignments.map((a) => (
             <tr key={a.id}><td>{a.title}</td><td>{a.due ? day(a.due, lang) : t.noDue}</td>
               <td><span className="meter"><i style={{ width: `${v.pupils.length ? (100 * a.done) / v.pupils.length : 0}%` }} /></span> {a.done}/{v.pupils.length}</td>
-              <td>{(() => { const st = statusOf(a); return <span className={`tag ${st === 'expired' ? 'later' : st === 'new' ? 'solid' : 'ai'}`}>{STATUS[lang][st]}</span>; })()}</td>
-              <td><button className="link small" onClick={() => go(`/lesson/${a.lesson_id}`)}>{t.open}</button> · <button className="link small" onClick={() => go(`/insight?class=${id}&lesson=${a.lesson_id}`)}>{lang === 'en' ? 'Summary' : 'Xem tóm tắt'}</button></td></tr>
+              <td>{(() => { const st = statusOf(a, v.pupils.length); return <span className={`tag ${st === 'expired' ? 'later' : st === 'done' ? 'done' : st === 'progress' ? 'current' : 'ai'}`}>{STATUS[lang][st]}</span>; })()}</td>
+              <td><button className="link small" onClick={() => go(`/lesson/${a.lesson_id}`)}>{t.open}</button> · <button className="link small" onClick={() => go(`/insight?class=${id}&lesson=${a.lesson_id}`)}>{lang === 'en' ? 'Summary' : 'Xem tóm tắt'}</button>
+                {' · '}<button className="link small muted" onClick={async () => { if (confirm(t.unassignAsk(v.class.name))) { await api.unassign(a.id); await load(); onChange(); } }}>{t.unassign}</button></td></tr>
           ))}
         </tbody></table>
       ) : <p className="small muted">{t.none}</p>}
@@ -132,12 +135,15 @@ function printCode(name: string, code: string, url: string, id: string) {
   w.document.close();
 }
 
-// Mới giao (the last two days) · Đang mở · Đã hết hạn (past its due date), as in Chi's design
-const STATUS = { vi: { new: 'Mới giao', open: 'Đang mở', expired: 'Đã hết hạn' }, en: { new: 'Just assigned', open: 'Open', expired: 'Past due' } };
-function statusOf(a: { due: string | null; created_at: string }): 'new' | 'open' | 'expired' {
+// The status follows what the learners did (Chi #34: a lesson done 1/1 still said "Just assigned"):
+// Mới giao (nobody has opened or answered it) · Đang làm (someone has) · Đã xong (every learner finished
+// all the items) · Đã hết hạn (past its due date and not everyone finished)
+const STATUS = { vi: { new: 'Mới giao', progress: 'Đang làm', done: 'Đã xong', expired: 'Đã hết hạn' }, en: { new: 'Just assigned', progress: 'In progress', done: 'Done', expired: 'Past due' } };
+export function statusOf(a: { due: string | null; done: number; started: number; seen?: number }, pupils: number): 'new' | 'progress' | 'done' | 'expired' {
+  if (pupils > 0 && a.done >= pupils) return 'done';
   const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   if (a.due && String(a.due).slice(0, 10) < today) return 'expired';
-  return Date.now() - Date.parse(a.created_at) < 2 * 864e5 ? 'new' : 'open';
+  return a.done || a.started || a.seen ? 'progress' : 'new';
 }
 
 // "+ Giao thêm bài": pick a ready lesson, then its Assign step opens

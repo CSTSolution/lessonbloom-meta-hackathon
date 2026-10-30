@@ -50,6 +50,16 @@ export function layout(start: string, steps: { section_id: string; title: string
   return out;
 }
 
+// The first plan of a path: the parts in the book's page order (Chi #35: "Numbers to 1000", pp. 1-5,
+// came last because the assigned lesson was put first). With a lesson assigned from this source it is
+// the current one today (Chi, 29 Oct): the parts before it are laid out in the weeks before.
+export function firstPlan(book: { id: string; book_id: string; page_from: number; ord: number }[], given?: string, today = vnToday()) {
+  const books = [...new Set(book.map((s) => s.book_id))];
+  const order = [...book].sort((x, y) => books.indexOf(x.book_id) - books.indexOf(y.book_id) || x.page_from - y.page_from || x.ord - y.ord).map((s) => s.id);
+  const at = given ? order.indexOf(given) : -1;
+  return { order, start: at >= 0 ? addDays(today, -7 * at) : mondayOf(today) };
+}
+
 export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T }) {
   const { sql } = d;
   const criteriaOf = async (tid: string) => cleanCriteria((await sql.one<{ criteria: unknown }>('select criteria from teachers where id = $1', [tid]))?.criteria);
@@ -71,21 +81,32 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     for (const x of rows) await sql.query('update sections set topic = $2 where id = $1', [x.id, topics.get(x.id) || x.book]);
   };
 
-  // The path for a class (or child) and a source, made the first time with 1 week per part. With a
-  // lesson assigned from this source, the path starts today with that lesson (the latest one) and goes
-  // on in book order; the parts before it come last. Without one, it starts this Monday at the first part.
+  // The path for a class (or child) and a source, made the first time with 1 week per part, as
+  // firstPlan() says. A path the assigner never saved follows that plan, also one made before (Chi #35);
+  // one she saved keeps her order.
   const pathFor = async (tid: string, classId: string, areaId: string) => {
-    let p = await sql.one<{ id: string; start_date: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start_date from paths where class_id = $1 and area_id = $2`, [classId, areaId]);
-    if (!p) {
-      const id = `p${classId.slice(0, 6)}${areaId.slice(0, 6)}${Date.now().toString(36)}`;
-      const book = await sql.query<{ id: string }>(`select s.id from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [areaId]);
+    const one = () => sql.one<{ id: string; start_date: string; fresh: boolean }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start_date, updated_at = created_at as fresh from paths where class_id = $1 and area_id = $2`, [classId, areaId]);
+    const plan = async () => {
+      const book = await sql.query<{ id: string; book_id: string; page_from: number; ord: number }>(`select s.id, s.book_id, s.page_from, s.ord from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, b.id, s.ord`, [areaId]);
       const given = await sql.one<{ section: string }>(`select l.refs->0->>'sectionId' as section from assignments a join lessons l on l.id = a.lesson_id
-        where a.class_id = $1 and l.area_id = $2 order by a.created_at desc limit 1`, [classId, areaId]);
-      const at = given ? book.findIndex((x) => x.id === given.section) : -1;
-      const secs = at > 0 ? [...book.slice(at), ...book.slice(0, at)] : book;
-      await sql.query('insert into paths (id, teacher_id, class_id, area_id, start_date) values ($1, $2, $3, $4, $5) on conflict (class_id, area_id) do nothing', [id, tid, classId, areaId, at >= 0 ? vnToday() : mondayOf(vnToday())]);
-      for (const [i, s] of secs.entries()) await sql.query('insert into path_steps (path_id, section_id, ord, weeks) values ($1, $2, $3, 1) on conflict do nothing', [id, s.id, i]);
-      p = (await sql.one<{ id: string; start_date: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start_date from paths where class_id = $1 and area_id = $2`, [classId, areaId]))!;
+        where a.class_id = $1 and a.removed_at is null and l.area_id = $2 order by a.created_at desc limit 1`, [classId, areaId]);
+      return firstPlan(book, given?.section ?? undefined);
+    };
+    let p = await one();
+    if (!p) {
+      const id = `p${classId.slice(0, 6)}${areaId.slice(0, 6)}${Date.now().toString(36)}`, f = await plan();
+      await sql.query('insert into paths (id, teacher_id, class_id, area_id, start_date) values ($1, $2, $3, $4, $5) on conflict (class_id, area_id) do nothing', [id, tid, classId, areaId, f.start]);
+      for (const [i, s] of f.order.entries()) await sql.query('insert into path_steps (path_id, section_id, ord, weeks) values ($1, $2, $3, 1) on conflict do nothing', [id, s, i]);
+      p = (await one())!;
+    } else if (p.fresh) {
+      // re-ordered in place (not remade), so a learner's extra week on this path stays
+      const f = await plan(), have = (await sql.query<{ section_id: string }>('select section_id from path_steps where path_id = $1 order by ord', [p.id])).map((x) => x.section_id);
+      if (have.join('|') !== f.order.join('|')) {
+        await sql.query('delete from path_steps where path_id = $1 and not (section_id = any($2))', [p.id, f.order]);
+        for (const [i, s] of f.order.entries()) await sql.query('insert into path_steps (path_id, section_id, ord, weeks) values ($1, $2, $3, 1) on conflict (path_id, section_id) do update set ord = excluded.ord', [p.id, s, i]);
+        await sql.query('update paths set start_date = $2 where id = $1', [p.id, f.start]);
+        p.start_date = f.start;
+      }
     }
     const steps = await sql.query<StepRow>(`select ps.section_id, s.title, s.page_from, s.page_to, s.topic, ps.weeks, ps.ord from path_steps ps join sections s on s.id = ps.section_id where ps.path_id = $1 order by ps.ord`, [p.id]);
     return { id: p.id, start: p.start_date, steps };
@@ -126,7 +147,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
         // "Hết thời gian" carries the summary (Chi): how many skills are mastered, practised, or repeating a mistake
         const end = one.find((r) => r.kind === 'end' && r.date >= from && r.date <= to);
         if (end) {
-          const asg = await sql.one<{ id: string }>(`select a.id from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [pa.class_id, st.sectionId]);
+          const asg = await sql.one<{ id: string }>(`select a.id from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and a.removed_at is null and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [pa.class_id, st.sectionId]);
           if (asg) {
             const data = await classData(pa.class_id, asg.id), ls = [...labelsFor(data, await criteriaOf(t.id)).values()].flatMap((m) => [...m.values()].map((x) => x.label));
             const n = (l: Label) => ls.filter((x) => x === l).length;
@@ -207,7 +228,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     const pick = c.req.query('classId'), lessonId = c.req.query('lessonId') || '';
     const out = [];
     for (const k of classes) {
-      const asg = lessonId ? (await sql.one<{ id: string }>('select id from assignments where class_id = $1 and lesson_id = $2 order by created_at desc limit 1', [k.id, lessonId]))?.id : undefined;
+      const asg = lessonId ? (await sql.one<{ id: string }>('select id from assignments where class_id = $1 and lesson_id = $2 and removed_at is null order by created_at desc limit 1', [k.id, lessonId]))?.id : undefined;
       if (lessonId && !asg) { out.push({ id: k.id, name: k.name, kind: k.kind, skills: [], pupils: [], mistakes: [] }); continue; }
       const data = await classData(k.id, asg), labels = labelsFor(data, cr);
       const skills = [...labels.entries()].map(([sk, m]) => {
@@ -312,7 +333,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       const extra = Object.fromEntries((await sql.query<{ section_id: string; weeks: number }>('select section_id, weeks from pupil_weeks where path_id = $1 and pupil_id = $2', [pa.id, p.id])).map((x) => [x.section_id, x.weeks]));
       const cur = layout(pa.start, steps, vnToday(), extra).find((x) => x.status === 'current');
       if (!cur) continue;
-      const asg = await sql.one<{ id: string; content: { items: Item[] } }>(`select a.id, a.content from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [p.class_id, cur.sectionId]);
+      const asg = await sql.one<{ id: string; content: { items: Item[] } }>(`select a.id, a.content from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and a.removed_at is null and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [p.class_id, cur.sectionId]);
       const tried = asg ? Number((await sql.one<{ n: string }>('select count(distinct item_id) as n from answers where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]))?.n) : 0;
       const g = asg ? await sql.one<{ slides: boolean; video: boolean }>('select slides_at is not null as slides, video_at is not null as video from pupil_progress where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]) : undefined;
       const extraItems = asg ? Number((await sql.one<{ n: string }>('select coalesce(sum(jsonb_array_length(items)), 0) as n from pupil_extra where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]))?.n) : 0;
@@ -376,7 +397,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       return c.json({ ok: true, adviceId: a?.id });
     }
     // 5 more items of the skill (or harder ones), written and checked like the lesson's, for her only
-    const asg = await sql.one<{ id: string; lesson_id: string; content: { items: Item[] } }>(`select a.id, a.lesson_id, a.content from assignments a where a.class_id = $1 and a.content->'items' @> $2::jsonb order by a.created_at desc limit 1`, [p.class_id, J([{ skill }])]);
+    const asg = await sql.one<{ id: string; lesson_id: string; content: { items: Item[] } }>(`select a.id, a.lesson_id, a.content from assignments a where a.class_id = $1 and a.removed_at is null and a.content->'items' @> $2::jsonb order by a.created_at desc limit 1`, [p.class_id, J([{ skill }])]);
     const l = asg && await sql.one<Lesson>('select * from lessons where id = $1', [asg.lesson_id]);
     if (!asg || !l) return fail(c, 'notFound', 404);
     const g = await gate(c); if (g) return g;

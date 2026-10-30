@@ -62,7 +62,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   app.get('/api/t/classes', async (c) => c.json({ classes: await sql.query(`select c.id, c.name, c.code, c.kind, c.grade, c.created_at,
       (select count(*) from pupils p where p.class_id = c.id)::int as pupils,
       (select count(*) from pupils p where p.class_id = c.id and p.joined_at is not null)::int as joined,
-      (select count(*) from assignments a where a.class_id = c.id)::int as assignments
+      (select count(*) from assignments a where a.class_id = c.id and a.removed_at is null)::int as assignments
     from classes c where c.teacher_id = $1 order by c.created_at`, [c.get('teacher').id]) }));
 
   app.post('/api/t/classes', async (c) => {
@@ -97,6 +97,8 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   });
 
   // One class: its pupils (joined or not, each with her own link) and what it was given, with progress.
+  // Unassigned lessons are left out (Chi #34); "seen" (slides, video or cards opened) lets the row say
+  // "In progress" before the first answer.
   app.get('/api/t/classes/:id', async (c) => {
     const k = await mine(c, c.req.param('id'));
     if (!k) return fail(c, 'notFound', 404);
@@ -105,8 +107,9 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     const assignments = await sql.query(`select a.id, a.lesson_id, a.content->>'title' as title, a.due, a.created_at, a.confirmed_at,
         jsonb_array_length(a.content->'items')::int as items,
         (select count(*) from pupil_progress g where g.assignment_id = a.id and g.done_at is not null)::int as done,
-        (select count(distinct pupil_id) from answers w where w.assignment_id = a.id)::int as started
-      from assignments a where a.class_id = $1 order by a.created_at desc`, [k.id]);
+        (select count(distinct pupil_id) from answers w where w.assignment_id = a.id)::int as started,
+        (select count(*) from pupil_progress g where g.assignment_id = a.id and (g.slides_at is not null or g.video_at is not null or g.cards_at is not null))::int as seen
+      from assignments a where a.class_id = $1 and a.removed_at is null order by a.created_at desc`, [k.id]);
     return c.json({ class: { ...k, url: joinUrl(k.code) }, pupils, assignments });
   });
 
@@ -137,13 +140,22 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
 
   // Assign: only with "I have read and checked" ticked this time; the tick's moment is kept with it.
   app.post('/api/t/lessons/:id/assign', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ classId?: string; confirmed?: unknown; due?: string; retry?: boolean; hints?: boolean }>().catch(() => ({} as Record<string, never>));
+    const t = c.get('teacher'), b = await c.req.json<{ classId?: string; confirmed?: unknown; due?: string; retry?: boolean; hints?: boolean; again?: unknown }>().catch(() => ({} as Record<string, never>));
     const l = await sql.one<Lesson>('select * from lessons where id = $1 and teacher_id = $2', [c.req.param('id'), t.id]);
     if (!l) return fail(c, 'notFound', 404);
     if (l.status !== 'ready' || !l.items.length) return fail(c, 'notReady');
     if (b.confirmed !== true) return fail(c, 'confirm');
     const k = await mine(c, String(b.classId || ''));
     if (!k) return fail(c, 'notFound', 404);
+    // the same lesson already on this child's / class's list: say so first (Chi #34, it was given 3 times
+    // by mistake); "Assign again" sends again: true
+    if (b.again !== true) {
+      const was = await sql.one<{ at: string }>('select created_at as at from assignments where lesson_id = $1 and class_id = $2 and removed_at is null order by created_at desc limit 1', [l.id, k.id]);
+      if (was) {
+        const on = (lang: string) => new Date(was.at).toLocaleDateString(lang, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' });
+        return c.json({ code: 'alreadyAssigned', at: was.at, className: k.name, error: `Bài này đã giao cho ${k.name} ngày ${on('vi-VN')}.`, errorEn: `This lesson was already assigned to ${k.name} on ${on('en-GB')}.` }, 409);
+      }
+    }
     const due = /^\d{4}-\d{2}-\d{2}$/.test(String(b.due || '')) ? b.due : null;
     const id = newId(10);
     await sql.query(`insert into assignments (id, lesson_id, class_id, teacher_id, content, due, retry, hints, confirmed_at) values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, now())`,
@@ -161,7 +173,15 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   app.get('/api/t/lessons/:id/assignments', async (c) => c.json({ assignments: await sql.query(`select a.id, a.class_id, k.name as class_name, a.due, a.created_at, a.confirmed_at,
       (select count(*) from pupil_progress g where g.assignment_id = a.id and g.done_at is not null)::int as done,
       (select count(*) from pupils p where p.class_id = a.class_id)::int as pupils
-    from assignments a join classes k on k.id = a.class_id where a.lesson_id = $1 and a.teacher_id = $2 order by a.created_at desc`, [c.req.param('id'), c.get('teacher').id]) }));
+    from assignments a join classes k on k.id = a.class_id where a.lesson_id = $1 and a.teacher_id = $2 and a.removed_at is null order by a.created_at desc`, [c.req.param('id'), c.get('teacher').id]) }));
+
+  // "Bỏ giao" (Chi #34): only the assigner's own. Soft: the lesson stays in Lessons and the answers
+  // already given stay in the summary; the child no longer sees it under "Today".
+  app.delete('/api/t/assignments/:id', async (c) => {
+    const row = await sql.one('update assignments set removed_at = now() where id = $1 and teacher_id = $2 and removed_at is null returning id', [c.req.param('id'), c.get('teacher').id]);
+    if (!row) return fail(c, 'notFound', 404);
+    return c.json({ ok: true });
+  });
 
   // ---- the pupil ----
   const perIp = new Limiter(40, 2000), answersPerPupil = new Limiter(60, 3000);
@@ -205,7 +225,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     return c.json({ ok: true });
   });
 
-  // "Hôm nay con học gì": what her class was given that is still open, newest first.
+  // "Hôm nay con học gì": what her class was given that is still open, newest first (unassigned ones left out, Chi #34).
   app.get('/api/p/today', async (c) => {
     const p = await pupilOf(c);
     if (!p) return fail(c, 'signIn', 401);
@@ -216,14 +236,15 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
         g.slides_at is not null as slides_seen, g.video_at is not null as video_seen, g.cards_at is not null as cards_seen, g.done_at is not null as done,
         (select count(distinct item_id) from answers w where w.assignment_id = a.id and w.pupil_id = $2)::int as answered
       from assignments a left join pupil_progress g on g.assignment_id = a.id and g.pupil_id = $2
-      where a.class_id = $1 and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
+      where a.class_id = $1 and a.removed_at is null and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
     return c.json({ pupil: { name: p.name }, class: { name: p.class_name }, lessons: rows, reminder: d.reminder ? await d.reminder(p.class_id, p.id).catch(() => null) : null });
   });
 
+  // an unassigned lesson is gone for the child too (Chi #34): no more answers on it, the old ones stay
   const assignmentOf = async (c: Context) => {
     const p = await pupilOf(c);
     if (!p) return { error: fail(c, 'signIn', 401) };
-    const a = await sql.one<{ id: string; content: Content; retry: boolean; hints: boolean }>('select id, content, retry, hints from assignments where id = $1 and class_id = $2', [c.req.param('id'), p.class_id]);
+    const a = await sql.one<{ id: string; content: Content; retry: boolean; hints: boolean }>('select id, content, retry, hints from assignments where id = $1 and class_id = $2 and removed_at is null', [c.req.param('id'), p.class_id]);
     if (!a) return { error: fail(c, 'notFound', 404) };
     // items the assigner added for her alone (advice "Luyện thêm" / "Bước tiếp") come after the lesson's
     const extra = await sql.query<{ items: Item[] }>('select items from pupil_extra where assignment_id = $1 and pupil_id = $2 order by id', [a.id, p.id]);

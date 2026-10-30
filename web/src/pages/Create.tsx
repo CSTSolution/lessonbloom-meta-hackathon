@@ -12,8 +12,9 @@ import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
 
 export const STEPS = { vi: ['Tài liệu', 'Câu hỏi', 'Slide', 'Video', 'Bài tập', 'Giao bài'], en: ['Material', 'Questions', 'Slides', 'Video', 'Practice', 'Assign'] };
-// Chi's role table: Questions (2) and Video (4) are the teacher's steps; a parent's run 1, 3, 5, 6, shown as 1-4.
-export const PARENT_STEPS = [1, 3, 5, 6];
+// Chi's role table: Questions (2) is the teacher's step; a parent's run 1, 3, 4, 5, 6, shown as 1-5. The
+// video is a step for parents too, so they see it before their child does (Chi #32).
+export const PARENT_STEPS = [1, 3, 4, 5, 6];
 export function Stepper({ at, onStep, done = at - 1, parent = false }: { at: number; onStep?: (i: number) => void; done?: number; parent?: boolean }) {
   const lang = useLang();
   const steps = STEPS[lang].map((s, i) => ({ s, n: i + 1 })).filter((x) => !parent || PARENT_STEPS.includes(x.n));
@@ -22,10 +23,10 @@ export function Stepper({ at, onStep, done = at - 1, parent = false }: { at: num
 
 const T = {
   vi: {
-    save: 'Lưu nháp và thoát', h1: 'Chọn nguồn và tài liệu tạo bài', lead: 'Bài chỉ soạn trong nguồn cô chọn.', src: 'Nguồn kiến thức', srcLead: 'Để “Tự tìm”, LessonBloom tìm đúng trang.', source: 'Nguồn', part: 'Phạm vi kiến thức', auto: 'Tự tìm theo tài liệu tạo bài', openKnowledge: 'Mở Kho kiến thức',
+    save: 'Lưu nháp và thoát', short: (left: number, need: number) => `Bạn có ${left} lượt, một bài cần ${need}. Nhập mã để có thêm lượt, rồi soạn tiếp ngay tại đây.`, shortDemo: 'Đăng nhập bằng email để nhập mã khuyến mãi.', promoPh: 'Mã khuyến mãi', apply: 'Dùng mã', promoOk: (n: number) => `Đã cộng ${n} lượt. Cô soạn tiếp nhé.`, usage: 'Xem lượt dùng', restored: 'Đã mở lại bài đang soạn dở.', discard: 'Bỏ nháp', h1: 'Chọn nguồn và tài liệu tạo bài', lead: 'Bài chỉ soạn trong nguồn cô chọn.', src: 'Nguồn kiến thức', srcLead: 'Để “Tự tìm”, LessonBloom tìm đúng trang.', source: 'Nguồn', part: 'Phạm vi kiến thức', auto: 'Tự tìm theo tài liệu tạo bài', openKnowledge: 'Mở Kho kiến thức',
     mat: 'Tài liệu tạo bài', matLead: 'Một câu, ảnh bài giảng hoặc ảnh bài tập đã làm.', kinds: { one: 'Một câu mô tả', lesson: 'Ảnh bài giảng', work: 'Ảnh bài tập đã làm', paste: 'Dán văn bản' },
-    what: 'Bài này cần học gì?', whatPh: 'Ví dụ: Phép cộng có nhớ trong phạm vi 100, tập trung vào nhớ 1 sang hàng chục.', pastePh: 'Dán đoạn văn bản (giáo án, đề bài…) vào đây.', say: '🎤 Nói', stop: '■ Dừng', hearing: 'Đang nghe…',
-    lessonPhoto: 'Chụp trang sách hoặc giáo án (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', workPhoto: 'Chụp bài con đã làm (tối đa 5 ảnh). AI nhận ra dạng bài và chỗ sai, rồi tạo bài luyện cùng dạng trong phạm vi đã chọn. Không chụp tên hay mặt.', pick: '📷 Chọn ảnh', reading: 'AI đang đọc ảnh…',
+    what: 'Bài này cần học gì?', whatPh: 'Ví dụ: Phép cộng có nhớ trong phạm vi 100, tập trung vào nhớ 1 sang hàng chục.', pastePh: 'Dán đoạn văn bản (giáo án, đề bài…) vào đây.', say: '● Nói', stop: '■ Dừng', hearing: 'Đang nghe…',
+    lessonPhoto: 'Chụp trang sách hoặc giáo án (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', workPhoto: 'Chụp bài con đã làm (tối đa 5 ảnh). AI nhận ra dạng bài và chỗ sai, rồi tạo bài luyện cùng dạng trong phạm vi đã chọn. Không chụp tên hay mặt.', pick: '+ Chọn ảnh', reading: 'AI đang đọc ảnh…',
     find: 'Tìm trong nguồn', finding: 'Đang tìm…', found: (c: string) => `Đã tìm thấy: ${c}. Bài chỉ dùng các trang này.`, quotes: 'Các đoạn AI đã dùng', mistakes: 'Chỗ con hay sai', notFound: 'Chưa có trong Kho kiến thức. Cô thêm tài liệu hoặc chọn phạm vi khác.',
     scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Cô cần một nguồn có sách trước. Bài giảng chỉ lấy nội dung từ sách của cô.', sample: 'Dùng sách mẫu',
     h2: 'Một vài câu hỏi về bài học', lead2: 'AI đã điền sẵn. Cô xem và sửa nếu cần.', fromAi: 'Gợi ý từ AI', optional: 'Không bắt buộc',
@@ -34,10 +35,10 @@ const T = {
     back: 'Quay lại', create: 'Tạo bài giảng', thinking: 'Đang đọc phạm vi…', page: 'tr.',
   },
   en: {
-    save: 'Save draft and leave', h1: 'Choose the source and the material', lead: 'The lesson is made only from the source you choose.', src: 'Source', srcLead: 'With “Find it for me”, LessonBloom finds the right pages.', source: 'Source', part: 'Part', auto: 'Find it from the material', openKnowledge: 'Open Knowledge',
+    save: 'Save draft and leave', short: (left: number, need: number) => `You have ${left} credits; a lesson needs ${need}. Enter a code for more, then carry on right here.`, shortDemo: 'Sign in with your email to use a promo code.', promoPh: 'Promo code', apply: 'Apply', promoOk: (n: number) => `${n} credits added. Carry on.`, usage: 'See usage', restored: 'Your unfinished lesson was opened again.', discard: 'Discard draft', h1: 'Choose the source and the material', lead: 'The lesson is made only from the source you choose.', src: 'Source', srcLead: 'With “Find it for me”, LessonBloom finds the right pages.', source: 'Source', part: 'Part', auto: 'Find it from the material', openKnowledge: 'Open Knowledge',
     mat: 'Lesson material', matLead: 'A sentence, a photo of the lesson or of a finished exercise.', kinds: { one: 'One sentence', lesson: 'Lesson photo', work: 'Finished exercise', paste: 'Paste text' },
-    what: 'What should this lesson teach?', whatPh: 'e.g. Unit 6: colours, the words red, blue and green.', pastePh: 'Paste text (a plan, an exercise…) here.', say: '🎤 Speak', stop: '■ Stop', hearing: 'Listening…',
-    lessonPhoto: 'Photograph the book page or your plan (up to 5 photos). No faces, names or personal details.', workPhoto: "Photograph the child's finished exercise (up to 5 photos). The AI finds its kind and the mistakes, then makes practice of the same kind in the chosen part. No names or faces.", pick: '📷 Choose photos', reading: 'Reading the photos…',
+    what: 'What should this lesson teach?', whatPh: 'e.g. Unit 6: colours, the words red, blue and green.', pastePh: 'Paste text (a plan, an exercise…) here.', say: '● Speak', stop: '■ Stop', hearing: 'Listening…',
+    lessonPhoto: 'Photograph the book page or your plan (up to 5 photos). No faces, names or personal details.', workPhoto: "Photograph the child's finished exercise (up to 5 photos). The AI finds its kind and the mistakes, then makes practice of the same kind in the chosen part. No names or faces.", pick: '+ Choose photos', reading: 'Reading the photos…',
     find: 'Find in the source', finding: 'Searching…', found: (c: string) => `Found: ${c}. The lesson uses only these pages.`, quotes: 'Passages the AI used', mistakes: 'Mistakes seen', notFound: 'Not in your knowledge area yet. Add material or choose another part.',
     scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You need a source with a book first. Lessons come only from your books.', sample: 'Use a sample book',
     h2: 'A few questions about the lesson', lead2: 'The AI filled these in. Check and change them if needed.', fromAi: 'Suggested by AI', optional: 'Optional',
@@ -48,17 +49,32 @@ const T = {
 };
 type Kind = 'one' | 'lesson' | 'work' | 'paste';
 
+// Step 1 is kept in this browser as she works (Chi #30): leaving to enter a code and coming back finds
+// it, and a part already found is not looked for (and paid for) again. Gone once the lesson is made.
+const DRAFT = 'lbm-draft';
+export interface Draft { areaId: string; sectionId: string; kind: Kind; text: string; focus: string; match: Match | null; at: number }
+export const readDraft = (): Draft | null => {
+  try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null') as Draft | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; }
+};
+const writeDraft = (d: Draft | null) => { try { if (d) localStorage.setItem(DRAFT, JSON.stringify(d)); else localStorage.removeItem(DRAFT); } catch { /* private window: no draft */ } };
+
 export function Create({ parent }: { parent: boolean }) {
   const t = useT(T), lang = useLang();
-  const q = new URLSearchParams(location.search);
-  const [areas, setAreas] = useState<AreaRow[] | null>(null), [areaId, setAreaId] = useState(q.get('area') || ''), [sections, setSections] = useState<SectionRow[]>([]), [sectionId, setSectionId] = useState(q.get('section') || '');
-  const [kind, setKind] = useState<Kind>('one'), [text, setText] = useState(''), [focus, setFocus] = useState('');
-  const [match, setMatch] = useState<Match | null>(null), [missing, setMissing] = useState(false), [setup, setSetup] = useState<Setup | null>(null), [open, setOpen] = useState('goal');
+  const q = new URLSearchParams(location.search), d0 = useRef(q.get('area') ? null : readDraft()).current;
+  const [areas, setAreas] = useState<AreaRow[] | null>(null), [areaId, setAreaId] = useState(q.get('area') || d0?.areaId || ''), [sections, setSections] = useState<SectionRow[]>([]), [sectionId, setSectionId] = useState(q.get('section') || d0?.sectionId || '');
+  const [kind, setKind] = useState<Kind>(d0?.kind || 'one'), [text, setText] = useState(d0?.text || ''), [focus, setFocus] = useState(d0?.focus || '');
+  const [match, setMatch] = useState<Match | null>(d0?.match || null), [missing, setMissing] = useState(false), [setup, setSetup] = useState<Setup | null>(null), [open, setOpen] = useState('goal');
+  // her credits, checked before any step that costs some (Chi #30): too few, and a code is entered here
+  const [cr, setCr] = useState<{ left: number; need: number; account: boolean } | null>(null), [code, setCode] = useState(''), [pmsg, setPmsg] = useState('');
+  const loadCr = () => { api.me().then((r) => setCr({ left: r.credits.left, need: r.lessonCredits ?? 60, account: r.teacher.kind === 'account' })).catch(() => {}); };
+  useEffect(() => { loadCr(); window.addEventListener('lbm-credits', loadCr); return () => window.removeEventListener('lbm-credits', loadCr); }, []);
+  const short = !!cr && cr.left < cr.need, firstArea = useRef(true);
+  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, kind, text, focus, match, at: Date.now() }); }, [areaId, sectionId, kind, text, focus, match]);
   const [busy, setBusy] = useState(''), [err, setErr] = useState(''), [rec, setRec] = useState<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const loadAreas = () => api.areas().then((r) => { const ready = r.areas.filter((a) => a.books.some((b) => b.status === 'ready')); setAreas(ready); setAreaId((x) => (x && ready.some((a) => a.id === x) ? x : ready[0]?.id || '')); }).catch(() => setAreas([]));
   useEffect(() => { void loadAreas(); }, []);
-  useEffect(() => { setMatch(null); setMissing(false); if (areaId) api.area(areaId).then((r) => setSections(r.sections)).catch(() => setSections([])); }, [areaId]);
+  useEffect(() => { if (firstArea.current) firstArea.current = false; else { setMatch(null); setMissing(false); } if (areaId) api.area(areaId).then((r) => setSections(r.sections)).catch(() => setSections([])); }, [areaId]);
   const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); setErr(''); try { await fn(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error).message || e)); } finally { setBusy(''); } };
   const record = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true }), r = new MediaRecorder(stream);
@@ -80,10 +96,26 @@ export function Create({ parent }: { parent: boolean }) {
   const toStep2 = () => run('intake', async () => {
     const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note };
     // a parent has no Questions step: the lesson is made straight from the setup the book gave
-    if (parent) { go(`/lesson/${(await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: s })).id}`); return; }
+    if (parent) { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: s }); writeDraft(null); go(`/lesson/${id}`); return; }
     setSetup(s);
   });
   const set = <K extends keyof Setup>(k: K, v: Setup[K]) => setSetup((s) => (s ? { ...s, [k]: v } : s));
+  const redeem = () => run('promo', async () => {
+    setPmsg('');
+    try { const r = await api.promo(code); setCode(''); setPmsg(t.promoOk(r.added.credits)); window.dispatchEvent(new Event('lbm-credits')); }
+    catch (e) { setPmsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error).message || e)); }
+  });
+  const shortBox = short && cr && (
+    <div className="banner warn stack" style={{ gap: 6 }}>
+      <b className="small">{t.short(cr.left, cr.need)}</b>
+      {cr.account ? <form className="row" style={{ gap: 6 }} onSubmit={(e) => { e.preventDefault(); void redeem(); }}>
+        <input value={code} maxLength={32} placeholder={t.promoPh} aria-label={t.promoPh} onChange={(e) => setCode(e.target.value.toUpperCase())} style={{ minWidth: 0, padding: '6px 10px', border: '1px solid var(--line)', borderRadius: 8 }} />
+        <button className="btn small primary" disabled={!!busy || code.trim().length < 4}>{t.apply}</button>
+        <button type="button" className="link small" onClick={() => window.open('/usage', '_blank')}>{t.usage}</button></form>
+        : <span className="small">{t.shortDemo}</span>}
+      {pmsg && <span className="small">{pmsg}</span>}
+    </div>);
+  const okBox = !short && pmsg && <div className="banner small">✓ {pmsg}</div>;
   if (!areas) return null;
 
   const top = <div className="row noprint" style={{ justifyContent: 'flex-end' }}><button className="link small" onClick={() => go('/')}>{t.save}</button></div>;
@@ -97,6 +129,8 @@ export function Create({ parent }: { parent: boolean }) {
     <div className="page narrow">{top}<Stepper at={1} parent={parent} />
       <div className="stack" style={{ gap: 14 }}>
         <div><h1>{t.h1}</h1><p className="small muted">{t.lead}</p></div>
+        {shortBox}{okBox}
+        {d0 && (d0.text || d0.match) && <div className="row small muted"><span className="grow">{t.restored}</span><button className="link small" onClick={() => { writeDraft(null); location.reload(); }}>{t.discard}</button></div>}
         <div className="card stack">
           <b><span className="num cur">1</span> {t.src}</b><span className="small muted">{t.srcLead}</span>
           <div className="grid2">
@@ -114,14 +148,14 @@ export function Create({ parent }: { parent: boolean }) {
           {kind === 'one' && (rec ? <button className="btn coral small" style={{ alignSelf: 'start' }} onClick={() => { rec.stop(); setRec(null); }}>{t.stop}</button>
             : <button className="btn small" style={{ alignSelf: 'start' }} disabled={!!busy} onClick={() => void record().catch((e) => setErr(String(e.message || e)))}>{busy === 'voice' ? t.hearing : t.say}</button>)}
           {focus && <p className="banner warn small"><b>{t.mistakes}:</b> {focus}</p>}
-          {!chosen && <div className="row"><span className="grow" /><button className="btn" disabled={!!busy || text.trim().length < 3} onClick={find}>{busy === 'find' ? t.finding : t.find}</button></div>}
+          {!chosen && <div className="row"><span className="grow" /><button className="btn" disabled={!!busy || short || text.trim().length < 3} onClick={find}>{busy === 'find' ? t.finding : t.find}</button></div>}
         </div>
         {match && !chosen && <div className="banner"><b>✓ {t.found(scopeText)}</b><details className="small"><summary>{match.title} · {t.quotes}</summary>{match.cited.map((c) => <blockquote key={c.id}>“{c.quote}” <span className="muted">· {t.page} {c.page}</span></blockquote>)}</details></div>}
         {chosen && <div className="banner">✓ {t.found(`${chosen.title} · ${scopeText}`)}</div>}
         {missing && <div className="banner warn">{t.notFound}</div>}
         {err && <p className="note">{err}</p>}
         <div className="row"><span className="small muted grow">{scopeText && t.scope(scopeText)}</span>
-          <button className="btn primary" disabled={!!busy || !(chosen || match)} onClick={toStep2}>{busy === 'intake' ? t.thinking : t.next}</button></div>
+          <button className="btn primary" disabled={!!busy || short || !(chosen || match)} onClick={toStep2}>{busy === 'intake' ? t.thinking : t.next}</button></div>
       </div>
     </div>
   );
@@ -150,9 +184,9 @@ export function Create({ parent }: { parent: boolean }) {
         </div>)}
         {row('lang', t.q.lang, setup.lang === 'en' ? t.en : t.vi, <div className="row">{(['vi', 'en'] as const).map((l) => <button key={l} className={`pill ${setup.lang === l ? 'on' : ''}`} onClick={() => set('lang', l)}>{l === 'vi' ? t.vi : t.en}</button>)}</div>)}
         {row('note', t.q.note, setup.note || t.none, <input value={setup.note || ''} maxLength={300} placeholder={t.notePh} onChange={(e) => set('note', e.target.value)} style={{ width: '100%' }} />, t.optional)}
-        {err && <p className="note">{err}</p>}
+        {shortBox}{err && <p className="note">{err}</p>}
         <div className="row"><button className="btn" onClick={() => setSetup(null)}>{t.back}</button><span className="grow" />
-          <button className="btn primary" disabled={!!busy || !setup.title.trim()} onClick={() => run('make', async () => go(`/lesson/${(await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: { ...setup, objectives: setup.objectives.filter(Boolean) } })).id}`))}>{t.create}</button></div>
+          <button className="btn primary" disabled={!!busy || short || !setup.title.trim()} onClick={() => run('make', async () => { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: { ...setup, objectives: setup.objectives.filter(Boolean) } }); writeDraft(null); go(`/lesson/${id}`); })}>{t.create}</button></div>
       </div>
     </div>
   );

@@ -88,7 +88,8 @@ test('the learning path follows the lesson that was assigned; a path she saved s
   const after = await path(k.id), cur = after.steps.find((x: any) => x.status === 'current');
   const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   assert.equal(cur.sectionId, lesson.refs[0].sectionId, 'the assigned lesson is the current one');
-  assert.equal(after.path.start, today, 'from today');
+  // the lessons before it in the book come first, in the weeks before (Chi #35); the assigned one starts today
+  assert.equal(cur.start, today, 'from today');
   assert.equal(after.steps.length, before.steps.length, 'no part is lost: the earlier ones come last');
   // a path the teacher saved herself is not re-planned by the next assignment
   const p2 = await path(k2.id);
