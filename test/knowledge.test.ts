@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { MockProvider } from '../server/ai/mock.ts';
 import { migrate } from '../server/db/migrate.ts';
 import { pgliteSql } from '../server/db/sql.ts';
-import { ingestBook, paragraphs, sectionsFrom } from '../server/knowledge/ingest.ts';
+import { ingestBook, ingestPages, paragraphs, sectionsFrom } from '../server/knowledge/ingest.ts';
 import { readPdf } from '../server/knowledge/pdf.ts';
 import { candidates, citation, findSection, NoMatch, terms, verify } from '../server/knowledge/search.ts';
 import { scopeOf } from '../server/lesson/items.ts';
@@ -47,6 +47,19 @@ test('a scanned textbook: "Bài 1" alone on its line takes its title from the ne
     ['Bài 5. Ôn tập phép cộng, phép trừ (không nhớ) trong phạm vi 100', 20, 20],
     ['Lesson 3. At the zoo', 21, 21],
   ]);
+});
+
+test('a page with no lesson heading becomes one part named after the source, so a lesson can be made (Chi #25)', async () => {
+  const sql = await pgliteSql(); await migrate(sql);
+  await sql.query(`insert into teachers (id, kind) values ('t1', 'demo')`);
+  await sql.query(`insert into areas (id, teacher_id, name, subject, grade) values ('a1', 't1', 'Toán 2', 'math', 2)`);
+  await sql.query(`insert into books (id, area_id, title, status, source) values ('b1', 'a1', 'Trang 30', 'processing', 'scan')`);
+  const ai = new MockProvider(); ai.answers.set('toc', () => ({ sections: [] }));
+  const r = await ingestPages(sql, ai, 'a1', 'b1', [{ page: 30, text: 'Tính:\n8 + 7 = ?   9 + 6 = ?\nSố hạng 8 7 Tổng ?' }]);
+  assert.equal(r.sections, 1);
+  const s = await sql.query<{ title: string; page_from: number }>('select title, page_from from sections where book_id = $1', ['b1']);
+  assert.deepEqual(s.map((x) => [x.title, x.page_from]), [['Trang 30', 30]]);
+  assert.ok(Number((await sql.one<{ n: string }>('select count(*) as n from passages where book_id = $1', ['b1']))?.n) > 0);
 });
 
 test('hybrid search: keywords, missing accents and lesson numbers all find the right section', async () => {

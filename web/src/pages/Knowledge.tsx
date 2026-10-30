@@ -189,7 +189,8 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
   const msg = (e: unknown) => (e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error)?.message || e));
   const run = async (fn: () => Promise<string | undefined>) => { setBusy(true); setErr(''); try { onDone(await fn()); } catch (e) { setErr(msg(e)); } finally { setBusy(false); setStep(''); setSent(null); } };
   const title = () => f.name.trim() || (file?.name || photos?.[0]?.name || '').replace(/\.(pdf|jpe?g|png|webp|heic|heif)$/i, '');
-  const isImage = (x: File) => /^image\//.test(x.type) || /\.(heic|heif)$/i.test(x.name);
+  // by type, or by name: Safari can give a photo an empty type (#26)
+  const isImage = (x: File) => /^image\//.test(x.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(x.name);
   // one PDF, or photos of the pages (#18, Chi): each photo is one page, read like a scanned book
   const pick = (list: File[]) => {
     setPhotos(null);

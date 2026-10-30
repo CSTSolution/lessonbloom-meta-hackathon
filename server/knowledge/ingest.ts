@@ -114,6 +114,13 @@ export async function ingestPages(sql: Sql, ai: AI, areaId: string, bookId: stri
   if (!pages.length) throw new NotText();
   let sections = sectionsFrom(paragraphs(pages));
   if (sections.filter((s) => s.title).length < 2) sections = await sectionsByModel(ai, pages);
+  // no lesson heading at all (a photo of a page in the middle of a lesson): the whole source is one part,
+  // named after the source, so a lesson can always be made from it; she can rename it (Chi #25)
+  if (!sections.some((s) => s.title)) {
+    const book = await sql.one<{ title: string }>('select title from books where id = $1', [bookId]);
+    const pars = paragraphs(pages);
+    sections = [{ title: (book?.title || pars[0]?.text || 'Part 1').slice(0, 120), pageFrom: pages[0].page, pageTo: pages[pages.length - 1].page, paragraphs: pars.map(({ page, text }) => ({ page, text })) }];
+  }
   await sql.tx(async (t) => {
     let ord = 0;
     for (const [i, s] of sections.entries()) {
