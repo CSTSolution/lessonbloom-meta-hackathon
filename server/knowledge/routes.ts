@@ -310,10 +310,15 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     // the whole book or none of it (Son, 30 Oct): stopped, or the held credit would not cover the rest
     if (out.length < want.length) throw new Unread(job.stopped ? 'stopped' : 'credits');
     if (!out.some((p) => p.text.trim())) throw new NotText();
-    await ingestPages(sql, d.ai, areaId, bookId, out);
-    await sql.query('update books set pages = $2 where id = $1', [bookId, out.length]);
+    // the page pictures are kept before the book shows as ready, so View source has them from the start
     const owner = await sql.one<{ teacher_id: string }>('select a.teacher_id from books b join areas a on a.id = b.area_id where b.id = $1', [bookId]);
     if (owner) await keepPages(owner.teacher_id, bookId, want);
+    try { await ingestPages(sql, d.ai, areaId, bookId, out); } catch (e) {
+      if (d.store) for (const f of await sql.query<{ key: string }>(`select key from book_files where book_id = $1 and kind = 'page'`, [bookId])) await d.store.del(f.key).catch(() => {});
+      await sql.query(`delete from book_files where book_id = $1 and kind = 'page'`, [bookId]);
+      throw e;
+    }
+    await sql.query('update books set pages = $2 where id = $1', [bookId, out.length]);
   };
   const holdCredits = (teacherId: string, n: number, ref: string) => holdC(sql, teacherId, n, ref);
   // what was held, less what the reading really cost, goes back (once); the page pictures are gone
