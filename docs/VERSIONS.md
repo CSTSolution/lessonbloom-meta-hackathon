@@ -3,7 +3,7 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
-## NEXT (31 Oct)
+## v1.0.20261031.2215 (31 Oct, evening)
 
 - **The server no longer runs out of memory while making videos** (31 Oct, 9:00–9:30: lessons failed with
   504/524 for ~30 min). Chromium no longer depends on Docker's small /dev/shm, the app has 2.5 GB instead
