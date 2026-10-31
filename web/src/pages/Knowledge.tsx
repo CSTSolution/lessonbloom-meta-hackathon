@@ -6,11 +6,14 @@ import { useEffect, useRef, useState } from 'react';
 import { api, MAX_PDF, ApiError, putSigned, type AreaRow, type BookRow, type Job, type ScanEstimate, type SectionRow } from '../api.ts';
 import { hasText, looksLikePdf, openPdf, pageJpeg, pageText } from '../pdf.ts';
 import { photoJpeg } from '../photo.ts';
+import { guessSubject, type Guess } from '../guess.ts';
 import { KnowledgeMapView, SourceView } from './Sources.tsx';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 const config = { maxPages: 200 };   // pages a scanned book reads at a time (the server's limit too)
 import { pl, useLang, useT } from '../i18n.ts';
+import { ask } from '../ask.tsx';
+import { ChromeLine } from './ChromeNote.tsx';
 import { go } from '../router.ts';
 
 const T = {
@@ -23,7 +26,7 @@ const T = {
     splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Tải sách của bạn: PDF hoặc ảnh trang sách.', orSample: 'Hoặc thử nhanh với sách mẫu do LessonBloom soạn:', noneHere: (s: string) => `Chưa có nguồn ${s} nào. Bấm "+ Thêm nguồn kiến thức" hoặc chọn "Tất cả".`,
     st: { waiting: (n: number) => `Đang chờ (thứ ${n} trong hàng): sẽ đọc khi xong việc đang làm.`, reading: 'Đang đọc sách: tách bài, đọc chữ từng trang…', readingPage: (p: string) => `Đang đọc sách · trang ${p}`, leave: 'Cô có thể rời trang; đọc xong sẽ có thông báo ở chuông.',
       done: (title: string, n: number, p: number) => `Đã thêm: ${title} · ${n} bài · ${p} trang.`, cost: (u: number, r: number) => ` Đã dùng ${u} lượt · trả lại ${r} lượt.`, retry: 'Thử lại', again: 'Xoá và thêm lại' },
-    form: { title: 'Thêm nguồn kiến thức', name: 'Tên nguồn', namePh: 'Ví dụ: Toán 2 · Tập 1', subject: 'Môn', grade: 'Lớp', file: 'Tệp PDF có chữ (tối đa 30 MB)', tooBig: (mb: number) => `Tệp này ${mb} MB, quá 30 MB. Cô tách sách ra từng chương rồi tải từng phần nhé.`, sent: (p: number) => `Đang tải lên… ${p}%`, go: 'Tải lên', busy: 'Đang tải lên…', sample: 'Hoặc dùng sách mẫu (đội LessonBloom tự viết):', toan: 'Toán 2', maths: 'Maths 2 (tiếng Anh)', eng: 'Tiếng Anh 3' },
+    form: { title: 'Thêm nguồn kiến thức', name: 'Tên nguồn', namePh: 'Ví dụ: Toán 2 · Tập 1', subject: 'Môn', grade: 'Lớp', file: 'Tệp PDF có chữ (tối đa 30 MB)', tooBig: (mb: number) => `Tệp này ${mb} MB, quá 30 MB. Cô tách sách ra từng chương rồi tải từng phần nhé.`, sent: (p: number) => `Đang tải lên… ${p}%`, go: 'Tải lên', busy: 'Đang tải lên…', chooseSubject: 'Chọn môn', supported: 'Hiện hỗ trợ Toán và Tiếng Anh lớp 1–5', guessed: (s: string) => `Máy đoán: ${s} – sửa nếu sai`, needSubject: 'Chọn môn trước khi thêm vào kho.', sample: 'Hoặc dùng sách mẫu (đội LessonBloom tự viết):', toan: 'Toán 2', maths: 'Maths 2 (tiếng Anh)', eng: 'Tiếng Anh 3' },
   },
   en: {
     title: 'Knowledge', lead: 'Lessons come only from these sources, with their pages.', add: '+ Add a source', private: 'Only you can see these; nothing is shared.', all: 'All', math: 'Maths', english: 'English',
@@ -34,14 +37,16 @@ const T = {
     splitAt: 'Split from page', newTitle: 'New part name', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Upload your book: a PDF or photos of its pages.', orSample: 'Or try it quickly with a sample book written by LessonBloom:', noneHere: (s: string) => `No ${s} sources yet. Press "+ Add a source" or choose "All".`,
     st: { waiting: (n: number) => `Waiting (number ${n} in your line): it is read when the job before is done.`, reading: 'Reading the book: finding the lessons, reading each page…', readingPage: (p: string) => `Reading the book · page ${p}`, leave: 'You can leave this page; the bell tells you when it is done.',
       done: (title: string, n: number, p: number) => `Added: ${title} · ${pl(n, 'lesson')} · ${pl(p, 'page')}.`, cost: (u: number, r: number) => ` Used ${pl(u, 'credit')} · ${r} given back.`, retry: 'Try again', again: 'Remove and add again' },
-    form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file with text (up to 30 MB)', tooBig: (mb: number) => `This file is ${mb} MB, over 30 MB. Split the book into chapters and upload them one by one.`, sent: (p: number) => `Uploading… ${p}%`, go: 'Upload', busy: 'Uploading…', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Toán 2 (Vietnamese)', maths: 'Maths 2', eng: 'English 3' },
+    form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file with text (up to 30 MB)', tooBig: (mb: number) => `This file is ${mb} MB, over 30 MB. Split the book into chapters and upload them one by one.`, sent: (p: number) => `Uploading… ${p}%`, go: 'Upload', busy: 'Uploading…', chooseSubject: 'Choose a subject', supported: 'Maths and English, grades 1–5, for now', guessed: (s: string) => `Guessed: ${s} – change it if wrong`, needSubject: 'Choose the subject before adding it.', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Toán 2 (Vietnamese)', maths: 'Maths 2', eng: 'English 3' },
   },
 };
 
 export function Knowledge() {
   const t = useT(T), lang = useLang();
   const [areas, setAreas] = useState<AreaRow[] | null>(null), [subject, setSubject] = useState<'' | 'math' | 'english'>(''), [grade, setGrade] = useState(0);
-  const [fold, setFold] = useState<Record<string, boolean>>({}), [sel, setSel] = useState(''), [sections, setSections] = useState<SectionRow[]>([]), [all, setAll] = useState(false), [adding, setAdding] = useState(false);
+  const [fold, setFold] = useState<Record<string, boolean>>({}), [sel, setSel] = useState(''), [sections, setSections] = useState<SectionRow[]>([]), [all, setAll] = useState(false);
+  // "/knowledge?add=1" opens the add form at once: the way in from an empty "+ New lesson" (Chi #39)
+  const [adding, setAdding] = useState(() => new URLSearchParams(location.search).has('add'));
   const [tab, setTab] = useState<'parts' | 'map'>('parts'), [source, setSource] = useState('');
   const [edit, setEdit] = useState<{ id: string; mode: 'rename' | 'split'; title: string; page: number } | null>(null), [pickMerge, setPickMerge] = useState(''), [err, setErr] = useState(''), [busy, setBusy] = useState('');
   const load = () => api.areas().then((r) => { setAreas(r.areas); setSel((s) => s || r.areas[0]?.id || ''); }).catch(() => setAreas([]));
@@ -92,7 +97,7 @@ export function Knowledge() {
           <div className="row"><div className="grow"><h2>{a.name}</h2><span className="small muted">{t[a.subject]} · {t.grade(a.grade)} · {book?.source === 'scan' ? 'Scan' : book?.source === 'text' ? (lang === 'en' ? 'Text' : 'Chữ') : 'PDF'}{book?.pages ? ` · ${t.pages(book.pages)}` : ''}</span></div>
             {/* only an uploaded PDF is kept on the server; a book read in the browser left only its text */}
             {book && (book.source ?? 'pdf') === 'pdf' && <a className="btn small" href={`/api/t/books/${book.id}/file`} target="_blank" rel="noreferrer">{t.view}</a>}
-            <button className="btn small danger" onClick={() => { if (confirm(t.removeAsk)) void run('del', async () => { await api.deleteArea(a.id); setSel(''); await load(); }); }}>{t.remove}</button></div>
+            <button className="btn small danger" onClick={async () => { if (await ask(t.removeAsk, { ok: t.remove, danger: true })) void run('del', async () => { await api.deleteArea(a.id); setSel(''); await load(); }); }}>{t.remove}</button></div>
           {book && <BookStatus t={t} book={book} sections={sections.length} onChange={load} onAgain={async () => { await api.deleteArea(a.id).catch(() => {}); setSel(''); await load(); setAdding(true); }} />}
           <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => { setTab(k); setSource(''); }}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
           {source && <SourceView sectionId={source} onClose={() => setSource('')} />}
@@ -185,7 +190,10 @@ const R = {
 
 function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: string) => void }) {
   const lang = useLang(), r = R[lang];
-  const [f, setF] = useState({ name: '', subject: 'math', grade: 2 }), [file, setFile] = useState<File | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [sent, setSent] = useState<number | null>(null);
+  // no subject preset (Chi #41): it is guessed from each file chosen, or she chooses it; what she changed by hand stays
+  const [f, setF] = useState<{ name: string; subject: '' | 'math' | 'english'; grade: number }>({ name: '', subject: '', grade: 2 }), [guess, setGuess] = useState<Guess>({}), touched = useRef({ subject: false, grade: false });
+  const applyGuess = (g: Guess) => { const k = touched.current; setGuess({ ...(!k.subject && g.subject && { subject: g.subject }), ...(!k.grade && g.grade && { grade: g.grade }) }); setF((x) => ({ ...x, subject: k.subject ? x.subject : g.subject ?? '', ...(!k.grade && g.grade && { grade: g.grade }) })); };
+  const [file, setFile] = useState<File | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState(''), [sent, setSent] = useState<number | null>(null);
   const [info, setInfo] = useState<{ pages: number; text: boolean; raw?: boolean } | null>(null), [opening, setOpening] = useState(false), [range, setRange] = useState({ from: 1, to: 1 }), [est, setEst] = useState<ScanEstimate | null>(null), [step, setStep] = useState('');
   const doc = useRef<PDFDocumentProxy | null>(null), [photos, setPhotos] = useState<File[] | null>(null), [server, setServer] = useState<{ areaId: string; bookId: string } | null>(null);
   const msg = (e: unknown) => (e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error)?.message || e));
@@ -199,7 +207,7 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
     if (list.length && list.every(isImage)) {
       setFile(null); setEst(null); doc.current = null;
       if (list.length > config.maxPages) { setInfo(null); setErr(r.tooMany(config.maxPages)); return; }
-      setErr(''); setPhotos(list); setInfo({ pages: list.length, text: false }); setRange({ from: 1, to: list.length });
+      setErr(''); setPhotos(list); setInfo({ pages: list.length, text: false }); setRange({ from: 1, to: list.length }); applyGuess(guessSubject(f.name, list[0].name));
       return;
     }
     if (list.length > 1) { setFile(null); setInfo(null); setErr(list.some((x) => x.type === 'application/pdf') && list.some(isImage) ? r.mixed : r.wrong); return; }
@@ -209,8 +217,13 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
   const choose = async (x: File | null) => {
     setFile(x); setInfo(null); setEst(null); setErr(''); setServer(null); doc.current = null;
     if (!x) return;
+    const g = guessSubject(f.name, x.name); applyGuess(g);
     setOpening(true);
-    try { const d = await openPdf(x); doc.current = d; const text = await hasText(d); setInfo({ pages: d.numPages, text }); setRange({ from: 1, to: Math.min(d.numPages, config.maxPages) }); }
+    try {
+      const d = await openPdf(x); doc.current = d; const text = await hasText(d); setInfo({ pages: d.numPages, text }); setRange({ from: 1, to: Math.min(d.numPages, config.maxPages) });
+      // the name said too little: the cover's text often has "TOÁN" and "Lớp 2" (a scanned cover has none)
+      if (text && !(g.subject && g.grade)) applyGuess(guessSubject(f.name, x.name, await pageText(d, 1).catch(() => '')));
+    }
     catch (e) {
       console.warn('[pdf] could not open in this browser:', e);
       // not a PDF at all; or a real PDF this browser could not open here: then upload it as it is (up to
@@ -280,9 +293,13 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
       <div className="grid2">
         <label className="field">{t.form.name}<input value={f.name} maxLength={80} placeholder={t.form.namePh} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
         <label className="field">{r.file}<input type="file" multiple accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" disabled={busy} onChange={(e) => pick([...(e.target.files || [])])} /></label>
-        <label className="field">{t.form.subject}<select value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })}><option value="math">{t.math}</option><option value="english">{t.english}</option></select></label>
-        <label className="field">{t.form.grade}<select value={f.grade} onChange={(e) => setF({ ...f, grade: Number(e.target.value) })}>{[1, 2, 3, 4, 5].map((g) => <option key={g} value={g}>{t.grade(g)}</option>)}</select></label>
+        <ChromeLine />
+        <label className="field">{t.form.subject}<select value={f.subject} onChange={(e) => { touched.current.subject = true; setGuess(({ subject: _, ...g }) => g); setF({ ...f, subject: e.target.value as 'math' | 'english' }); }}><option value="" disabled>{t.form.chooseSubject}</option><option value="math">{t.math}</option><option value="english">{t.english}</option></select>
+          <span className="small muted">{t.form.supported}</span></label>
+        <label className="field">{t.form.grade}<select value={f.grade} onChange={(e) => { touched.current.grade = true; setGuess(({ grade: _, ...g }) => g); setF({ ...f, grade: Number(e.target.value) }); }}>{[1, 2, 3, 4, 5].map((g) => <option key={g} value={g}>{t.grade(g)}</option>)}</select></label>
       </div>
+      {(guess.subject || guess.grade) && <p className="small muted" role="status">{t.form.guessed([guess.subject && t[guess.subject], guess.grade && t.grade(guess.grade)].filter(Boolean).join(' · '))}</p>}
+      {info && !f.subject && <p className="small danger">{t.form.needSubject}</p>}
       {opening && <p className="small muted" role="status">{r.opening}</p>}
       {info && (photos ? <p className="small"><b>{r.photos(photos.length)}</b></p> : info.raw && !server ? <p className="banner blue small"><b>{file?.name}</b> · {r.raw}</p> : <p className="small"><b>{file?.name}</b> · {r.info(info.pages, info.text)}</p>)}
       {info && !info.text && <div className="card stack" style={{ gap: 8, background: 'var(--leaf-2)' }}>
@@ -300,7 +317,7 @@ function AddSource({ t, onDone }: { t: (typeof T)['vi']; onDone: (areaId?: strin
       {sent !== null && <div className="stack" style={{ gap: 4 }} role="status"><span className="small muted">{t.form.sent(sent)}</span><span className="meter" style={{ width: '100%' }}><i style={{ width: `${sent}%` }} /></span></div>}
       {step && <p className="small muted" role="status">{step}</p>}
       <div className="row">
-        <button className="btn primary" disabled={busy || !info || (!info.text && !est?.enough)}>{busy ? t.form.busy : info && !info.text && est ? r.read(count, est.need) : err && info ? r.retry : r.add}</button><span className="grow" />
+        <button className="btn primary" disabled={busy || !info || !f.subject || (!info.text && !est?.enough)}>{busy ? t.form.busy : info && !info.text && est ? r.read(count, est.need) : err && info ? r.retry : r.add}</button><span className="grow" />
         <span className="small muted">{t.form.sample}</span>
         <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('maths2')).area.id)}>{t.form.maths}</button>
         <button type="button" className="btn small" disabled={busy} onClick={() => run(async () => (await api.sampleArea('english3')).area.id)}>{t.form.eng}</button>

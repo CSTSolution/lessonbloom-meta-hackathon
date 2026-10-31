@@ -36,6 +36,9 @@ export interface Slide {
   imagePrompt: string;
   image?: string;
   page?: number;                  // the page of the book it comes from
+  // the code check of its numbers, units and title (Chi, 31 Oct): written again automatically (fixed),
+  // or still wrong after one rewrite (fixed false). Shown on the slide until the assigner changes it.
+  flag?: { fixed: boolean; vi: string; en: string };
 }
 
 export type Op = '+' | '-' | '×' | ':';

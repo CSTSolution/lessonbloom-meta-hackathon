@@ -6,9 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type Item, type Lesson, type Slide } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { shrink } from '../photo.ts';
+import { ask } from '../ask.tsx';
 import { go } from '../router.ts';
 import { Assign } from './Assign.tsx';
-import { Stepper } from './Create.tsx';
+import { keepStep, lessonStep, Stepper } from './Create.tsx';
+import { NotFound } from './NotFound.tsx';
 // items the AI second review dropped (the rest of `rejected` failed a code check and were written again)
 const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.startsWith('ai:'))).length;
 
@@ -42,18 +44,24 @@ type Dict = (typeof T)['vi'];
 
 export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
   const t = useT(T), lang = useLang();
-  const first = Math.min(6, Math.max(3, Number(new URLSearchParams(location.search).get('step')) || 3));
-  const [tick, setTick] = useState(0), [l, setL] = useState<Lesson | null>(null), [step, setStep0] = useState(first), [seen, setSeen] = useState(first);
+  // the step asked for in the link, else the one she left this lesson on (Chi #43), else the slides
+  const first = Math.min(6, Math.max(3, Number(new URLSearchParams(location.search).get('step')) || lessonStep(id) || 3));
+  const [tick, setTick] = useState(0), [l, setL] = useState<Lesson | null>(null), [step, setStep0] = useState(first), [seen, setSeen] = useState(first), [gone, setGone] = useState(false);
   const setStep = (n: number) => { setStep0(n); setSeen((s) => Math.max(s, n)); };
+  useEffect(() => { if (l?.status === 'ready') keepStep(id, l.setup.title, step); }, [id, step, l?.status]);
+  // leaving a lesson not assigned yet: a short note says where it is kept (Chi #37)
+  const saved = lang === 'en' ? 'The lesson is kept in Lessons → Drafts.' : 'Bài đã lưu ở Bài giảng → Bản nháp.';
+  useEffect(() => () => { api.lessons().then((r) => { const row = r.lessons.find((x) => x.id === id); if (row && !row.given) window.dispatchEvent(new CustomEvent('lbm-toast', { detail: saved })); }).catch(() => {}); }, [id]);
   useEffect(() => {
     let alive = true, timer: ReturnType<typeof setTimeout>;
     const load = async () => {
       try { const { lesson } = await api.lesson(id); if (!alive) return; setL(lesson); if (lesson.status === 'working' || lesson.pictures_pending || String(lesson.video_status).startsWith('working')) timer = setTimeout(load, 1500); }
-      catch { if (alive) timer = setTimeout(load, 4000); }
+      catch (e) { if (!alive) return; if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setGone(true); else timer = setTimeout(load, 4000); }
     };
     void load();
     return () => { alive = false; clearTimeout(timer); };
   }, [id, tick]);
+  if (gone) return <NotFound what="lesson" />;
   if (!l) return null;
   const ref = l.refs?.[0], refText = ref ? (lang === 'en' ? ref.en : ref.vi) : '';
   return (
@@ -80,14 +88,19 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
   const run = async (fn: () => Promise<void>, label = 'x') => { setWhat(label); setBusy(true); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); } };
   useEffect(() => { setCut(null); setMsg(''); }, [i]);
   if (!s) return null;
+  // the code check's mark (Chi, 31 Oct): a slide written again automatically, or one still to check
+  const flagOf = (x: Slide) => (x as Slide & { flag?: { fixed: boolean; vi: string; en: string } }).flag;
+  const flagWords = (f: { fixed: boolean; vi: string; en: string }) => lang === 'en' ? `${f.fixed ? 'Fixed automatically' : 'Please check'}: ${f.en}` : `${f.fixed ? 'Đã sửa tự động' : 'Kiểm tra lại'}: ${f.vi}`;
+  const flag = flagOf(s);
   return (
     <>
       <div className="row noprint" style={{ justifyContent: 'flex-end', marginBottom: 8 }}><button className="btn small" onClick={() => window.print()}>{t.pdf}</button></div>
       <div className="noprint slide-grid">
-        <div className="slide-list">{l.slides.map((x, j) => <button key={x.id} className={j === i ? 'on' : ''} onClick={() => setI(j)}>{j + 1}&nbsp; {x.heading}</button>)}</div>
+        <div className="slide-list">{l.slides.map((x, j) => <button key={x.id} className={j === i ? 'on' : ''} onClick={() => setI(j)}>{j + 1}&nbsp; {x.heading}{flagOf(x) && <span title={flagWords(flagOf(x)!)} aria-label={flagWords(flagOf(x)!)} style={{ color: '#8a5200' }}>&nbsp;●</span>}</button>)}</div>
         <div className="stack">
           <div className="slide-big">
             <div className="row"><h2 className="grow">{s.heading}</h2><span className="tag next">{t.slideN(i + 1, l.slides.length)}</span></div>
+            {flag && <p className="banner warn small" role="note" style={{ marginTop: 8 }}><b>{flagWords(flag)}.</b> {lang === 'en' ? 'Read this slide before you assign the lesson.' : 'Xem lại slide này trước khi giao bài.'}</p>}
             <div className="row" style={{ alignItems: 'flex-start', marginTop: 12, gap: 18 }}>
               {s.example && <div className="ex" style={{ background: 'var(--leaf-2)', borderRadius: 10, padding: '10px 16px' }}>{s.example}</div>}
               <ul className="grow" style={{ margin: 0 }}>{s.bullets.map((b, j) => <li key={j}>{b}</li>)}</ul>
@@ -213,7 +226,7 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
                 <div className="row small"><details className="grow"><summary className="link">{t.details}</summary><p><b>{t.explain}:</b> {it.explain}</p>{!!it.redone?.length && <p className="muted">↻ <b>{t.redoneWhy}:</b> {it.redone.join('; ')}</p>}{refText && <p className="muted">{t.page}: {ref(refText, it.page)}</p>}</details>
                   <button className="btn small noprint" onClick={() => setEditing(editing === it.id ? '' : it.id)}>{t.edit}</button>
                   <button className="btn small noprint" disabled={!!busy} onClick={() => run(it.id, async () => onChange((await api.similarItem(l.id, it.id)).items))}>{busy === it.id ? t.working2 : t.similar}</button>
-                  <button className="btn small danger noprint" onClick={async () => { if (confirm(t.removeAsk)) { await api.deleteItem(l.id, it.id); onChange(l.items.filter((x) => x.id !== it.id)); } }}>{t.remove}</button></div>
+                  <button className="btn small danger noprint" onClick={async () => { if (await ask(t.removeAsk, { danger: true })) { await api.deleteItem(l.id, it.id); onChange(l.items.filter((x) => x.id !== it.id)); } }}>{t.remove}</button></div>
                 {editing === it.id && <ItemEdit it={it} t={t} onSave={async (f) => run('edit', async () => { const r = await api.editItem(l.id, it.id, f); onChange(l.items.map((x) => (x.id === it.id ? r.item : x))); setEditing(''); })} onCancel={() => setEditing('')} />}
               </div>
             ))}

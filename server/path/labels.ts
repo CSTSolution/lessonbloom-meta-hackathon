@@ -63,7 +63,8 @@ export function classLabel(labels: Label[], c: Criteria): Label {
 export const clock = { now: () => Date.now() };
 
 // Dates in Vietnam days, as YYYY-MM-DD strings.
-export const vnToday = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+// from `clock`, so a test can pin the day (the reminders skip weekends)
+export const vnToday = () => new Date(clock.now() + 7 * 3600e3).toISOString().slice(0, 10);
 export const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 export const weekday = (d: string) => new Date(`${d}T00:00:00Z`).getUTCDay();   // 0 Sunday … 6 Saturday
 export const mondayOf = (d: string) => addDays(d, -((weekday(d) + 6) % 7));

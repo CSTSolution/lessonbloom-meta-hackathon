@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { clock } from '../server/path/labels.ts';
-import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, onDay, schoolToday, testServer } from './helpers.ts';
 
 test('items carry their page; a teacher types her classes at sign-up', async () => {
   const s = await testServer(), call = s.client();
@@ -52,8 +52,8 @@ test('the mid-lesson reminder goes only to a learner who has not finished the pr
   };
   const mia = await kid('198.51.100.120', 'Mia'), leo = await kid('198.51.100.121', 'Leo');
   for (const it of lesson.items) await leo('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer });
-  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
-  clock.now = () => Date.parse(`${today}T00:00:00Z`) + (18 - 7) * 3600e3 + 30 * 60e3;   // 18:30 Vietnam time
+  const today = schoolToday();
+  onDay(today, '18:30');   // 18:30 Vietnam time, on a school day
   try {
     const p = (await call('GET', `/api/t/path?classId=${k.id}&areaId=${areaId}`)).json, sec = lesson.refs[0].sectionId;
     const order = [sec, ...p.steps.map((x: any) => x.sectionId).filter((x: string) => x !== sec)];

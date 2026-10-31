@@ -10,6 +10,7 @@
 import type { AI, ChatMsg, ToolCall, ToolSpec } from '../ai/types.ts';
 import { Blocked, checkOutput, guardedJson, newCanary, scopedSystem, wrapUser } from '../guard/guard.ts';
 import { checkItem, contextOf } from './items.ts';
+import { checkSlide, issueWords, type SlideIssue } from './slide-check.ts';
 import { fill, langName, maxWords, slideCount, SLIDES_SCHEMA } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides } from './writer.ts';
@@ -28,7 +29,8 @@ const whyOf = (rej: { codes: string[] }[], lang: 'vi' | 'en') => {
   const codes = new Set(rej.flatMap((x) => x.codes));
   return WHY.filter((w) => w.codes.some((c) => codes.has(c))).map((w) => w[lang]).join(', ');
 };
-export const LIMITS = { maxTurns: 18, maxItemCalls: 14, maxItems: 30, minItems: 8, maxFixes: 6 };
+// maxSlideFixes: slides the code check has written again, at most, per lesson (each is one more model call)
+export const LIMITS = { maxTurns: 18, maxItemCalls: 14, maxItems: 30, minItems: 8, maxFixes: 6, maxSlideFixes: 4 };
 export type Say = (vi: string, en: string) => void | Promise<void>;
 export interface Built { skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; rejected: Rejected[]; agent: AgentNote }
 
@@ -73,6 +75,8 @@ export function reviewLesson(setup: Setup, source: string, b: { skills: Skill[];
     if (s.kind !== 'title' && !grounded(s.source, source)) issues.push(`${s.id}: its source quote is not in the book section`);
     for (const t of [s.heading, ...s.bullets]) if (Math.max(0, ...t.split(/[.!?;\n]+/).map((x) => words(x).length)) > maxWords(setup.grade)) { issues.push(`${s.id}: a sentence longer than ${maxWords(setup.grade)} words`); break; }
   }
+  // a slide still failing the code check of its numbers (Chi, 31 Oct)
+  for (const s of b.slides) { const ci = checkSlide(s); if (ci.length) issues.push(`${s.id}: ${ci.map((i) => i.detail).join('; ')}`); }
   for (const k of b.skills) for (const lv of ['basic', 'good'] as Level[]) if (!b.items.some((i) => i.skill === k.tag && i.level === lv)) issues.push(`skill ${k.tag}: no ${lv} items`);
   if (!b.items.some((i) => i.level === 'advanced')) issues.push('no advanced items');
   if (b.items.length < LIMITS.minItems) issues.push(`only ${b.items.length} items (at least ${LIMITS.minItems})`);
@@ -90,6 +94,19 @@ export async function simplify(ai: AI, setup: Setup, slide: Slide, reason: strin
   return s ? { ...slide, heading: String(s.heading || slide.heading).slice(0, 90), bullets: (s.bullets || slide.bullets).map((x) => String(x).slice(0, 160)).slice(0, 4), notes: String(s.notes || slide.notes).slice(0, 500), narration: String(s.narration || slide.narration).slice(0, 600) } : slide;
 }
 
+// A slide the code check turned down (Chi, 31 Oct), written again once: the title, the content and the
+// example must say the same thing and every calculation must be right. Same kind, picture and page.
+export async function fixSlide(ai: AI, setup: Setup, source: string, slide: Slide, problems: SlideIssue[]): Promise<Slide> {
+  const { id: _id, image: _img, flag: _flag, ...shown } = slide;
+  const r = await guardedJson<{ slides: Omit<Slide, 'id'>[] }>(ai, { endpoint: 'slides', creative: true,
+    system: `Rewrite ONE slide of a lesson for grade ${setup.grade} pupils, in ${langName(setup.lang)}, so that it is right. Code found the PROBLEMS listed: fix them. The heading, the bullets and the example must say the same thing (the same numbers, the same comparison, the same unit), and every calculation must be correct. Keep the slide kind, its facts from the book section and its source quote; sentences of at most ${maxWords(setup.grade)} words.`,
+    prompt: wrapUser(JSON.stringify({ slide: shown, problems: problems.map((p) => p.detail), book_section: source.slice(0, 6000) })), schema: SLIDES_SCHEMA, fixture: { simplify: slide, fix: problems } });
+  const s = r.slides?.[0];
+  if (!s) return slide;
+  return { ...slide, heading: String(s.heading || slide.heading).slice(0, 90), bullets: (Array.isArray(s.bullets) && s.bullets.length ? s.bullets : slide.bullets).map((x) => String(x).slice(0, 160)).slice(0, 4),
+    example: s.example !== undefined ? String(s.example).slice(0, 80) || undefined : slide.example, notes: String(s.notes || slide.notes).slice(0, 500), narration: String(s.narration || slide.narration).slice(0, 600), source: String(s.source || slide.source).slice(0, 400) };
+}
+
 const clip = (s: unknown, n = 200) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 const args = (c: ToolCall): Record<string, any> => { try { const a = JSON.parse(c.args || '{}'); return a && typeof a === 'object' ? a : {}; } catch { return {}; } };
 
@@ -97,9 +114,38 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   const canary = newCanary(), changes: string[] = [];
   let skills: Skill[] = [], outline: { kind: string; heading: string; objective?: string }[] = [], slides: Slide[] = [], items: Item[] = [], cards: Card[] = [];
   const rejected: Rejected[] = [];
-  let n = 0, itemCalls = 0, fixes = 0, turns = 0, finished = false, note = '', model = '';
+  let n = 0, itemCalls = 0, fixes = 0, slideFixes = 0, turns = 0, finished = false, note = '', model = '';
   const nextId = () => `ex${String(++n).padStart(2, '0')}`;
   const ctx = () => contextOf(setup, skills, source);
+  // Every slide the agent writes passes the code check of its title, numbers and units (Chi, 31 Oct). One
+  // that fails is written again once and checked again; it keeps a mark either way, so the assigner reads
+  // it before ticking "I have read and checked": "Đã sửa tự động: …", or "Kiểm tra lại: …" when the
+  // rewrite was still wrong (the better of the two versions is kept).
+  const checkSlides = async (list: Slide[]): Promise<Slide[]> => {
+    const out: Slide[] = [];
+    for (const s of list) {
+      const issues = checkSlide(s);
+      if (!issues.length) { out.push(s); continue; }
+      const num = Number(s.id.slice(2)) || s.id;
+      let best = s, left = issues;
+      if (slideFixes < LIMITS.maxSlideFixes) {
+        slideFixes++;
+        try { const f = await fixSlide(ai, setup, source, s, issues), again = checkSlide(f); if (again.length < issues.length) { best = f; left = again; } }
+        catch (e) { console.warn(`[agent] slide fix failed, the first version is kept: ${String((e as Error)?.message).slice(0, 200)}`); }   // blocked or busy
+      }
+      const w = issueWords(left.length ? left : issues);
+      if (!left.length) {
+        out.push({ ...best, flag: { fixed: true, ...w } });
+        await say(`Slide ${num}: ${w.vi}, viết lại.`, `Slide ${num}: ${w.en}, written again.`);
+        changes.push(setup.lang === 'en' ? `Slide ${num}: ${w.en}; written again` : `Slide ${num}: ${w.vi}, đã viết lại`);
+      } else {
+        out.push({ ...best, flag: { fixed: false, ...w } });
+        await say(`Slide ${num}: ${w.vi}, cần xem lại.`, `Slide ${num}: ${w.en}, please check it.`);
+        changes.push(setup.lang === 'en' ? `Slide ${num}: ${w.en}; please check it` : `Slide ${num}: ${w.vi}, cần xem lại`);
+      }
+    }
+    return out;
+  };
 
   const tool = async (c: ToolCall): Promise<unknown> => {
     const a = args(c);
@@ -115,7 +161,8 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         if (!outline.length) return { error: 'save_plan first' };
         slides = await writeSlides(ai, setup, source, outline);
         await say(`Đã viết ${slides.length} slide.`, `Wrote ${slides.length} slides.`);
-        return { slides: slides.map(({ id, kind, heading }) => ({ id, kind, heading })) };
+        slides = await checkSlides(slides);
+        return { slides: slides.map(({ id, kind, heading, flag }) => ({ id, kind, heading, ...(flag ? { checked: flag.fixed ? `written again by code: ${flag.en}` : `still to check: ${flag.en}` } : {}) })) };
       }
       case 'write_items': {
         if (!skills.length) return { error: 'save_plan first' };
@@ -146,7 +193,8 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         if (!s) return { error: `no slide ${clip(a.id, 20)}` };
         if (fixes >= LIMITS.maxFixes) return { error: 'fix limit reached; call finish' };
         fixes++;
-        slides[slides.indexOf(s)] = await simplify(ai, setup, s, clip(a.reason));
+        // simpler words must not break its numbers: checked again (a mark it had stays)
+        slides[slides.indexOf(s)] = (await checkSlides([await simplify(ai, setup, s, clip(a.reason))]))[0];
         changes.push(`Slide ${Number(s.id.slice(2))}: ${clip(a.reason)}`);
         await say(`Đã viết lại slide ${s.id.slice(2)} cho dễ đọc hơn.`, `Made slide ${s.id.slice(2)} easier to read.`);
         return { ok: true };
@@ -202,7 +250,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     const p = await planLesson(ai, setup, source);
     skills = skills.length ? skills : p.skills; outline = outline.length ? outline : p.outline;
   }
-  if (!slides.length) { slides = await writeSlides(ai, setup, source, outline); await say(`Đã viết ${slides.length} slide.`, `Wrote ${slides.length} slides.`); }
+  if (!slides.length) { slides = await writeSlides(ai, setup, source, outline); await say(`Đã viết ${slides.length} slide.`, `Wrote ${slides.length} slides.`); slides = await checkSlides(slides); }
   for (const k of skills) for (const level of ['basic', 'good'] as Level[]) {
     if (items.length >= LIMITS.maxItems || items.some((i) => i.skill === k.tag && i.level === level)) continue;
     const r = await writeItems(ai, setup, source, skills, { skill: k.tag, template: setup.subject === 'math' ? (level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill'), level, count: 3 }, nextId, items);

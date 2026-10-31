@@ -3,6 +3,7 @@
 import { MockProvider } from '../server/ai/mock.ts';
 import { createApp } from '../server/app.ts';
 import { config } from '../server/config.ts';
+import { clock } from '../server/path/labels.ts';
 import { migrate } from '../server/db/migrate.ts';
 import { pgliteSql } from '../server/db/sql.ts';
 import { Jobs } from '../server/jobs.ts';
@@ -30,6 +31,14 @@ export async function testServer(opts: { store?: Store | null } = {}) {
   };
   return { sql, ai, app, sent, client, jobs, store };
 }
+
+// A school day to test reminders on: today in Vietnam, or the next Monday on a weekend (the reminders
+// skip weekends, so these tests failed every Saturday and Sunday). `onDay` sets the clock to it.
+export function schoolToday(): string {
+  const d = new Date(Date.now() + 7 * 3600e3), dow = d.getUTCDay();
+  return new Date(d.getTime() + (dow === 6 ? 2 : dow === 0 ? 1 : 0) * 864e5).toISOString().slice(0, 10);
+}
+export const onDay = (day: string, hm = '09:00') => { const [h, m] = hm.split(':').map(Number); clock.now = () => Date.parse(`${day}T00:00:00Z`) + ((h - 7) * 60 + m) * 60e3; };
 
 type Call = ReturnType<Awaited<ReturnType<typeof testServer>>['client']>;
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));

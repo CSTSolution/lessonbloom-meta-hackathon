@@ -1,6 +1,7 @@
 // Sign-up step 2 · "Bạn là ai?": teacher or parent, chosen once. A teacher gives her name and subject;
 // a parent her name and her children's first names (only first names, up to 4) with their grade.
 import { useState } from 'react';
+import { go } from '../router.ts';
 import { api, ApiError, type Teacher } from '../api.ts';
 import { useLang, useT } from '../i18n.ts';
 import { LangToggle } from './LangToggle.tsx';
@@ -27,7 +28,7 @@ export function SignupRole({ teacher, onDone }: { teacher: Teacher; onDone: (t: 
   const ok = name.trim() && (role === 'teacher' || kids.some((k) => k.name.trim()));
   const go2 = async () => {
     setBusy(true); setErr('');
-    try { onDone((await api.setRole({ role, name: name.trim(), subject: role === 'teacher' ? subject : '', classes: role === 'teacher' ? classes.split(',').map((x) => x.trim()).filter(Boolean) : [], children: role === 'parent' ? kids.filter((k) => k.name.trim()) : [] })).teacher); }
+    try { go('/'); onDone((await api.setRole({ role, name: name.trim(), subject: role === 'teacher' ? subject : '', classes: role === 'teacher' ? classes.split(',').map((x) => x.trim()).filter(Boolean) : [], children: role === 'parent' ? kids.filter((k) => k.name.trim()) : [] })).teacher); }
     catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); }
   };
   return (

@@ -11,11 +11,20 @@ export interface Sql {
 }
 
 // node-postgres. The CST database uses a self-signed certificate: encrypted, CA not checked.
+// A connection that breaks (31 Oct: the app ran out of memory and every request hung on a dead one) is
+// dropped, a new one is never waited on for more than 10 s, and a query outside a transaction is tried
+// once more on a fresh connection.
+const BROKEN = /Connection terminated|socket disconnected|ECONNRESET|ECONNREFUSED|timeout exceeded when trying to connect|Client has encountered a connection error/i;
 export function pgSql(url: string): Sql {
-  const pool = new pg.Pool({ connectionString: url.replace(/[?&]sslmode=[^&]*/, ''), ssl: /sslmode=(require|no-verify)/.test(url) ? { rejectUnauthorized: false } : undefined, max: 8 });
+  const pool = new pg.Pool({ connectionString: url.replace(/[?&]sslmode=[^&]*/, ''), ssl: /sslmode=(require|no-verify)/.test(url) ? { rejectUnauthorized: false } : undefined, max: 8,
+    keepAlive: true, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 30_000 });
+  pool.on('error', (e) => console.warn(`[db] idle connection dropped: ${e.message}`));
+  const again = async <T>(c: { query: pg.Pool['query'] }, f: () => Promise<T>): Promise<T> => {
+    try { return await f(); } catch (e) { if (c !== pool || !BROKEN.test(String((e as Error)?.message))) throw e; console.warn(`[db] ${(e as Error).message}; trying once more`); return f(); }
+  };
   const over = (c: { query: pg.Pool['query'] }): Sql => ({
-    async query(text, params = []) { return (await c.query(text, params)).rows; },
-    async one(text, params = []) { return (await c.query(text, params)).rows[0]; },
+    async query(text, params = []) { return again(c, async () => (await c.query(text, params)).rows); },
+    async one(text, params = []) { return again(c, async () => (await c.query(text, params)).rows[0]); },
     tx: () => { throw new Error('nested transaction'); },
     close: async () => {},
   });

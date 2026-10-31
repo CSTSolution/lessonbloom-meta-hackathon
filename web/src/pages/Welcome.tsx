@@ -3,6 +3,7 @@ import { VERSION } from '../version.ts';
 import { useState } from 'react';
 import { api, ApiError, type Teacher } from '../api.ts';
 import { getLang, useLang, useT } from '../i18n.ts';
+import { ChromeLine } from './ChromeNote.tsx';
 import { LangToggle } from './LangToggle.tsx';
 import { Notice } from './Notice.tsx';
 
@@ -51,6 +52,7 @@ export function Welcome({ onSignedIn }: { onSignedIn: (t: Teacher) => void }) {
           <h2>{t.door}</h2>
           <button className="btn primary lg" disabled={!!busy} onClick={() => run('demo', async () => onSignedIn((await api.demo(getLang())).teacher))}>{t.demo}</button>
           <p className="muted small">{t.demoNote}</p>
+          <ChromeLine />
           <p className="muted small" style={{ textAlign: 'center' }}>— {t.or} —</p>
           {!sent ? (
             <form className="stack" onSubmit={(e) => { e.preventDefault(); void run('send', async () => { await api.sendCode(email.trim(), getLang()); setSent(true); }); }}>

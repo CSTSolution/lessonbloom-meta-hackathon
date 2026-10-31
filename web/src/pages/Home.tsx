@@ -6,7 +6,8 @@ import { api, ApiError, type Credits, type Job, type LessonRow, type Teacher } f
 import { pl, setRole, useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
 import { Classes } from './Classes.tsx';
-import { Create, readDraft } from './Create.tsx';
+import { ChromeBanner } from './ChromeNote.tsx';
+import { Create, readDraft, readLast, STEPS } from './Create.tsx';
 import { Criteria, Insights } from './Insights.tsx';
 import { Knowledge } from './Knowledge.tsx';
 import { LangToggle } from './LangToggle.tsx';
@@ -25,9 +26,9 @@ const T = {
   vi: {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
-    teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string) => `Bài đang soạn dở: ${what}`, draftGo: 'Soạn tiếp', allClasses: 'Tất cả các lớp', all: 'Tất cả',
+    teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string, step: string) => `Tiếp tục: ${what} · ${step}`, draftGo: 'Tiếp tục', allClasses: 'Tất cả các lớp', all: 'Tất cả',
     groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
-    status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
+    status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, example: 'Ví dụ', carryOn: 'Soạn tiếp', empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Lượt dùng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
     creditsHint: 'Một bài giữ trước 90 lượt (kèm hình), thường dùng khoảng 65; phần không dùng được trả lại.', usage: 'Xem lượt dùng chi tiết', promo: 'Nhập mã khuyến mãi', promoPh: 'Mã khuyến mãi', apply: 'Dùng', promoOk: (c: number, d: number) => `Đã thêm${c ? ` ${c} lượt dùng` : ''}${c && d ? ' và' : ''}${d ? ` ${d} ngày thuê bao` : ''}.`, promoDemo: 'Đăng nhập bằng email để dùng mã khuyến mãi.',
@@ -36,9 +37,9 @@ const T = {
   en: {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
-    teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string) => `A lesson you started: ${what}`, draftGo: 'Carry on', allClasses: 'All classes', all: 'All',
+    teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string, step: string) => `Continue: ${what} · ${step}`, draftGo: 'Continue', allClasses: 'All classes', all: 'All',
     groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
-    status: { working: 'Making…', error: 'Could not be made' }, empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
+    status: { working: 'Making…', error: 'Could not be made' }, example: 'Example', carryOn: 'Carry on', empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
     creditsHint: 'A lesson holds 90 credits (pictures included) and usually uses about 65; the rest comes back.', usage: 'See usage in detail', promo: 'Enter a promo code', promoPh: 'Promo code', apply: 'Apply', promoOk: (c: number, d: number) => `Added${c ? ` ${pl(c, 'credit')}` : ''}${c && d ? ' and' : ''}${d ? ` ${d} subscriber days` : ''}.`, promoDemo: 'Sign in with your email to use a promo code.',
@@ -64,6 +65,8 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
         <nav className="tabs">{tabs.map((k) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => go(k)}>{k === '/classes' && parent ? t.kids : t.nav[k]}</button>)}</nav>
         <Me teacher={teacher} t={t} onSignOut={onSignOut} />
       </header>
+      <ChromeBanner />
+      <Toast />
       {path === '/new' ? <Create parent={parent} />
         : lessonId ? <LessonPage id={lessonId} parent={parent} />
         : path.startsWith('/knowledge') ? <Knowledge />
@@ -79,6 +82,19 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
         : <Main teacher={teacher} t={t} />}
     </div>
   );
+}
+
+// A short note in the corner that goes by itself after about 4 s, sent as window event 'lbm-toast' with
+// the text (Chi #37: "Bài đã lưu ở Bài giảng → Bản nháp" on leaving a lesson not assigned yet).
+function Toast() {
+  const [text, setText] = useState('');
+  useEffect(() => {
+    let h = 0;
+    const f = (e: Event) => { setText(String((e as CustomEvent).detail || '')); clearTimeout(h); h = window.setTimeout(() => setText(''), 4000); };
+    window.addEventListener('lbm-toast', f);
+    return () => { clearTimeout(h); window.removeEventListener('lbm-toast', f); };
+  }, []);
+  return text ? <div className="toast" role="status">{text}</div> : null;
 }
 
 function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: () => void }) {
@@ -131,6 +147,12 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
   }, []);
   useEffect(() => { if (!rows?.some((r) => r.status === 'working')) return; const id = setTimeout(() => api.lessons().then((r) => setRows(r.lessons)).catch(() => {}), 2500); return () => clearTimeout(id); }, [rows]);
   if (!rows) return null;
+  // the most recent unfinished work: a lesson request half-written (step Material), or a lesson made but
+  // not assigned yet (at the step she left it on); a lesson since assigned or removed is not offered
+  const last = readLast(), lastRow = last && rows.find((r) => r.id === last.id && !r.given);
+  const next = draft && (draft.text || draft.match || draft.part) && (!lastRow || draft.at > last!.at)
+    ? { what: draft.text || draft.match?.title || draft.part || '', step: STEPS[lang][0], to: '/new' }
+    : lastRow ? { what: lastRow.setup.title, step: STEPS[lang][last!.step - 1], to: `/lesson/${lastRow.id}` } : null;
   const shown = rows.filter((r) => !pick || r.classes.some((k) => k.id === pick));
   const groups = { open: shown.filter((r) => r.open), draft: shown.filter((r) => !r.given), done: shown.filter((r) => r.given && !r.open) };
   const subject = SUBJ[teacher.subject]?.[lang];
@@ -145,7 +167,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
           </div><button className="btn primary" onClick={() => go('/new')}>{t.make}</button></div>
           {classes.length > 0 && <div className="row">{[{ id: '', name: parent ? t.all : t.allClasses }, ...classes].map((k) => <button key={k.id} className={`pill ${pick === k.id ? 'on' : ''}`} onClick={() => setPick(k.id)}>{k.name}</button>)}</div>}
           {/* step 1 left half-done (to enter a code, say) is here to carry on with (Chi #30) */}
-          {draft && <div className="banner row"><span className="grow small">{t.draft((draft.text || draft.match?.title || '…').slice(0, 80))}</span><button className="btn small primary" onClick={() => go('/new')}>{t.draftGo}</button></div>}
+          {next && <div className="banner row"><span className="grow small">{t.draft(next.what.slice(0, 80), next.step)}</span><button className="btn small primary" onClick={() => go(next.to)}>{t.draftGo}</button></div>}
           {!rows.length && <div className="card"><p className="muted">{t.empty}</p></div>}
           {/* drafts first, open when there are any: a lesson just made is found there, not thought lost (Chi, 30 Oct) */}
           {rows.length > 0 && (['draft', 'open', 'done'] as const).map((g) => (
@@ -156,10 +178,11 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
               </button>
               {open === g && groups[g].length > 0 && <div className="lessons" style={{ paddingTop: 10 }}>{groups[g].map((r, i) => (
                 <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
-                  <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example || r.setup.title.trim().charAt(0).toUpperCase()}</div>
+                  <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example ? <><span className="thumb-tag">{t.example}</span><span>{r.example}</span></> : r.setup.title.trim().charAt(0).toUpperCase()}</div>
                   {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}
                   <b className="small">{r.setup.title}</b>
                   <span className="small muted">{r.status === 'ready' ? t.parts(r.slides, r.items, r.cards, r.video) : t.status[r.status as 'working' | 'error']}</span>
+                  {g === 'draft' && r.status === 'ready' && <span className="btn small primary" style={{ alignSelf: 'start' }}>{t.carryOn}</span>}
                 </button>
               ))}</div>}
             </div>

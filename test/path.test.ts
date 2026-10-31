@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { classLabel, clock, DEFAULT_CRITERIA, labelOf, mistakeOf, schoolDay } from '../server/path/labels.ts';
 import { firstPlan, layout } from '../server/path/routes.ts';
 import type { Item } from '../server/lesson/types.ts';
-import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, onDay, schoolToday, testServer } from './helpers.ts';
 
 test('labels by code: 80 / 50 / the same mistake 3 times in 2 sessions; a class at 30% / 70%', () => {
   const it = { id: 'i', subject: 'math', template: 'fill', skill: 'add', level: 'basic', prompt: '', explain: '', a: 36, op: '+', b: 27, answer: '63' } as Item;
@@ -46,6 +46,7 @@ test('a parent: children at sign-up become "Con của tôi", each with a private
 });
 
 test('path, summary, advice for one learner, and her reminder', async () => {
+  const today = schoolToday(); onDay(today);
   const s = await testServer(), call = s.client();
   await call('POST', '/api/auth/demo');
   await call('POST', '/api/t/role', { role: 'teacher', name: 'Cô Hạnh', subject: 'math' });
@@ -67,7 +68,6 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   assert.equal(again.path.id, p.path.id);
   assert.deepEqual(again.steps.map((x: any) => x.sectionId), p.steps.map((x: any) => x.sectionId));
   const sec = lesson.refs[0].sectionId, order = [sec, ...p.steps.map((x: any) => x.sectionId).filter((x: string) => x !== sec)];
-  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
   await call('PUT', `/api/t/path/${p.path.id}`, { start: today, steps: order.map((id: string, i: number) => ({ sectionId: id, weeks: i === 0 ? 2 : 1 })) });
   p = (await call('GET', `/api/t/path?classId=${k.id}&areaId=${areaId}`)).json;
   assert.deepEqual(p.steps.map((x: any) => x.sectionId), order, 'the order she saved stays');
@@ -87,7 +87,7 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   at('15:00'); assert.equal((await an('GET', '/api/p/today')).json.reminder, null, 'not before the chosen time');
   at('18:30'); assert.match((await an('GET', '/api/p/today')).json.reminder.vi, /Bắt đầu bài/, 'her reminder for today, in the app');
   at('21:00'); assert.match((await an('GET', '/api/p/today')).json.reminder.vi, /Bắt đầu bài/, 'once shown, the same one all day');
-  clock.now = () => Date.now();
+  onDay(today);   // back to the morning of the school day, for the rest of the test
   const add = lesson.items.find((i: any) => i.op === '+' && i.template === 'fill' && i.blank === 'result') ?? lesson.items.find((i: any) => i.op === '+' && i.template !== 'truefalse');
   for (let i = 0; i < 3; i++) await an('POST', `/api/p/a/${a.id}/answer`, { itemId: add.id, answer: String(Number(add.answer) - 10) });
   for (const it of lesson.items) { await an('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer }); await binh('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer }); }

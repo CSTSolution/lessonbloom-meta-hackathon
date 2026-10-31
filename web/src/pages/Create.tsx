@@ -28,7 +28,9 @@ const T = {
     what: 'Bài này cần học gì?', whatPh: 'Ví dụ: Phép cộng có nhớ trong phạm vi 100, tập trung vào nhớ 1 sang hàng chục.', pastePh: 'Dán đoạn văn bản (giáo án, đề bài…) vào đây.', say: '● Nói', stop: '■ Dừng', hearing: 'Đang nghe…',
     lessonPhoto: 'Chụp trang sách hoặc giáo án (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', workPhoto: 'Chụp bài con đã làm (tối đa 5 ảnh). AI nhận ra dạng bài và chỗ sai, rồi tạo bài luyện cùng dạng trong phạm vi đã chọn. Không chụp tên hay mặt.', pick: '+ Chọn ảnh', reading: 'AI đang đọc ảnh…',
     find: 'Tìm trong nguồn', finding: 'Đang tìm…', found: (c: string) => `Đã tìm thấy: ${c}. Bài chỉ dùng các trang này.`, quotes: 'Các đoạn AI đã dùng', mistakes: 'Chỗ con hay sai', notFound: 'Chưa có trong Kho kiến thức. Cô thêm tài liệu hoặc chọn phạm vi khác.',
-    scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Cô cần một nguồn có sách trước. Bài giảng chỉ lấy nội dung từ sách của cô.', sample: 'Dùng sách mẫu',
+    scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Bạn chưa có sách nào. Bài giảng chỉ được soạn từ sách của bạn.', booksReading: 'Sách của bạn đang được đọc; đọc xong là soạn bài được. Trong lúc chờ, bạn có thể dùng sách mẫu.', sample: 'Dùng sách mẫu',
+    upPdf: 'Tải sách (PDF)', upPhotos: 'Chụp / tải ảnh trang sách', sampleOf: 'Sách mẫu do đội LessonBloom tự viết:', samples: { maths2: 'Maths 2 (tiếng Anh)', english3: 'Tiếng Anh 3', toan2: 'Toán 2' }, noSource: 'Chưa có sách', addingSample: 'Đang thêm sách mẫu…',
+    matOpt: 'Tuỳ chọn', fromPart: (p: string) => `Bài sẽ soạn từ cả phần “${p}”. Muốn thu hẹp hoặc nhấn mạnh điểm nào, thêm một câu hoặc ảnh.`, addMat: 'Thêm tài liệu', nextPart: 'Soạn bài từ phần này',
     h2: 'Một vài câu hỏi về bài học', lead2: 'AI đã điền sẵn. Cô xem và sửa nếu cần.', fromAi: 'Gợi ý từ AI', optional: 'Không bắt buộc',
     q: { goal: 'Mục tiêu', title: 'Tên bài', minutes: 'Thời lượng', level: 'Mức của lớp', make: 'Cần tạo', lang: 'Ngôn ngữ', note: 'Ghi chú cho AI' },
     min: (n: number) => `${n} phút`, lv: { mixed: 'Nhiều mức (3 mức bài tập)', basic: 'Phần lớn cơ bản', advanced: 'Phần lớn nâng cao' }, mk: { slides: 'Slide bài giảng', items: 'Bài tập theo mẫu', video: 'Video có giọng đọc', cards: 'Thẻ nhớ' }, always: 'luôn có', vi: 'Tiếng Việt', en: 'Tiếng Anh', none: 'Chưa có', notePh: 'Ví dụ: dùng tình huống ở chợ',
@@ -40,7 +42,9 @@ const T = {
     what: 'What should this lesson teach?', whatPh: 'e.g. Unit 6: colours, the words red, blue and green.', pastePh: 'Paste text (a plan, an exercise…) here.', say: '● Speak', stop: '■ Stop', hearing: 'Listening…',
     lessonPhoto: 'Photograph the book page or your plan (up to 5 photos). No faces, names or personal details.', workPhoto: "Photograph the child's finished exercise (up to 5 photos). The AI finds its kind and the mistakes, then makes practice of the same kind in the chosen part. No names or faces.", pick: '+ Choose photos', reading: 'Reading the photos…',
     find: 'Find in the source', finding: 'Searching…', found: (c: string) => `Found: ${c}. The lesson uses only these pages.`, quotes: 'Passages the AI used', mistakes: 'Mistakes seen', notFound: 'Not in your knowledge area yet. Add material or choose another part.',
-    scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You need a source with a book first. Lessons come only from your books.', sample: 'Use a sample book',
+    scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You have no books yet. Lessons are made only from your own books.', booksReading: 'Your book is being read; once it is done you can make a lesson. Meanwhile you can use a sample book.', sample: 'Use a sample book',
+    upPdf: 'Upload a book (PDF)', upPhotos: 'Take or upload photos of pages', sampleOf: 'Sample books written by the LessonBloom team:', samples: { maths2: 'Maths 2', english3: 'English 3', toan2: 'Toán 2 (Vietnamese)' }, noSource: 'No book yet', addingSample: 'Adding the sample book…',
+    matOpt: 'Optional', fromPart: (p: string) => `The lesson is made from the whole part “${p}”. To narrow it or stress a point, add a sentence or a photo.`, addMat: 'Add material', nextPart: 'Make the lesson from this part',
     h2: 'A few questions about the lesson', lead2: 'The AI filled these in. Check and change them if needed.', fromAi: 'Suggested by AI', optional: 'Optional',
     q: { goal: 'Objectives', title: 'Title', minutes: 'Length', level: 'Class level', make: 'To make', lang: 'Language', note: 'Note for the AI' },
     min: (n: number) => `${n} min`, lv: { mixed: 'Mixed (3 practice levels)', basic: 'Mostly basic', advanced: 'Mostly advanced' }, mk: { slides: 'Slides', items: 'Practice from templates', video: 'Narrated video', cards: 'Flashcards' }, always: 'always made', vi: 'Vietnamese', en: 'English', none: 'None', notePh: 'e.g. use market examples',
@@ -52,10 +56,17 @@ type Kind = 'one' | 'lesson' | 'work' | 'paste';
 // Step 1 is kept in this browser as she works (Chi #30): leaving to enter a code and coming back finds
 // it, and a part already found is not looked for (and paid for) again. Gone once the lesson is made.
 const DRAFT = 'lbm-draft';
-export interface Draft { areaId: string; sectionId: string; kind: Kind; text: string; focus: string; match: Match | null; at: number }
+export interface Draft { areaId: string; sectionId: string; part?: string; kind: Kind; text: string; focus: string; match: Match | null; at: number }
 export const readDraft = (): Draft | null => {
   try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null') as Draft | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; }
 };
+// The step she was on in each lesson, and which lesson she worked on last (Chi #43: Carry on opens that
+// step; the Lessons page offers the most recent unfinished work, a draft or a lesson not assigned yet).
+export interface LastLesson { id: string; title: string; step: number; at: number }
+const LAST = 'lbm-last-lesson';
+export const lessonStep = (id: string): number | null => { try { const n = Number(localStorage.getItem(`lbm-step-${id}`)); return n >= 3 && n <= 6 ? n : null; } catch { return null; } };
+export const keepStep = (id: string, title: string, step: number) => { try { localStorage.setItem(`lbm-step-${id}`, String(step)); localStorage.setItem(LAST, JSON.stringify({ id, title, step, at: Date.now() })); } catch { /* private window */ } };
+export const readLast = (): LastLesson | null => { try { const d = JSON.parse(localStorage.getItem(LAST) || 'null') as LastLesson | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; } };
 const writeDraft = (d: Draft | null) => { try { if (d) localStorage.setItem(DRAFT, JSON.stringify(d)); else localStorage.removeItem(DRAFT); } catch { /* private window: no draft */ } };
 
 export function Create({ parent }: { parent: boolean }) {
@@ -69,10 +80,15 @@ export function Create({ parent }: { parent: boolean }) {
   const loadCr = () => { api.me().then((r) => setCr({ left: r.credits.left, need: r.lessonCredits ?? 60, account: r.teacher.kind === 'account' })).catch(() => {}); };
   useEffect(() => { loadCr(); window.addEventListener('lbm-credits', loadCr); return () => window.removeEventListener('lbm-credits', loadCr); }, []);
   const short = !!cr && cr.left < cr.need, firstArea = useRef(true);
-  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, kind, text, focus, match, at: Date.now() }); }, [areaId, sectionId, kind, text, focus, match]);
+  // a draft with nothing in it yet (no part chosen, no sentence) is not kept (Chi #43)
+  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, part: sections.find((s) => s.id === sectionId)?.title, kind, text, focus, match, at: Date.now() }); }, [areaId, sectionId, kind, text, focus, match, sections]);
   const [busy, setBusy] = useState(''), [err, setErr] = useState(''), [rec, setRec] = useState<MediaRecorder | null>(null);
+  // no book yet (Chi #39): the sample books are offered here; a book still being read is said so
+  const [reading, setReading] = useState(false), [pickSample, setPickSample] = useState(false);
+  // a part chosen makes the material optional (Chi #40): folded until she asks for it, open if she wrote some
+  const [moreMat, setMoreMat] = useState(!!d0?.text);
   const chunks = useRef<Blob[]>([]);
-  const loadAreas = () => api.areas().then((r) => { const ready = r.areas.filter((a) => a.books.some((b) => b.status === 'ready')); setAreas(ready); setAreaId((x) => (x && ready.some((a) => a.id === x) ? x : ready[0]?.id || '')); }).catch(() => setAreas([]));
+  const loadAreas = () => api.areas().then((r) => { setReading(r.areas.some((a) => a.books.some((b) => b.status === 'processing'))); const ready = r.areas.filter((a) => a.books.some((b) => b.status === 'ready')); setAreas(ready); setAreaId((x) => (x && ready.some((a) => a.id === x) ? x : ready[0]?.id || '')); }).catch(() => setAreas([]));
   useEffect(() => { void loadAreas(); }, []);
   useEffect(() => { if (firstArea.current) firstArea.current = false; else { setMatch(null); setMissing(false); } if (areaId) api.area(areaId).then((r) => setSections(r.sections)).catch(() => setSections([])); }, [areaId]);
   const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); setErr(''); try { await fn(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error).message || e)); } finally { setBusy(''); } };
@@ -119,11 +135,20 @@ export function Create({ parent }: { parent: boolean }) {
   if (!areas) return null;
 
   const top = <div className="row noprint" style={{ justifyContent: 'flex-end' }}><button className="link small" onClick={() => go('/')}>{t.save}</button></div>;
-  if (!areas.length) return (
-    <div className="page narrow">{top}<Stepper at={1} parent={parent} />
-      <div className="card stack"><p>{t.noArea}</p><div className="row"><button className="btn primary" onClick={() => go('/knowledge')}>{t.openKnowledge}</button>
-        <button className="btn" disabled={!!busy} onClick={() => run('sample', async () => { await api.sampleArea(lang === 'en' ? 'maths2' : 'toan2'); await loadAreas(); })}>{t.sample}</button></div>{err && <p className="note">{err}</p>}</div></div>
-  );
+  // lessons still come only from her books (Chi #39): with none, the Material step says so and offers
+  // the three ways to get one; a sample book is added here and comes back chosen, on this same step
+  const addSample = (b: 'maths2' | 'english3' | 'toan2') => run('sample', async () => { const id = (await api.sampleArea(b)).area.id; await loadAreas(); setAreaId(id); setSectionId(''); setPickSample(false); });
+  const noBook = !areas.length && <div className="banner warn stack" style={{ gap: 8 }}>
+    <b className="small">{reading ? t.booksReading : t.noArea}</b>
+    <div className="row">
+      <button className="btn small primary" onClick={() => go('/knowledge?add=1')}>{t.upPdf}</button>
+      <button className="btn small primary" onClick={() => go('/knowledge?add=1')}>{t.upPhotos}</button>
+      <button className="btn small" disabled={!!busy} onClick={() => setPickSample(!pickSample)}>{t.sample}</button>
+    </div>
+    {pickSample && <div className="row small"><span className="muted">{t.sampleOf}</span>{(['maths2', 'english3', 'toan2'] as const).map((b) => <button key={b} className="btn small" disabled={!!busy} onClick={() => void addSample(b)}>{t.samples[b]}</button>)}{busy === 'sample' && <span className="muted" role="status">{t.addingSample}</span>}</div>}
+  </div>;
+  // the material: needed to find the part when "Find it" is chosen; with a part chosen, only to narrow it
+  const matOpen = !chosen || moreMat || !!text.trim();
 
   if (!setup) return (
     <div className="page narrow">{top}<Stepper at={1} parent={parent} />
@@ -133,14 +158,20 @@ export function Create({ parent }: { parent: boolean }) {
         {d0 && (d0.text || d0.match) && <div className="row small muted"><span className="grow">{t.restored}</span><button className="link small" onClick={() => { writeDraft(null); location.reload(); }}>{t.discard}</button></div>}
         <div className="card stack">
           <b><span className="num cur">1</span> {t.src}</b><span className="small muted">{t.srcLead}</span>
+          {noBook}
           <div className="grid2">
-            <label className="field">{t.source}<select value={areaId} onChange={(e) => { setAreaId(e.target.value); setSectionId(''); }}>{areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-            <label className="field">{t.part}<select value={sectionId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); }}><option value="">{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {s.page_from}</option>)}</select></label>
+            <label className="field">{t.source}<select value={areaId} disabled={!areas.length} onChange={(e) => { setAreaId(e.target.value); setSectionId(''); }}>{areas.length ? areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>) : <option value="">{t.noSource}</option>}</select></label>
+            <label className="field">{t.part}<select value={sectionId} disabled={!areaId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); }}><option value="">{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {s.page_from}</option>)}</select></label>
           </div>
-          <button className="link small" style={{ alignSelf: 'start' }} onClick={() => go('/knowledge')}>{t.openKnowledge}</button>
+          {areas.length > 0 && <button className="link small" style={{ alignSelf: 'start' }} onClick={() => go('/knowledge')}>{t.openKnowledge}</button>}
         </div>
-        <div className="card stack">
-          <b><span className="num cur">2</span> {t.mat}</b><span className="small muted">{t.matLead}</span>
+        {!matOpen && chosen && <div className="card stack">
+          <b><span className="num">2</span> {t.mat}</b>
+          <span className="small muted"><b>{t.matOpt}</b> · {t.fromPart(chosen.title)}</span>
+          <button className="btn small" style={{ alignSelf: 'start' }} onClick={() => setMoreMat(true)}>{t.addMat}</button>
+        </div>}
+        {matOpen && <div className="card stack">
+          <b><span className={`num ${chosen ? '' : 'cur'}`}>2</span> {t.mat}{chosen && <> <span className="tag">{t.matOpt}</span></>}</b><span className="small muted">{t.matLead}</span>
           <div className="row">{(Object.keys(t.kinds) as Kind[]).map((k) => <button key={k} className={`btn small ${kind === k ? 'primary' : ''}`} onClick={() => setKind(k)}>{t.kinds[k]}</button>)}</div>
           {(kind === 'lesson' || kind === 'work') && <><p className="small muted">{kind === 'work' ? t.workPhoto : t.lessonPhoto}</p>
             <label className="btn" style={{ alignSelf: 'start' }}>{busy === 'photo' ? t.reading : t.pick}<input type="file" accept="image/*" multiple hidden disabled={!!busy} onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) void photos(fs, kind); }} /></label></>}
@@ -148,14 +179,14 @@ export function Create({ parent }: { parent: boolean }) {
           {kind === 'one' && (rec ? <button className="btn coral small" style={{ alignSelf: 'start' }} onClick={() => { rec.stop(); setRec(null); }}>{t.stop}</button>
             : <button className="btn small" style={{ alignSelf: 'start' }} disabled={!!busy} onClick={() => void record().catch((e) => setErr(String(e.message || e)))}>{busy === 'voice' ? t.hearing : t.say}</button>)}
           {focus && <p className="banner warn small"><b>{t.mistakes}:</b> {focus}</p>}
-          {!chosen && <div className="row"><span className="grow" /><button className="btn" disabled={!!busy || short || text.trim().length < 3} onClick={find}>{busy === 'find' ? t.finding : t.find}</button></div>}
-        </div>
+          {!chosen && <div className="row"><span className="grow" /><button className="btn" disabled={!!busy || short || !areaId || text.trim().length < 3} onClick={find}>{busy === 'find' ? t.finding : t.find}</button></div>}
+        </div>}
         {match && !chosen && <div className="banner"><b>✓ {t.found(scopeText)}</b><details className="small"><summary>{match.title} · {t.quotes}</summary>{match.cited.map((c) => <blockquote key={c.id}>“{c.quote}” <span className="muted">· {t.page} {c.page}</span></blockquote>)}</details></div>}
         {chosen && <div className="banner">✓ {t.found(`${chosen.title} · ${scopeText}`)}</div>}
         {missing && <div className="banner warn">{t.notFound}</div>}
         {err && <p className="note">{err}</p>}
         <div className="row"><span className="small muted grow">{scopeText && t.scope(scopeText)}</span>
-          <button className="btn primary" disabled={!!busy || short || !(chosen || match)} onClick={toStep2}>{busy === 'intake' ? t.thinking : t.next}</button></div>
+          <button className="btn primary" disabled={!!busy || short || !(chosen || match)} onClick={toStep2}>{busy === 'intake' ? t.thinking : chosen ? t.nextPart : t.next}</button></div>
       </div>
     </div>
   );

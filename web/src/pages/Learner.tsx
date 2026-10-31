@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, type Advice, type LearnerView } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
+import { NotFound } from './NotFound.tsx';
 
 const T = {
   vi: {
@@ -26,11 +27,13 @@ const dm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 export function Learner({ id, parent }: { id: string; parent: boolean }) {
   const t = useT(T), lang = useLang();
   const [v, setV] = useState<LearnerView | null>(null), [why, setWhy] = useState(''), [open, setOpen] = useState(''), [busy, setBusy] = useState(''), [msg, setMsg] = useState('');
-  const load = () => api.learner(id, lang).then(setV).catch(() => setV(null));
+  const [gone, setGone] = useState(false);
+  const load = () => api.learner(id, lang).then(setV).catch((e) => { setV(null); if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setGone(true); });
   useEffect(() => { setV(null); void load(); setMsg(''); }, [id, lang]);
   // the advice is worded by Muse Spark in the background; ask again until it is there (at most 5 times)
   const [tries, setTries] = useState(0);
   useEffect(() => { if (!v?.wording || tries >= 5) return; const h = setTimeout(() => { setTries((n) => n + 1); void load(); }, 3000); return () => clearTimeout(h); }, [v, tries]);
+  if (gone) return <NotFound what="learner" />;
   if (!v) return <div className="page narrow"><p className="muted" role="status" style={{ marginTop: 24 }}>{lang === 'vi' ? 'Đang tải…' : 'Loading…'}</p></div>;
   const act = async (a: Advice, action: 'apply' | 'keep' | 'undo') => {
     setBusy(a.kind + action); setMsg('');

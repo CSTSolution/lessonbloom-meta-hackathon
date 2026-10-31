@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, type ClassRow, type ClassView } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
+import { ask } from '../ask.tsx';
 import { go } from '../router.ts';
 
 const T = {
@@ -95,7 +96,7 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
               <td><span className="meter"><i style={{ width: `${v.pupils.length ? (100 * a.done) / v.pupils.length : 0}%` }} /></span> {a.done}/{v.pupils.length}</td>
               <td>{(() => { const st = statusOf(a, v.pupils.length); return <span className={`tag ${st === 'expired' ? 'later' : st === 'done' ? 'done' : st === 'progress' ? 'current' : 'ai'}`}>{STATUS[lang][st]}</span>; })()}</td>
               <td><button className="link small" onClick={() => go(`/lesson/${a.lesson_id}`)}>{t.open}</button> · <button className="link small" onClick={() => go(`/insight?class=${id}&lesson=${a.lesson_id}`)}>{lang === 'en' ? 'Summary' : 'Xem tóm tắt'}</button>
-                {' · '}<button className="link small muted" onClick={async () => { if (confirm(t.unassignAsk(v.class.name))) { await api.unassign(a.id); await load(); onChange(); } }}>{t.unassign}</button></td></tr>
+                {' · '}<button className="link small muted" onClick={async () => { if (await ask(t.unassignAsk(v.class.name), { ok: t.unassign, danger: true })) { await api.unassign(a.id); await load(); onChange(); } }}>{t.unassign}</button></td></tr>
           ))}
         </tbody></table>
       ) : <p className="small muted">{t.none}</p>}
@@ -117,7 +118,7 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
       {v.pupils.length > 12 && !showAll && <button className="link small" onClick={() => setShowAll(true)}>{lang === 'en' ? `See all ${v.pupils.length}` : `Xem cả ${v.pupils.length} em`}</button>}</>}
       <div className="row small" style={{ justifyContent: 'flex-end' }}>
         <button className="link small" onClick={async () => { const n = prompt(t.rename, v.class.name); if (n?.trim()) { await api.renameClass(id, n); await load(); onChange(); } }}>{t.rename}</button>
-        <button className="link small danger" onClick={async () => { if (confirm(t.delAsk)) { await api.deleteClass(id); onChange(); } }}>{t.del}</button>
+        <button className="link small danger" onClick={async () => { if (await ask(t.delAsk, { ok: t.del, danger: true })) { await api.deleteClass(id); onChange(); } }}>{t.del}</button>
       </div>
     </div>
   );

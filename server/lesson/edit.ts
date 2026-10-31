@@ -12,6 +12,7 @@ import { Blocked, type Budget, requireOnTask } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import { simplify } from './agent.ts';
 import { buildEnglish, buildMath, checkItem, contextOf, type RawEnglish, type RawMath } from './items.ts';
+import { markSlide } from './slide-check.ts';
 import type { Item, Lesson, Slide } from './types.ts';
 import type { Files } from '../files.ts';
 import { makeVideo } from './video.ts';
@@ -63,7 +64,8 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
         ? simplify(d.ai, l.setup, s, 'the assigner asked for a simpler slide')
         : (await writeSlides(d.ai, l.setup, l.source, [{ kind: s.kind, heading: s.heading }]))[0], l.id);
       if (!fresh) return fail(c, 'aiBusy', 503);
-      const slide: Slide = { ...s, heading: fresh.heading || s.heading, bullets: fresh.bullets?.length ? fresh.bullets : s.bullets, example: fresh.example ?? s.example, notes: fresh.notes || s.notes, narration: fresh.narration || s.narration, source: fresh.source || s.source };
+      // her new version is checked like the agent's: a right one clears the old mark, a wrong one reads "Kiểm tra lại" (Chi, 31 Oct)
+      const slide: Slide = markSlide({ ...s, heading: fresh.heading || s.heading, bullets: fresh.bullets?.length ? fresh.bullets : s.bullets, example: fresh.example ?? s.example, notes: fresh.notes || s.notes, narration: fresh.narration || s.narration, source: fresh.source || s.source });
       await saveSlides(l.id, l.slides.map((x) => (x.id === s.id ? slide : x)));
       await logEdit(c, l.id, 'slide_rewrite');
       return c.json({ slide });
@@ -84,7 +86,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
         return (await writeSlides(d.ai, l.setup, l.source, [{ kind: 'teach', heading: topic || (l.setup.lang === 'en' ? 'One more step, from the book section' : 'Thêm một ý, từ phần bài trong sách') }]))[0];
       }, l.id);
       if (!s) return fail(c, 'aiBusy', 503);
-      const slide: Slide = { ...s, id: newSlideId(l.slides), page: l.slides.find((x) => x.page)?.page };
+      const slide: Slide = markSlide({ ...s, id: newSlideId(l.slides), page: l.slides.find((x) => x.page)?.page });
       const slides = [...l.slides.slice(0, at), slide, ...l.slides.slice(at)];
       await saveSlides(l.id, slides);
       await logEdit(c, l.id, 'slide_add');

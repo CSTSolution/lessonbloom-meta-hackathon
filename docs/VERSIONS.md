@@ -3,6 +3,32 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## NEXT (31 Oct)
+
+- **The server no longer runs out of memory while making videos** (31 Oct, 9:00–9:30: lessons failed with
+  504/524 for ~30 min). Chromium no longer depends on Docker's small /dev/shm, the app has 2.5 GB instead
+  of 1.5 GB, ffmpeg uses 2 threads, and a broken database connection is dropped and tried again instead of
+  hanging every request.
+- **Slides are checked by code** (Chi, 31 Oct): a title that contradicts its content ("greater than 60,
+  less than 50"), a wrong sum, or units that do not match are written again once, and the slide keeps a
+  mark "Fixed automatically: …" (or "Please check: …") for the assigner to read before assigning.
+- **"Are you sure?" inside the app**, in her language (Unassign, remove a source or an item, delete a
+  class), instead of the browser's own box. (Chi #34)
+- **Continue opens the step she left** a lesson on; the Lessons page offers only the most recent
+  unfinished work, "Continue: <title> · <step>"; an empty draft is not kept. Leaving a lesson not yet
+  assigned shows "The lesson is kept in Lessons → Drafts" for 4 s. A card's picture is labelled
+  "Example". (Chi #37, #43)
+- **A link to a lesson or learner that is not there** (or another account's) says so, with "Back to
+  Lessons", instead of an empty page; signing in or up always lands on Lessons. (Chi #38)
+- **No book yet**: "+ New lesson" explains and offers Upload a book, Photos of pages, or a sample book
+  (added in one tap, back on the same step). (Chi #39)
+- **A chosen part makes the material optional**: the material box folds away, the button reads "Make the
+  lesson from this part". (Chi #40)
+- **Add a source guesses the subject and grade** from the file name ("Toán 2" → Maths · Grade 2) and no
+  longer presets Maths; "Maths and English, grades 1–5, for now". (Chi #41)
+- **"Works best in Google Chrome"** on top in other browsers (closable), on the welcome page and at the
+  upload box; not on the child's pages, which must work in Safari on an iPhone. (Chi #42)
+
 ## v1.0.20261030.2225 (30 Oct, late)
 
 - **A lesson holds 90 credits** and usually uses about 65; the rest comes back (Son, 31 Oct: real lessons

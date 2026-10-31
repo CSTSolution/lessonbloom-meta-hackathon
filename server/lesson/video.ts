@@ -76,8 +76,8 @@ async function render(d: { sql: Sql; ai: AI; files: Files }, l: Lesson, opts: { 
       await writeFile(join(dir, `s${i}.html`), slideHtml(s, i + 1, l.slides.length, l.setup.title, picture, sub));
       await writeFile(join(dir, `s${i}.wav`), wav);
       // its own profile in the video's folder: never waits on a Chrome already open on the same machine
-      await run(CHROMIUM, ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--no-first-run', `--user-data-dir=${join(dir, 'chrome')}`, '--window-size=1280,720', `--screenshot=${join(dir, `s${i}.png`)}`, `file://${join(dir, `s${i}.html`)}`], { timeout: 60e3 });
-      await run(FFMPEG, ['-y', '-loglevel', 'error', '-loop', '1', '-i', join(dir, `s${i}.png`), '-i', join(dir, `s${i}.wav`), '-af', 'apad', '-t', seconds.toFixed(2),
+      await run(CHROMIUM, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--disable-extensions', '--hide-scrollbars', '--no-first-run', `--user-data-dir=${join(dir, 'chrome')}`, '--window-size=1280,720', `--screenshot=${join(dir, `s${i}.png`)}`, `file://${join(dir, `s${i}.html`)}`], { timeout: 60e3 });
+      await run(FFMPEG, ['-y', '-loglevel', 'error', '-threads', '2', '-loop', '1', '-i', join(dir, `s${i}.png`), '-i', join(dir, `s${i}.wav`), '-af', 'apad', '-t', seconds.toFixed(2),
         '-c:v', 'libx264', '-tune', 'stillimage', '-pix_fmt', 'yuv420p', '-r', '25', '-c:a', 'aac', '-ar', '44100', '-ac', '1', join(dir, `s${i}.mp4`)], { timeout: 120e3 });
       parts.push({ file: `s${i}.mp4`, seconds, heading: s.heading, start });
       start += seconds;
