@@ -3,6 +3,24 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1949 (1 Nov, evening)
+
+Chi's review of 1555 (#55–#58):
+- **A "?" guide for buttons people mix up (#58, Son's spec)**: cards like slides, two side by side for a
+  choice, a small drawing each; shown the first time the button is used and from the "?"; "Don't show this
+  again" kept in this browser per account. On the two photo buttons, "Find it or choose a part" and
+  "Upload your child's work".
+- **Photo buttons (#57)**: "Photo of a book page" and "Photo of marked work"; whose work is chosen before the
+  photos are read; a book-page photo that looks like marked work offers to switch and read it again.
+- **Work sheets (#55a)**: "273 + x = 321" style sums are worked out by code.
+- **English sub-units (#55b)**: "1.4 Let's put on a play!" starts its own part; a printed range is shown only
+  if it fits the part.
+- **Pages (#55c)**: a slide's page stays inside its part (pages were converted twice).
+- **Question count (#55d)**: the Assign step leads with the lesson's number of practice questions.
+- **A lesson that fails at the end (#55e)** gives back all its credits, and is less likely to fail.
+- **Word-order hints (#55f)**: the first word, then the first two.
+- **Removing a source in use (#56)** cannot hang; an error shows at the top and the page is never locked.
+
 ## v1.0.20261101.1555 (1 Nov, afternoon)
 
 From live tests of the items not tried on live before:
