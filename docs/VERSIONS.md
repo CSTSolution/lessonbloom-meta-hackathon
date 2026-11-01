@@ -3,6 +3,14 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.2307 (1 Nov, night)
+
+From the live English test of 2246:
+- A child's English worksheet is looked for by what its wrong questions say ("What colour is it?"); the model
+  names the kind after the exercise ("Fill in the missing word"), which found no part. Checked live: found.
+- A book item asking the very question of the child's own item is left out.
+- The child's greeting does not repeat a kind named after the exercise.
+
 ## v1.0.20261101.2246 (1 Nov, night)
 
 Chi's review of 1949 (#59–#62):
