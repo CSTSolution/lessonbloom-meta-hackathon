@@ -208,7 +208,8 @@ const TIP: Partial<Record<WorkKind, Words>> = {
   find_missing: { vi: 'Thử lại bằng phép tính ngược để kiểm tra.', en: 'Check with the opposite sum.' },
 };
 const TIP_ANY: Words = { vi: 'Làm từ hàng đơn vị, cẩn thận từng hàng.', en: 'Start from the ones, one column at a time.' };
-const show = (q: string) => tidy(q).replace(/ - /g, ' − ').replace(/ \? /g, ' … ');
+// the sum as printed, without a trailing "=" or "= ?" (live test 1 Nov: "329 cm + 183 cm =, con viết…")
+const show = (q: string) => tidy(q).replace(/\s*=\s*\??\s*$/, '').replace(/ - /g, ' − ').replace(/ \? /g, ' … ');
 
 export function workSlide(w: Work, kinds: WorkKind[], lang: Lang, parent: boolean): Slide {
   const L = lang === 'en' ? 'en' : 'vi', you = parent ? 'con' : 'em';
@@ -222,7 +223,9 @@ export function workSlide(w: Work, kinds: WorkKind[], lang: Lang, parent: boolea
   const top = types[0], tip = (top && TIP[top.kind]) || TIP_ANY;
   bullets.push(tip[L]);
   const first = top && w.questions.find((q) => !q.ok && q.kind === top.kind && q.calc && !q.calc.cmp && q.calc.blank === 'result');
-  const example = first?.calc ? `${first.calc.a} ${SIGN[first.calc.op!]} ${first.calc.b} = ${first.right}` : undefined;
+  // with the unit on every number when the sheet had one ("329 cm + 183 cm = 512 cm")
+  const u = first?.calc?.unit ? ` ${first.calc.unit}` : '';
+  const example = first?.calc ? `${first.calc.a}${u} ${SIGN[first.calc.op!]} ${first.calc.b}${u} = ${first.right}` : undefined;
   const names = joinW(types.map((t) => lower(t.label[L])), L === 'en' ? 'and' : 'và');
   const slip = types.map((t) => w.questions.find((q) => !q.ok && q.kind === t.kind && q.slip)?.slip?.[L]).find(Boolean);
   return {

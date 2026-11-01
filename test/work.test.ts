@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { checkItem, contextOf } from '../server/lesson/items.ts';
 import { checkSlide } from '../server/lesson/slide-check.ts';
 import type { Setup } from '../server/lesson/types.ts';
-import { applyWork, forPrompt, greetOf, slipOf, readCalc, titled, typeWork } from '../server/lesson/work.ts';
+import { applyWork, forPrompt, greetOf, slipOf, readCalc, titled, typeWork, workSlide } from '../server/lesson/work.ts';
 import { areaWithBook, testServer } from './helpers.ts';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -174,4 +174,12 @@ test('a word problem answered with the working ("64 - 28 = 46 (quả)") is judge
   assert.ok(wrong.slip, 'the slip is found from 46');
   const right = typeWork({ questions: [{ q, sum: '64 - 28', child: '64 - 28 = 36 (quả)', mark: 'right' }] }).questions[0];
   assert.deepEqual([right.ok, right.unsure], [true, undefined], 'a right answer with its working is not flagged');
+});
+
+test('the opening slide shows a sum with units as printed, without a trailing "=" (live test, 1 Nov)', () => {
+  const w = typeWork({ questions: [{ q: '329 cm + 183 cm =', child: '999 cm', mark: 'wrong' }, { q: '47 + 25 =', child: '62', mark: 'wrong' }] }, { date: '2026-11-01' });
+  const s = workSlide(w, ['add_carry'], 'vi', true);
+  assert.equal(s.bullets[0], 'Phép cộng có nhớ: 329 cm + 183 cm, con viết 999 cm. Đúng là 512 cm.');
+  assert.equal(s.bullets[1], 'Phép cộng có nhớ: 47 + 25, con viết 62. Đúng là 72.');
+  assert.equal(s.example, '329 cm + 183 cm = 512 cm');
 });

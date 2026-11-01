@@ -3,6 +3,22 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1310 (1 Nov, afternoon)
+
+Chi's five priorities of 1 Nov noon:
+- **Lessons from a child's work (#54)**: sums with units ("329 cm + 183 cm") and word problems are worked
+  out by code; a row whose mark and sum disagree is not a mistake until she chooses Right / Wrong ("1 to
+  check"); "Make a lesson from these mistakes" picks the source whose number range reaches the sheet.
+- **Video step (#53)**: no tick until the video is there ("being made", "not made yet", "English only").
+- **Read again to split into lessons (#48)**: for a book still in one part; from its kept text or PDF for
+  free, or from its kept page pictures at the scan price (the estimate first). Each book now keeps its
+  page text.
+- **English practice (#52)**: matching says "Match each word to its picture."; pictures that read as
+  another word are not used; a wrong fill-in's hint is about its gap; numbers in words, built by code.
+- **Hints (#50)**: the second wrong try shows the lesson's method from the numbers, the third the whole
+  working; advice leads with the newest repeated mistake; "Learning now" is the lesson assigned last;
+  mistake labels follow the screen's language.
+
 ## v1.0.20261101.1213 (1 Nov, noon)
 
 - **Videos for English lessons only, for now** (Chi #49): the server's Vietnamese voice loads a model of
