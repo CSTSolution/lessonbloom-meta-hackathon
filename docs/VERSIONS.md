@@ -3,6 +3,20 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1424 (1 Nov, afternoon)
+
+The rest of Chi's review (Vietnamese books are no longer worked on):
+- **Safari (#26)**: a PDF the browser cannot open is judged text or scanned by the same rule as Chrome, so
+  a scan read on our server gets the page range, the credit estimate, the hold and "page k/N".
+- **Pages as printed (#53)**: slides, practice and the new-lesson screen show the page numbers printed in
+  the book, like Knowledge; the progress ends with the lesson's real number of practice questions.
+- **Small things (#51)**: a parent's summary no longer says "the whole class"; only the newest lesson is
+  "Today", the others "Another lesson"; a removed source leaves the list at once; a lesson's page range
+  no longer moves with small differences between two readings of the same scan.
+- **Assign** picks the child whose work the lesson was made from.
+- **English**: the hint for a wrong option is about that option (checked never to give the answer); "Which
+  is 321 in words?" with word options; practice built by code from a child's own wrong English answers.
+
 ## v1.0.20261101.1328 (1 Nov, afternoon)
 
 From the live test of 1310 (a made-up sheet read by the real model):
