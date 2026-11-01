@@ -3,6 +3,20 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.2246 (1 Nov, night)
+
+Chi's review of 1949 (#59–#62):
+- **"Only what you gave" or the whole part (#60)**: after "Find in the source", every kind of material asks how
+  much the lesson covers; "only what you gave" (chosen first) uses just the pages the material was found on, even
+  inside a one-part book, and makes the material the lesson's required focus. A lesson from the child's work is
+  narrow too.
+- **Lesson size (#61)**: from a whole part at most 10 slides and 20 practice items; from narrow material at most 7
+  and 12; flashcards at most 8.
+- **Feedback in the app (#62)**: a Feedback button (type, text, optional screenshot, page and version), "Is this
+  lesson useful?" once per lesson, "Report" on each practice item; shown in the admin view and emailed to
+  hello@cstsolution.com ("lessonbloom-meta: …").
+- **Lessons headings (#59)** open and close on their own.
+
 ## v1.0.20261101.2123 (1 Nov, evening)
 
 - **One photo button (Chi #57, option B)**: "Take / add photos" replaces the two photo buttons. The photos are
