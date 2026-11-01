@@ -3,6 +3,15 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1328 (1 Nov, afternoon)
+
+From the live test of 1310 (a made-up sheet read by the real model):
+- A word problem answered with its working ("64 - 28 = 46 (quả)") is judged by the number after the last
+  "=", so a right answer written with its working is no longer flagged; the model is asked for the final
+  answer only.
+- The opening slide shows the child's sums as printed: no trailing "=", and the unit on every number
+  ("329 cm + 183 cm = 512 cm").
+
 ## v1.0.20261101.1310 (1 Nov, afternoon)
 
 Chi's five priorities of 1 Nov noon:
