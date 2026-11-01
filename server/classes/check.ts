@@ -142,11 +142,24 @@ function readHint(it: MathIt, given: string, lang: 'vi' | 'en'): string {
   return w ? (vi ? `Số ${n} đọc là “${w}”. ${tail}` : `${n} in words is “${w}”. ${tail}`) : tail;
 }
 
+// Words in order (Chi #55: no hint at all after a wrong try): the first word, then the first two (or one more than
+// she already has right), by code; always at least two cards left for her, so it never gives the sentence away.
+function orderHint(answer: string, given: string, lang: 'vi' | 'en', wrongBefore: number): string {
+  const w = String(answer).trim().split(/\s+/).filter(Boolean), g = norm(given).split(' ');
+  let have = 0;
+  while (have < w.length && norm(w[have]) === g[have]) have++;
+  const k = Math.min(Math.max(wrongBefore + 1, have + 1), 2, w.length - 2);
+  if (k < 1) return '';
+  const start = w.slice(0, k).join(' ').replace(/[,;:]$/, '');
+  return lang === 'en' ? `Start with “${start}”.` : `Câu bắt đầu bằng “${start}”.`;
+}
+
 export function hintOf(it: Item, given = '', lang: 'vi' | 'en' = 'vi', wrongBefore = 0): string {
   if (it.subject === 'math') return mathHint(it, given, lang, wrongBefore);
   const x = String(it.explain || '');
   // English: these explanations are the answer itself (the sentence, the pairs): no hint; others hide the word
-  if (it.template === 'match' || it.template === 'order') return '';
+  if (it.template === 'match') return '';
+  if (it.template === 'order') return orderHint(it.answer, given, lang, wrongBefore);
   const esc = it.answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), hide = (s: string) => (esc ? s.replace(new RegExp(`(?<!\\p{L})${esc}(?!\\p{L})`, 'giu'), '___') : s);
   // Chi #52: the reason for the very option she picked ("floor": the floor is lava), else the explanation, the answer hidden
   const why = Object.entries(it.why || {}).find(([o]) => norm(o) === norm(given))?.[1];

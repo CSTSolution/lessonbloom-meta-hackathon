@@ -21,7 +21,7 @@ const T = {
     title: 'Kho kiến thức', lead: 'Bài chỉ soạn từ các nguồn này, ghi rõ trang.', add: '+ Thêm nguồn kiến thức', private: 'Chỉ bạn xem được, không chia sẻ.', all: 'Tất cả', math: 'Toán', english: 'Tiếng Anh',
     sources: (n: number) => `${n} nguồn`, reading: (n: number) => `${n} đang đọc`, ready: 'Sẵn sàng', grade: (g: number) => `Lớp ${g}`, pages: (n: number) => `${n} trang`,
     status: { processing: 'Đang đọc tài liệu…', ready: 'Sẵn sàng', error: 'Lỗi' }, errors: { interrupted: 'Việc đọc sách bị ngắt khi máy chủ khởi động lại; lượt đã giữ được trả lại. Cô xoá nguồn này rồi thêm lại nhé.', scanned: 'Tài liệu là ảnh chụp. Cô xoá nguồn này rồi thêm lại tệp: app sẽ đọc từng trang ảnh (có dự kiến lượt trước).', failed: 'Chưa đọc được tệp này.', stopped: 'Cô đã dừng việc đọc, nên sách không được thêm; lượt chưa dùng đã được trả lại.', credits: 'Lượt đã giữ không đủ để đọc hết sách, nên sách không được thêm (app không giữ một phần sách); lượt chưa dùng đã được trả lại.', unreadable: 'Không đọc được chữ trên các trang này. Cô xem ảnh có rõ, đúng chiều không, rồi xoá và thêm lại nhé.', blocked: 'Nội dung không dùng được.' },
-    view: 'Xem tài liệu', remove: 'Xoá khỏi kho', removeAsk: 'Xoá nguồn này khỏi kho? Bài đã soạn vẫn còn.', parts: (n: number) => `Phạm vi kiến thức (${n})`, partsLead: 'Mỗi bài chỉ chọn một phạm vi làm giới hạn kiến thức.',
+    view: 'Xem tài liệu', remove: 'Xoá khỏi kho', removeAsk: 'Xoá nguồn này khỏi kho? Bài đã soạn vẫn còn.', removing: 'Đang xoá…', slow: 'Máy chủ xoá nguồn này lâu quá. Cô tải lại trang sau một phút để xem nguồn đã được xoá chưa nhé.', parts: (n: number) => `Phạm vi kiến thức (${n})`, partsLead: 'Mỗi bài chỉ chọn một phạm vi làm giới hạn kiến thức.',
     page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', source: 'Xem nguồn', mapTab: 'Bản đồ kiến thức', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
     splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', inFile: (n: number) => `trang ${n} trong file`,
     oneLesson: 'Sách này chưa chia được bài, bạn tách tay theo trang: bấm "Tách" và chọn trang bắt đầu bài tiếp theo.',
@@ -35,7 +35,7 @@ const T = {
     title: 'Knowledge', lead: 'Lessons come only from these sources, with their pages.', add: '+ Add a source', private: 'Only you can see these; nothing is shared.', all: 'All', math: 'Maths', english: 'English',
     sources: (n: number) => `${pl(n, 'source')}`, reading: (n: number) => `${n} reading`, ready: 'Ready', grade: (g: number) => `Grade ${g}`, pages: (n: number) => `${pl(n, 'page')}`,
     status: { processing: 'Reading…', ready: 'Ready', error: 'Error' }, errors: { interrupted: 'Reading was interrupted by a server restart; the held credits were given back. Remove this source and add it again.', scanned: 'The file is scanned pictures. Remove this source and add the file again: the app will read each page picture (with a credit estimate first).', failed: 'This file could not be read.', stopped: 'You stopped the reading, so the book was not added; the unused credits came back.', credits: 'The held credits were not enough to read the whole book, so it was not added (LessonBloom keeps no part of a book); the unused credits came back.', unreadable: 'No text could be read on these pages. Check the pictures are clear and the right way up, then remove and add them again.', blocked: 'This content cannot be used.' },
-    view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
+    view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', removing: 'Removing…', slow: 'The server is taking too long to remove this source. Reload the page in a minute to see whether it is gone.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
     page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', source: 'View source', mapTab: 'Knowledge map', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
     splitAt: 'Split from page', newTitle: 'New part name', inFile: (n: number) => `page ${n} in the file`,
     oneLesson: 'This book could not be split into lessons; split it by page: press "Split" and choose the page where the next lesson starts.',
@@ -54,18 +54,30 @@ export function Knowledge() {
   // "/knowledge?add=1" opens the add form at once: the way in from an empty "+ New lesson" (Chi #39)
   const [adding, setAdding] = useState(() => new URLSearchParams(location.search).has('add'));
   const [tab, setTab] = useState<'parts' | 'map'>('parts'), [source, setSource] = useState('');
-  const [edit, setEdit] = useState<{ id: string; mode: 'rename' | 'split'; title: string; page: number } | null>(null), [pickMerge, setPickMerge] = useState(''), [err, setErr] = useState(''), [busy, setBusy] = useState('');
+  const [edit, setEdit] = useState<{ id: string; mode: 'rename' | 'split'; title: string; page: number } | null>(null), [pickMerge, setPickMerge] = useState(''), [err, setErr] = useState({ what: '', text: '' }), [busy, setBusy] = useState('');
   // only the newest answer is shown: a poll sent before a delete and answered after it put the source back (Chi #51c)
   const seq = useRef(0);
   const load = () => { const n = ++seq.current; return api.areas().then((r) => { if (n !== seq.current) return; setAreas(r.areas); setSel((s) => s || r.areas[0]?.id || ''); }).catch(() => { if (n === seq.current) setAreas([]); }); };
-  const gone = async (id: string) => { setAreas((xs) => xs && xs.filter((x) => x.id !== id)); setSel(''); await load(); };
-  const loadSections = () => sel ? api.area(sel).then((r) => setSections(r.sections)).catch(() => setSections([])) : Promise.resolve();
+  // a removed source leaves nothing behind (Chi #56): its parts, an open "View source", a rename or merge in progress
+  const gone = async (id: string) => { setAreas((xs) => xs && xs.filter((x) => x.id !== id)); setSel(''); setSections([]); setSource(''); setEdit(null); setPickMerge(''); await load(); };
+  // the parts of the source shown now, newest answer only (another source's parts never land on this one)
+  const secSeq = useRef(0);
+  const loadSections = () => { const n = ++secSeq.current; if (!sel) { setSections([]); return Promise.resolve(); } return api.area(sel).then((r) => { if (n === secSeq.current) setSections(r.sections); }).catch(() => { if (n === secSeq.current) setSections([]); }); };
   useEffect(() => { void load(); }, []);
   useEffect(() => { if (!areas?.some((a) => a.books.some((b) => b.status === 'processing'))) return; const id = setTimeout(load, 2000); return () => clearTimeout(id); }, [areas]);
   useEffect(() => { void loadSections(); setAll(false); setEdit(null); setPickMerge(''); }, [sel, areas]);
-  useEffect(() => { setSource(''); }, [sel]);
+  // another source chosen: the parts shown so far are not its parts, even for a moment (Chi #56)
+  useEffect(() => { setSource(''); setSections([]); setErr({ what: '', text: '' }); }, [sel]);
   useEffect(() => { if (!areas) return; const sh = areas.filter((x) => (!subject || x.subject === subject) && (!grade || x.grade === grade)); if (!sh.some((x) => x.id === sel)) setSel(sh[0]?.id || ''); }, [subject, grade, areas]);
-  const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); setErr(''); try { await fn(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(''); } };
+  // every action ends: its message where she is looking, and the page free again (Chi #56)
+  const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); setErr({ what: '', text: '' }); try { await fn(); } catch (e) { setErr({ what, text: e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String((e as Error)?.message || e) }); } finally { setBusy(''); } };
+  // Remove never waits forever (Chi #56: the source stayed, with no message): a source already gone counts as removed
+  const remove = (id: string) => run('del', async () => {
+    let h = 0;
+    const slow = new Promise<never>((_, no) => { h = window.setTimeout(() => no(new ApiError('slow', T.vi.slow, T.en.slow, 0)), 30e3); });
+    try { await Promise.race([api.deleteArea(id), slow]); } catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; } finally { clearTimeout(h); }
+    await gone(id);
+  });
   if (!areas) return null;
   const shown = areas.filter((a) => (!subject || a.subject === subject) && (!grade || a.grade === grade));
   const grades = [...new Set(areas.filter((a) => !subject || a.subject === subject).map((a) => a.grade))].sort();
@@ -108,7 +120,8 @@ export function Knowledge() {
           <div className="row"><div className="grow"><h2>{a.name}</h2><span className="small muted">{t[a.subject]} · {t.grade(a.grade)} · {book?.source === 'scan' ? 'Scan' : book?.source === 'text' ? (lang === 'en' ? 'Text' : 'Chữ') : 'PDF'}{book?.pages ? ` · ${t.pages(book.pages)}` : ''}</span></div>
             {/* only an uploaded PDF is kept on the server; a book read in the browser left only its text */}
             {book && (book.source ?? 'pdf') === 'pdf' && <a className="btn small" href={`/api/t/books/${book.id}/file`} target="_blank" rel="noreferrer">{t.view}</a>}
-            <button className="btn small danger" onClick={async () => { if (await ask(t.removeAsk, { ok: t.remove, danger: true })) void run('del', async () => { await api.deleteArea(a.id); await gone(a.id); }); }}>{t.remove}</button></div>
+            <button className="btn small danger" disabled={busy === 'del'} onClick={async () => { if (await ask(t.removeAsk, { ok: t.remove, danger: true }).catch(() => false)) void remove(a.id); }}>{busy === 'del' ? t.removing : t.remove}</button></div>
+          {err.what === 'del' && <p className="note" role="alert">{err.text}</p>}
           {book && <BookStatus t={t} book={book} sections={sections.length} onChange={load} onAgain={async () => { await api.deleteArea(a.id).catch(() => {}); await gone(a.id); setAdding(true); }} />}
           {book?.status === 'ready' && !book.printed && <PageOne key={book.id} t={t} book={book} onSaved={async () => { await load(); }} />}
           <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => { setTab(k); setSource(''); }}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
@@ -142,7 +155,7 @@ export function Knowledge() {
           <div className="row">{sections.length > 6 && !all && <button className="link small" onClick={() => setAll(true)}>{t.seeAll(sections.length)}</button>}<span className="grow" />
             {sections.length > 1 && <button className="btn small" onClick={() => setPickMerge(pickMerge ? '' : 'pick')}>{pickMerge ? t.cancel : t.merge}</button>}</div>
           </>}
-          {err && <p className="note">{err}</p>}
+          {err.text && err.what !== 'del' && <p className="note" role="alert">{err.text}</p>}
         </div>}
       </div>}
     </div>

@@ -13,7 +13,7 @@ import { checkItem, contextOf, rangeOf, regroups } from './items.ts';
 import { checkSlide, issueWords, type SlideIssue } from './slide-check.ts';
 import { fill, langName, maxWords, slideCount, SLIDES_SCHEMA } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Op, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
-import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides } from './writer.ts';
+import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides, type ItemRequest } from './writer.ts';
 import { applyWork, forPrompt } from './work.ts';
 
 const LEVEL_WORDS: Record<Level, { vi: string; en: string }> = { basic: { vi: 'cơ bản', en: 'basic' }, good: { vi: 'khá', en: 'good' }, advanced: { vi: 'nâng cao', en: 'advanced' } };
@@ -187,7 +187,9 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
         if (!skills.length) return { error: 'save_plan first' };
         if (itemCalls >= LIMITS.maxItemCalls || items.length >= LIMITS.maxItems) return { error: 'item limit reached; move on' };
         itemCalls++;
-        const r = await writeItems(ai, setup, source, skills, { skill: clip(a.skill, 40), template: clip(a.template, 20), level: (['basic', 'good', 'advanced'].includes(a.level) ? a.level : 'basic') as Level, count: Math.min(4, Number(a.count) || 3) }, nextId, items);
+        // one batch the writer cannot give (busy, cut off) is the agent's to ask again, not the end of its run (Chi #55)
+        const r = await writeItems(ai, setup, source, skills, { skill: clip(a.skill, 40), template: clip(a.template, 20), level: (['basic', 'good', 'advanced'].includes(a.level) ? a.level : 'basic') as Level, count: Math.min(4, Number(a.count) || 3) }, nextId, items).catch((e) => e as Error);
+        if (r instanceof Error) { console.warn(`[agent] write_items failed: ${String(r.message).slice(0, 200)}`); return { error: 'that batch could not be written; ask again or move on' }; }
         const room = LIMITS.maxItems - items.length;
         items.push(...r.kept.slice(0, room)); rejected.push(...r.rejected);
         // the teacher sees the skill's name and the level in words, never the internal tag (Chi, 29 Oct)
@@ -264,7 +266,15 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     changes.push('The agent stopped early; the app completed the lesson.');
   }
 
-  // Code completes anything the agent did not do.
+  // Code completes anything the agent did not do. A batch of items or the flashcards the model cannot give here
+  // (busy, cut off, blocked) only leaves those out: it no longer loses the whole lesson after the self-check, with
+  // the credits it had used (Chi #55: "Chưa soạn được bài này"; the second try worked)
+  const more = async (req: ItemRequest): Promise<Item[]> => {
+    try { const r = await writeItems(ai, setup, source, skills, req, nextId, items); rejected.push(...r.rejected); return r.kept; }
+    catch (e) { console.warn(`[agent] items for ${req.skill} (${req.level}) left out: ${String((e as Error)?.message).slice(0, 200)}`); return []; }
+  };
+  // a column skill is practised in columns (Chi #47)
+  const templateFor = (k: Skill, level: Level) => (setup.subject === 'math' ? (k.kind === 'column' ? 'column' : level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill'));
   if (!skills.length || !outline.length) {
     const p = await planLesson(ai, setup, source);
     skills = skills.length ? skills : p.skills; outline = outline.length ? outline : p.outline;
@@ -277,8 +287,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     if (!col) { col = { tag: skills.some((k) => k.tag === 'dat_tinh') ? 'dat_tinh_cot' : 'dat_tinh', name: setup.lang === 'en' ? 'Column addition and subtraction' : 'Đặt tính rồi tính', kind: 'column' }; skills = [...skills, col]; }
     for (const level of ['basic', 'good', 'advanced'] as Level[]) {
       if (!columnGaps(setup, source, skills, items).length) break;
-      const r = await writeItems(ai, setup, source, skills, { skill: col.tag, template: 'column', level, count: 3 }, nextId, items);
-      items.push(...r.kept); rejected.push(...r.rejected);
+      items.push(...await more({ skill: col.tag, template: 'column', level, count: 3 }));
     }
     while (items.length > LIMITS.maxItems) {
       const count = new Map<string, number>();
@@ -290,14 +299,20 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   }
   for (const k of skills) for (const level of ['basic', 'good'] as Level[]) {
     if (items.length >= LIMITS.maxItems || items.some((i) => i.skill === k.tag && i.level === level)) continue;
-    // a column skill is practised in columns (Chi #47)
-    const template = setup.subject === 'math' ? (k.kind === 'column' ? 'column' : level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill');
-    const r = await writeItems(ai, setup, source, skills, { skill: k.tag, template, level, count: 3 }, nextId, items);
-    items.push(...r.kept); rejected.push(...r.rejected);
+    items.push(...await more({ skill: k.tag, template: templateFor(k, level), level, count: 3 }));
   }
-  if (!cards.length) cards = await writeCards(ai, setup, source);
+  if (!cards.length) cards = await writeCards(ai, setup, source).catch((e) => { console.warn(`[agent] flashcards left out: ${String((e as Error)?.message).slice(0, 200)}`); return [] as Card[]; });
   // Last line of defence: every item passes the checks once more against the final skills.
   items = items.filter((i) => !checkItem(i, { ...ctx(), items }).length).slice(0, LIMITS.maxItems);
+  // Too few left (Chi #55): one more batch for the skill with the fewest items, at the level it lacks, before the AI review
+  // (which never drops below the minimum); one call at most, within maxItems
+  if (items.length < LIMITS.minItems && skills.length) {
+    const has = (k: Skill) => items.filter((i) => i.skill === k.tag).length, k = [...skills].sort((x, y) => has(x) - has(y))[0];
+    const level: Level = items.some((i) => i.skill === k.tag && i.level === 'basic') ? 'good' : 'basic';
+    const got = (await more({ skill: k.tag, template: templateFor(k, level), level, count: Math.min(4, LIMITS.minItems - items.length) })).slice(0, LIMITS.maxItems - items.length);
+    items.push(...got);
+    if (got.length) await say(`Thêm ${got.length} câu luyện tập cho đủ bài.`, `Added ${got.length} practice item${got.length === 1 ? '' : 's'} so the lesson has enough.`);
+  }
   // Then the AI second review (Chi's doc 2): Muse Spark reads them once more; it can only drop.
   const rv = await reviewItems(ai, setup, source, skills, items, LIMITS.minItems);
   if (rv.rejected.length) { items = rv.kept; rejected.push(...rv.rejected); changes.push(setup.lang === 'en' ? `The AI review removed ${rv.rejected.length} item${rv.rejected.length === 1 ? '' : 's'}.` : `Bước AI rà soát bỏ ${rv.rejected.length} câu.`); }
@@ -319,6 +334,8 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     }
   }
 
+  // nothing to teach or practise is not a lesson: it fails, and its held credits all come back (Chi #55)
+  if (!slides.length || !items.length) throw new Error(`no ${slides.length ? 'practice' : 'slides'} could be written`);
   if (!note) note = setup.lang === 'en'
     ? `I made ${slides.length} slides, ${items.length} practice items and ${cards.length} flashcards from the section of your book. Every item passed the code checks.`
     : `Trợ lý đã soạn ${slides.length} slide, ${items.length} câu luyện tập và ${cards.length} thẻ nhớ từ phần bài trong sách của cô. Mọi câu đều đã qua bộ kiểm tra.`;

@@ -37,8 +37,11 @@ const UNIT = /(\d)\s*(cm|dm|mm|km|m|kg|g|ml|l|đồng|giờ|phút|ngày|tuổi|q
 // ("64 - 28 = 46 (quả)", live test 1 Nov) the one after the last "="
 export const numIn = (s: string) => { const m = /\d+(?:[.,]\d+)?/.exec(s.includes('=') ? s.slice(s.lastIndexOf('=') + 1) : s); return m ? Number(m[0].replace(',', '.')) : NaN; };
 
+// "find x" (Chi #55: "273 + x = 321" was "Other", right answer "?"): a lone letter is the blank, like "?" or "…";
+// after the units are set aside, so "m" or "g" after a number stays a unit. "Tìm x:" before the sum is dropped.
+const LETTER = /(?<![\p{L}\d])[a-z](?![\p{L}\d])/gu, FIND_X = /^(?:tìm|find)\s+[a-z]\s*[:,.]?\s*/iu;
 export function readCalc(q: string): Calc | null {
-  const units = new Set<string>(), t0 = tidy(q).replace(UNIT, (_, d: string, u: string) => { units.add(u.toLowerCase()); return d; });
+  const units = new Set<string>(), t0 = tidy(q).replace(FIND_X, '').replace(UNIT, (_, d: string, u: string) => { units.add(u.toLowerCase()); return d; }).replace(LETTER, '?');
   const x = calcOf(t0);
   return x && units.size === 1 ? { ...x, unit: [...units][0] } : units.size > 1 ? null : x;
 }
@@ -292,7 +295,7 @@ export function workItems(qs: WorkQ[], kind: WorkKind, skill: string, lang: Lang
   for (const q of own) {
     const x = q.calc!;
     if (x.cmp) out.push(compareItem(id(), skill, x.a, x.op, x.b, x.c!, (q.child.match(/[<>=]/)?.[0]) ?? '=', lang, 'basic'));
-    else if (x.blank !== 'result') out.push({ ...buildMath({ template: 'fill', skill, level: 'basic', a: x.blank === 'a' ? Number(q.right) : x.a, op: x.op!, b: x.blank === 'b' ? Number(q.right) : x.b!, blank: x.blank, explain: '' }, id(), lang), fromWork: true });
+    else if (x.blank !== 'result') out.push({ ...buildMath({ template: 'fill', skill, level: 'basic', a: x.blank === 'a' ? numIn(q.right) : x.a, op: x.op!, b: x.blank === 'b' ? numIn(q.right) : x.b!, blank: x.blank, explain: '' }, id(), lang), fromWork: true });
     else out.push({ ...buildMath({ template: x.op === '+' || x.op === '-' ? 'column' : 'fill', skill, level: 'basic', a: x.a, op: x.op!, b: x.b!, blank: 'result', explain: explainOf(x.a, x.op!, x.b!, lang) }, id(), lang), fromWork: true });
   }
   const x = own[0]?.calc;

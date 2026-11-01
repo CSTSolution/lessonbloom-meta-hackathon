@@ -140,14 +140,19 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     // when it is all done (pictures and video too). One job at a time per account: it waits in her line.
     const need = config.guard.lessonCredits, hold = { used: 0 };
     await holdCredits(d.sql, t.id, need, id);
-    const settle = () => settleHold(d.sql, t.id, id, hold.used).catch((e) => console.error(`[lesson] ${id} settle: ${(e as Error).message}`));
+    // a lesson that could not be made charges nothing: all its hold comes back (Chi #55: 8 credits gone for "Chưa soạn được bài này")
+    const settle = (failed = false) => settleHold(d.sql, t.id, id, failed ? 0 : hold.used).catch((e) => console.error(`[lesson] ${id} settle: ${(e as Error).message}`));
+    // each slide's and item's page is stored as the place in the file (the lesson page shows it as printed): sectionOf
+    // gives printed pages, shown once more there ("tr. 20" on a part of pages 10–14, Chi #55)
+    const filePage = new Map((await d.sql.query<{ id: string; page: number }>('select id, page from passages where section_id = $1', [m.section.id])).map((p) => [p.id, Number(p.page)]));
+    const passages = m.passages.map((p) => ({ ...p, page: filePage.get(p.id) ?? p.page }));
     await d.jobs.add(t.id, 'lesson', id, setup.title,
       async () => {
         // when its turn comes the app must still have its budget, or it stops here
         const b = await d.budget.check(t.id);
         if (b && b !== 'credits') { await lessons.step(id, 'Ứng dụng đang tạm dừng soạn bài. Cô thử lại sau nhé; lượt đã giữ được trả lại.', 'Making lessons is paused for now. Please try again later; the held credits came back.'); await lessons.fail(id); await settle(); return; }
         await new Promise<void>((ready) => {
-          void d.held(t.id, hold, () => runLesson(d.ai, lessons, id, ai, source, { files: d.files, budget: d.budget, teacherId: t.id, held: true, passages: m.passages, sql: d.sql, onReady: ready }), undefined, id).finally(settle);
+          void d.held(t.id, hold, () => runLesson(d.ai, lessons, id, ai, source, { files: d.files, budget: d.budget, teacherId: t.id, held: true, passages, sql: d.sql, onReady: ready }), undefined, id).then((made) => settle(!made), () => settle());
         });
       },
       async () => { await d.sql.query(`delete from lessons where id = $1 and teacher_id = $2 and status = 'working'`, [id, t.id]); await settle(); }, need);

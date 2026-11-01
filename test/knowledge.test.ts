@@ -7,10 +7,10 @@ import { migrate } from '../server/db/migrate.ts';
 import { pgliteSql } from '../server/db/sql.ts';
 import { ingestBook, ingestPages, paragraphs, printedPages, sectionsFrom } from '../server/knowledge/ingest.ts';
 import { readPdf } from '../server/knowledge/pdf.ts';
-import { candidates, citation, findSection, NoMatch, terms, verify } from '../server/knowledge/search.ts';
+import { candidates, citation, findSection, NoMatch, printedRange, terms, verify } from '../server/knowledge/search.ts';
 import { scopeOf } from '../server/lesson/items.ts';
 import { sectionOf } from '../server/knowledge/routes.ts';
-import { areaWithBook, testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
 const TOAN = await readFile(new URL('../samples/books/toan2.pdf', import.meta.url));
 
@@ -125,6 +125,32 @@ test('Kết nối tri thức keeps to "Bài N": a "LUYỆN TẬP" banner inside 
     { page: 10, text: 'LUYỆN TẬP\n2 Số?' },
   ];
   assert.deepEqual(parts(pages), [['Bài 1: Ôn tập các số đến 100', 7, 8], ['Bài 2: Tia số. Số liền trước, số liền sau', 9, 10]]);
+});
+
+test('an English book\'s numbered sub-units ("1.4 Let\'s put on a play!") each start a part, which ends where the next starts (Chi #55b)', () => {
+  const pages = [
+    { page: 1, text: '# 1.3 Animal homes\nRead and match.\nA bird lives in a nest.', printed: 6 },
+    { page: 2, text: 'Look at the pictures. Where does a fox live?', printed: 7 },
+    { page: 3, text: 'Write about an animal home.\n1.5 m + 2.3 m\n2.5 kg of rice.', printed: 8 },
+    { page: 4, text: "1.4 Let's put on a play!\nRead the play with your friends.", printed: 9 },
+    { page: 5, text: 'Act it out in groups.', printed: 10 },
+    { page: 6, text: 'Who was your favourite character?', printed: 11 },
+    { page: 7, text: '1.5\nMAMMALS AND BIRDS\nMammals have fur. Birds have feathers.', printed: 12 },
+    { page: 8, text: 'Sort the animals: mammal or bird?', printed: 13 },
+    { page: 9, text: 'Unit 2: Our world\n2.1 Maps and places\nFind the river on the map.', printed: 14 },
+    { page: 10, text: 'Draw a map of your street.', printed: 15 },
+  ];
+  assert.deepEqual(parts(pages), [
+    ['1.3 Animal homes', 1, 3],
+    ["1.4 Let's put on a play!", 4, 6],
+    ['1.5 Mammals and birds', 7, 8],
+    ['2.1 Maps and places', 9, 10],
+  ]);
+  // the whole file is printed 6-15; a part's printed range comes from its own pages only
+  const shown = (n: number) => pages.find((p) => p.page === n)?.printed ?? null;
+  assert.deepEqual(printedRange(shown, 4, 6), { printedFrom: 9, printedTo: 11 });
+  assert.deepEqual(printedRange((n) => (n === 6 ? 15 : shown(n)), 4, 6), { printedFrom: null, printedTo: null }, '6-15 is never shown for three file pages');
+  assert.deepEqual(printedRange(shown, 1, 10), { printedFrom: 6, printedTo: 15 });
 });
 
 test('a book split by Muse Spark keeps its pages as in the file (a scan of pages 58-77 is not pages 1-20) (Chi #48)', async () => {
@@ -283,4 +309,34 @@ test('API: the same file added again is found by its fingerprint, for its owner 
   // a reading that failed can be added again without the warning
   await s.sql.query(`update books set status = 'error' where id = 'bk1'`);
   assert.equal((await call('POST', '/api/t/areas/same', { fingerprint: fp })).json.same, null);
+});
+
+test('API: a source used by a lesson, and assigned to a class, can be removed; the lesson and the assignment stay (Chi #56)', async () => {
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  await call('POST', '/api/t/role', { role: 'teacher', name: 'Ms Hanh', subject: 'math', classes: ['2A'] });
+  const { areaId } = await areaWithBook(call, 'maths2');
+  const { id, lesson, match } = await lessonFrom(call, areaId, 'Lesson 21 adding with regrouping');
+  assert.equal(lesson.status, 'ready');
+  const k = (await call('GET', '/api/t/classes')).json.classes[0];
+  await call('POST', `/api/t/classes/${k.id}/pupils`, { names: 'Mia' });
+  const a = (await call('POST', `/api/t/lessons/${id}/assign`, { classId: k.id, confirmed: true })).json.assignment;
+  // the part shows "Used in 1 lesson", as Chi saw it
+  assert.equal((await call('GET', `/api/t/areas/${areaId}`)).json.sections.find((x: any) => x.id === match.sectionId).lessons, 1);
+  const del = await call('DELETE', `/api/t/areas/${areaId}`);
+  assert.equal(del.status, 200, JSON.stringify(del.json));
+  assert.ok(!(await call('GET', '/api/t/areas')).json.areas.some((x: any) => x.id === areaId), 'the source is gone');
+  assert.equal((await s.sql.one<{ n: number }>('select count(*)::int as n from sections where id = $1', [match.sectionId]))?.n, 0, 'with its parts');
+  const kept = (await call('GET', `/api/t/lessons/${id}`)).json.lesson;
+  assert.equal(kept.status, 'ready');
+  assert.ok(kept.source.length > 50 && kept.items.length, 'the lesson keeps its own copy of the text');
+  const kid = s.client('198.51.100.56'), room = (await kid('GET', `/api/p/class/${k.code}`)).json;
+  await kid('POST', '/api/p/enter', { code: k.code, pupilId: room.pupils[0].id });
+  assert.ok((await kid('GET', `/api/p/a/${a.id}`)).json.lesson.items.length, 'the assigned lesson still opens for the child');
+  assert.equal((await call('DELETE', `/api/t/areas/${areaId}`)).status, 404, 'removed once');
+  // a book (not the whole source) used by a lesson goes the same way
+  const b = await areaWithBook(call, 'maths2'), l2 = await lessonFrom(call, b.areaId, 'Lesson 21 adding with regrouping');
+  assert.equal((await call('DELETE', `/api/t/books/${b.bookId}`)).status, 200);
+  assert.equal((await call('GET', `/api/t/areas/${b.areaId}`)).json.books.length, 0);
+  assert.equal((await call('GET', `/api/t/lessons/${l2.id}`)).json.lesson.status, 'ready');
 });

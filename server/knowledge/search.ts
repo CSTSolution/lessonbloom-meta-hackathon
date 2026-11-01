@@ -96,10 +96,12 @@ export async function shownPages(sql: Sql, bookId: string): Promise<Shown> {
   const m = new Map(rows.map((r) => [Number(r.page), Number(r.printed)]));
   return (page) => m.get(page) ?? (one && page - one + 1 >= 1 ? page - one + 1 : null);
 }
-// a range is shown as printed only when both ends are known, so it never mixes the two numberings
+// a range is shown as printed only when both ends are known, so it never mixes the two numberings; and only
+// when it fits the part's own pages (Chi #55b: "6–15" must never stand for a part of fewer file pages). A
+// spread ("[page N]") holds two printed pages on one file page, so up to twice as many is allowed.
 export const printedRange = (shown: Shown, from: number, to: number) => {
   const a = shown(from), b = shown(to);
-  return a != null && b != null ? { printedFrom: a, printedTo: b } : { printedFrom: null, printedTo: null };
+  return a != null && b != null && b >= a && b - a <= 2 * (to - from) + 1 ? { printedFrom: a, printedTo: b } : { printedFrom: null, printedTo: null };
 };
 export const pagesLabel = (s: { pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null }) => {
   const [a, b] = s.printedFrom != null && s.printedTo != null ? [s.printedFrom, s.printedTo] : [s.pageFrom, s.pageTo];

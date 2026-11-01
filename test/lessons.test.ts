@@ -7,7 +7,7 @@ import type { ChatMsg, ChatTurn, Endpoint, ToolSpec } from '../server/ai/types.t
 import { buildLesson, columnGaps, LIMITS, reviewLesson } from '../server/lesson/agent.ts';
 import { checkItem, contextOf, regroups } from '../server/lesson/items.ts';
 import { intake } from '../server/lesson/writer.ts';
-import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
+import { areaWithBook, lessonFrom, settled, testServer } from './helpers.ts';
 
 const MATH = await readFile(new URL('../samples/toan-lop2-cong-co-nho.txt', import.meta.url), 'utf8');
 const ENG = await readFile(new URL('../samples/tieng-anh-lop3-colours.txt', import.meta.url), 'utf8');
@@ -154,4 +154,64 @@ test('a lesson shows its slides\' and items\' pages as printed in the book, like
   assert.match(l.refs[0].vi, new RegExp(`tr\\. ${a.lesson.refs[0].pageFrom - 1}`), 'the citation shows the printed page too');
   const sec = (await call('GET', `/api/t/areas/${areaId}`)).json.sections.find((x: any) => x.id === a.match.sectionId);
   assert.equal(sec.printed_from, sec.page_from - 1, 'Knowledge shows the same numbering');
+});
+
+// Chi #55: a Cambridge lesson ended "Chưa soạn được bài này" after the self-check and 8 credits were gone. A batch
+// the model cannot give at the end only leaves its items out, a lesson short of items gets one more batch, and a
+// lesson that still cannot be made gives back all its held credits and says so.
+class Flaky extends Scripted {
+  down = new Set<Endpoint>(); revive = true;
+  override async json<T>(req: Parameters<MockProvider['json']>[0]): Promise<T> {
+    if (req.endpoint === 'cards' && this.revive) this.down.delete('items');   // the items writer is back after the flashcards
+    if (this.down.has(req.endpoint)) throw new Error(`${req.endpoint} failed: busy`);
+    return super.json<T>(req);
+  }
+}
+test('a batch that fails at the end leaves its items out; a lesson short of items gets one more batch (Chi #55)', async () => {
+  const ai = new Flaky([]), setup = await intake(ai, MATH, 'vi'), steps: string[] = [];
+  ai.down.add('items');
+  const b = await buildLesson(ai, setup, MATH, (vi) => { steps.push(vi); });
+  assert.ok(b.items.length > 0 && b.items.length <= 4, `one more batch after the last check: ${b.items.length}`);
+  assert.ok(steps.some((x) => /^Thêm \d+ câu luyện tập cho đủ bài\.$/.test(x)), steps.join(' | '));
+  const none = new Flaky([]);
+  none.down.add('items'); none.revive = false;
+  await assert.rejects(buildLesson(none, setup, MATH), /no practice/, 'no practice at all: the lesson is not made');
+});
+
+test('API: a lesson that cannot be made gives back all its held credits and says so (Chi #55)', async () => {
+  const s = await testServer(), call = s.client('198.51.100.181');
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'toan2');
+  const match = (await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Bài 21' })).json.match;
+  const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: match.sectionId })).json;
+  s.ai.answers.set('slides', () => { throw new Error('slides failed: busy'); });
+  const { id } = (await call('POST', '/api/t/lessons', { areaId, sectionId: match.sectionId, request: 'Bài 21', setup })).json;
+  let l: any;
+  for (let i = 0; i < 400; i++) { l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson; if (l.status !== 'working') break; await new Promise((r) => setTimeout(r, 20)); }
+  assert.equal(l.status, 'error');
+  assert.match(l.steps.at(-1).vi, /Chưa soạn được bài này\. Không tốn lượt nào/);
+  assert.match(l.steps.at(-1).en, /No credits were used/);
+  await settled(s.sql, id);
+  const log = await s.sql.query<{ reason: string; credits: string }>(`select reason, credits from credit_log where ref = $1 order by reason`, [id]);
+  assert.deepEqual(log.map((x) => [x.reason, Number(x.credits)]), [['hold', -20], ['refund', 20]], 'the whole hold came back');
+});
+
+// Chi #55: "tr. 20" on a slide of a part shown as pages 10–14. The part's pages were printed numbers already and the
+// lesson page turned them into printed numbers once more; now they are stored as the place in the file, inside the part.
+test('a slide\'s and an item\'s page is always one of its own part\'s pages, as printed (Chi #55)', async () => {
+  const { inPart, pageOf } = await import('../server/lesson/lessons.ts');
+  const ps = [{ page: 10, text: 'Phép cộng có nhớ 36 + 27 = 63' }, { page: 11, text: 'Đặt tính rồi tính 45 + 38' }];
+  assert.equal(pageOf('Đặt tính rồi tính 45 + 38', ps), 11);
+  assert.notEqual(pageOf('tr. 20 Đặt tính 45 + 38', ps), 20, 'a page number in the quote is not a page');
+  assert.equal(inPart(20, ps), undefined); assert.equal(inPart(11, ps), 11);
+  const s = await testServer(), call = s.client('198.51.100.182');
+  await call('POST', '/api/auth/demo');
+  const { areaId, bookId } = await areaWithBook(call, 'toan2');
+  // the book's page 1 is the file's page 2, set before the lesson is made
+  assert.equal((await call('PUT', `/api/t/books/${bookId}/page-one`, { pageOne: 2 })).status, 200);
+  const a = await lessonFrom(call, areaId, 'Bài 21');
+  const r = a.lesson.refs[0], pages = [...a.lesson.slides, ...a.lesson.items].map((x: any) => x.page).filter(Boolean);
+  assert.ok(pages.length, 'slides and items carry their page');
+  assert.ok(pages.every((p: number) => p >= r.pageFrom - 1 && p <= r.pageTo - 1), `printed pages ${r.pageFrom - 1}–${r.pageTo - 1}: ${pages.join(', ')}`);
+  assert.match(r.vi, new RegExp(`tr\\. ${r.pageFrom - 1}$`));
 });

@@ -56,6 +56,13 @@ const capitals = (line: string) => {
 };
 // a numbered heading of one lesson (not of a chapter or topic): such a book keeps to its numbers
 const LESSON_NO = /^(bài|tiết|unit|lesson)\s/iu;
+// An English book's numbered sub-unit, "1.4 Let's put on a play!", "3.2 Fractions": each is its own lesson
+// (Chi #55b: with no word before the number it was not seen, so 1.4 ran on into 1.5 "Mammals and birds").
+// The title starts with a capital and reads as a title, so "1.5 m + 2.3 m" or "2.5 kg of rice." is not one.
+const SUB = /^(\d{1,2}\.\d{1,2})\.?(?:\s*[:\-–]\s*|\s+)(.+)$/u, SUB_BARE = /^(\d{1,2}\.\d{1,2})\.?$/u;
+const subTitle = (t: string) => t.length <= 90 && /^[\p{Lu}"“'‘]/u.test(t) && !/[.:;,]$/.test(t) && (t.match(/\p{L}{2,}/gu) ?? []).length >= 2
+  && t.replace(/[\p{L}\s'’"“”‘!?,-]/gu, '').length * 2 <= (t.match(/\p{L}/gu) ?? []).length;
+const subHead = (no: string, t: string) => `${no} ${sentence(t.trim())}`;
 
 type Kind = 'number' | 'title';
 // The page's lines, with each heading found (a bare "Bài 1" takes the next line as its title).
@@ -69,6 +76,10 @@ function linesOf(text: string): { text: string; heading: boolean; kind?: Kind }[
     if (PAGE_NO.test(line)) { if (line.startsWith('[')) top = 0; out.push({ text: line, heading: false }); continue; }
     top++;
     if (line.length <= 120 && HEADING.test(line)) { out.push({ text: tidy(line), heading: true, kind: 'number' }); continue; }
+    const sub = SUB.exec(line);
+    if (sub && subTitle(sub[2])) { out.push({ text: subHead(sub[1], sub[2]), heading: true, kind: 'number' }); continue; }
+    // "1.4" in a badge, its title on the next line, at the top of the page
+    if (top <= 3 && SUB_BARE.test(line) && next && subTitle(next) && !HEADING.test(next)) { out.push({ text: subHead(line.replace(/\.$/, ''), next), heading: true, kind: 'number' }); i++; top++; continue; }
     if (BARE.test(line)) {
       const hasTitle = next && next.length <= 100 && !HEADING.test(next) && !BARE.test(next) && /^\p{L}/u.test(next);
       out.push({ text: hasTitle ? titled(line.replace(/[\s:.\-–]+$/, ''), next) : line.replace(/[\s:.\-–]+$/, ''), heading: true, kind: 'number' });
@@ -94,7 +105,7 @@ export function paragraphs(pages: PdfPage[]): { page: number; text: string; head
   const read = pages.map((p) => ({ page: p.page, lines: linesOf(p.text) }));
   // a book whose lessons are numbered ("Bài 21", "Unit 3") keeps to them: a title in capitals there is a
   // part inside a lesson ("LUYỆN TẬP"), as before (Chi #48)
-  const numbered = read.reduce((n, p) => n + p.lines.filter((l) => l.heading && l.kind === 'number' && LESSON_NO.test(l.text)).length, 0) >= 2;
+  const numbered = read.reduce((n, p) => n + p.lines.filter((l) => l.heading && l.kind === 'number' && (LESSON_NO.test(l.text) || SUB.test(l.text))).length, 0) >= 2;
   const out: { page: number; text: string; heading: boolean }[] = [];
   for (const p of read) {
     let cur: string | null = null;
@@ -151,7 +162,7 @@ export function passagesOf(s: Section): { page: number; text: string }[] {
   return out;
 }
 
-const TOC_SYSTEM = `You build the table of contents of a primary-school book from the first lines of each page. Return the lessons or units in order: title (as printed, short) and the page where it starts. A lesson title may have no number: some books print it in capitals at the top of the page where the lesson starts (for example "PHÉP CỘNG (KHÔNG NHỚ) TRONG PHẠM VI 1000", "LUYỆN TẬP", "LUYỆN TẬP CHUNG"); each such title starts its own lesson, and a lesson is usually 1-4 pages. Never an exercise or an instruction. Only what the lines show; the page is the number in [p…].`;
+const TOC_SYSTEM = `You build the table of contents of a primary-school book from the first lines of each page. Return the lessons or units in order: title (as printed, short) and the page where it starts. A lesson title may have no number: some books print it in capitals at the top of the page where the lesson starts (for example "PHÉP CỘNG (KHÔNG NHỚ) TRONG PHẠM VI 1000", "LUYỆN TẬP", "LUYỆN TẬP CHUNG"); each such title starts its own lesson, and a lesson is usually 1-4 pages. A numbered sub-unit ("1.4 Let's put on a play!", "1.5 Mammals and birds") starts its own lesson too, so a lesson ends where the next one starts. Never an exercise or an instruction. Only what the lines show; the page is the number in [p…].`;
 const TOC_SCHEMA = { type: 'object', properties: { sections: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, page: { type: 'integer' } }, required: ['title', 'page'] } } }, required: ['sections'] };
 
 // A book with no recognisable headings: Muse Spark reads page openings and lists where lessons start.

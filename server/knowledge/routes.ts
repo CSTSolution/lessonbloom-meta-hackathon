@@ -494,24 +494,36 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     await sql.query('update books set page_one = $2 where id = $1', [bk.id, n]);
     return c.json({ ok: true, pageOne: n });
   });
+  // Removing a source (Chi #56: one with a part used in a lesson stayed, with no message). Its rows go first,
+  // in one transaction that waits a few seconds at most for a row another request holds; lessons already
+  // made stay (they keep their own copy of the text, assignments theirs; only the link area_id is cleared).
+  // Her kept files in R2 go after, for a few seconds at most each: a slow storage call never keeps the
+  // source, nor holds the page; what is left is finished in the background.
+  const removeBooks = async (c: Context<Env>, bookIds: string[], rows: (q: Sql) => Promise<unknown>) => {
+    const keys = bookIds.length ? await sql.query<{ key: string }>('select key from book_files where book_id = any($1::text[])', [bookIds]) : [];
+    try {
+      await sql.tx(async (q) => { await q.query(`set local lock_timeout = '8s'`); await rows(q); });
+    } catch (e) {
+      console.error(`[book] remove ${bookIds.join(',')}: ${String((e as Error)?.message).slice(0, 300)}`);
+      return c.json({ code: 'removeBusy', error: 'Chưa xoá được nguồn này (máy chủ đang bận với nó, ví dụ một bài đang soạn từ nguồn). Cô thử lại sau ít phút nhé.', errorEn: 'This source could not be removed yet (the server is busy with it, for example a lesson being made from it). Please try again in a few minutes.' }, 409);
+    }
+    const files = (async () => {
+      for (const f of keys) await Promise.race([d.store?.del(f.key), new Promise((r) => setTimeout(r, 5000))]).catch((e) => console.warn(`[files] ${f.key}: ${(e as Error).message}`));
+      for (const id of bookIds) { await rm(bookFile(id), { force: true }).catch(() => {}); await rm(scanDir(id), { recursive: true, force: true }).catch(() => {}); }
+    })();
+    await Promise.race([files, new Promise((r) => setTimeout(r, 10_000))]);
+    return c.json({ ok: true });
+  };
   app.delete('/api/t/areas/:id', async (c) => {
     const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
     if (!a) return fail(c, 'notFound', 404);
     const books = await sql.query<{ id: string }>('select id from books where area_id = $1', [a.id]);
-    for (const b of books) await dropFiles(b.id);
-    await sql.query('delete from areas where id = $1', [a.id]);
-    const { unlink } = await import('node:fs/promises');
-    for (const b of books) await unlink(bookFile(b.id)).catch(() => {});
-    return c.json({ ok: true });
+    return removeBooks(c, books.map((b) => b.id), (q) => q.query('delete from areas where id = $1', [a.id]));
   });
   app.delete('/api/t/books/:id', async (c) => {
     const ok = await sql.one('select 1 from books b join areas a on a.id = b.area_id where b.id = $1 and a.teacher_id = $2', [c.req.param('id'), c.get('teacher').id]);
     if (!ok) return fail(c, 'notFound', 404);
-    await dropFiles(c.req.param('id'));
-    await sql.query('delete from books where id = $1', [c.req.param('id')]);
-    const { unlink } = await import('node:fs/promises');
-    await unlink(bookFile(c.req.param('id'))).catch(() => {});
-    return c.json({ ok: true });
+    return removeBooks(c, [c.req.param('id')], (q) => q.query('delete from books where id = $1', [c.req.param('id')]));
   });
 
   // "View source" (Son, 30 Oct): one part of her book as it was read, page by page, and where its original

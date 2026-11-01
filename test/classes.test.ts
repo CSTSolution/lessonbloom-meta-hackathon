@@ -112,6 +112,21 @@ test('hints: the second wrong try shows the method, built by code from the numbe
   }
 });
 
+// Chi #55: words in order gave no hint after a wrong try. Code gives the first word, then the first two, and
+// always leaves at least two cards for her; matching keeps no hint.
+test('words in order: the first word, then the first two, never the whole sentence (Chi #55)', async () => {
+  const { hintOf } = await import('../server/classes/check.ts');
+  const e = (template: any, answer: string) => ({ id: 'o', subject: 'english', template, skill: 's', level: 'basic', prompt: 'Put the words in order.', explain: `The right sentence: ${answer}`, answer, words: answer.split(' ').reverse() }) as Item;
+  const it = e('order', 'It is a red kite.');
+  assert.equal(hintOf(it, 'a red kite is It', 'en', 0), 'Start with “It”.');
+  assert.equal(hintOf(it, 'a red kite is It', 'en', 1), 'Start with “It is”.');
+  assert.equal(hintOf(it, 'a red kite is It', 'vi', 3), 'Câu bắt đầu bằng “It is”.', 'Vietnamese words for a vi lesson, still two at most');
+  assert.equal(hintOf(it, 'It a red kite is', 'en', 0), 'Start with “It is”.', 'one more than she already has right');
+  assert.equal(hintOf(e('order', 'I like cats.'), 'cats like I', 'en', 5), 'Start with “I”.', 'three words: two cards stay hers');
+  assert.equal(hintOf(e('order', 'Hello Sam'), 'Sam Hello', 'en', 0), '');
+  assert.equal(hintOf(e('match', 'red=🔴,blue=🔵'), 'blue=🔴,red=🔵', 'en', 1), '');
+});
+
 test('the answer route: a nudge on the first wrong try, the method on the second (Chi #50)', async () => {
   const { hintOf } = await import('../server/classes/check.ts');
   const s = await testServer(), call = s.client();

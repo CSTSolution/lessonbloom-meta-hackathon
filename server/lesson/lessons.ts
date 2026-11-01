@@ -79,11 +79,23 @@ export function itemPage(it: Item, passages: { page: number; text: string }[]): 
   return best[0];
 }
 
-export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; held?: boolean; passages?: { page: number; text: string }[]; sql?: Sql ; onReady?: () => void}) {
+// A page of the part, or none (Chi #55: "tr. 20" on a slide of a part shown as pages 10–14): a slide or an item never
+// shows a page outside its own part's pages
+export function inPart(page: number | undefined, passages: { page: number }[]): number | undefined {
+  if (page === undefined || !passages.length) return undefined;
+  const ps = passages.map((p) => p.page);
+  return page >= Math.min(...ps) && page <= Math.max(...ps) ? page : undefined;
+}
+
+// true when the lesson was made (pictures and the video may still have failed after); false when it could not
+// be made: its held credits all come back (the caller settles at 0), and the message says so (Chi #55)
+export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Setup, source: string, pics?: { files: Files; budget: Budget; teacherId: string; held?: boolean; passages?: { page: number; text: string }[]; sql?: Sql ; onReady?: () => void}): Promise<boolean> {
+  let made = false;
   try {
     const b = await buildLesson(ai, setup, source, (vi, en) => lessons.step(id, vi, en));
-    if (pics?.passages) for (const s of b.slides) { const p = pageOf(s.source, pics.passages); if (p) s.page = p; }
-    if (pics?.passages) for (const it of b.items) it.page = itemPage(it, pics.passages);
+    const ps = pics?.passages;
+    if (ps) for (const s of b.slides) { const p = inPart(pageOf(s.source, ps), ps); if (p) s.page = p; else delete s.page; }
+    if (ps) for (const it of b.items) it.page = inPart(itemPage(it, ps), ps);
     // a teaching slide whose words are not in the book section is left out, while enough slides remain
     // (the opening slide on the child's own mistakes comes from her work, not the book: it stays, Chi #46)
     const loose = b.slides.filter((s) => !['title', 'summary'].includes(s.kind) && !s.fromWork && !grounded(s.source, source));
@@ -96,6 +108,7 @@ export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Set
     await lessons.step(id, `Xong! Bài có ${b.slides.length} slide và ${n} câu luyện tập (sau khi bỏ câu trùng, câu chưa đạt). Cô xem bài giảng và ghi chú của trợ lý nhé. Hình minh họa đang được vẽ thêm.`, `Done! The lesson has ${b.slides.length} slides and ${n} practice question${n === 1 ? '' : 's'} (after dropping repeats and items that failed the checks). Have a look at the lesson and the agent's note. Pictures are on their way.`);
     if (setup.make && !setup.make.cards) b.cards = [];   // she asked for no flashcards
     await lessons.finish(id, b);
+    made = true;
     pics?.onReady?.();   // the lesson is there: her next job may start while pictures and the video follow
     if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides, pics.held);
     // the video, made after the pictures (local voices, free) unless she asked for none
@@ -103,10 +116,13 @@ export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Set
       const l = await pics.sql.one<Lesson>('select * from lessons where id = $1', [id]);
       if (l && l.status === 'ready') { await pics.sql.query(`update lessons set video_status = 'working:0' where id = $1`, [id]); await makeVideo({ sql: pics.sql, ai, files: pics.files }, l, { subtitles: true, voice: 0 }); }
     }
+    return true;
   } catch (e) {
     // the teacher sees a plain message; details stay in the server log
-    console.error(`[lesson] ${id} failed: ${String((e as Error)?.stack || e).slice(0, 1500)}`);
-    await lessons.step(id, 'Chưa soạn được bài này. Cô thử lại sau ít phút nhé.', 'This lesson could not be made. Please try again in a few minutes.').catch(() => {});
+    console.error(`[lesson] ${id} failed${made ? ' after it was made (pictures or video)' : ''}: ${String((e as Error)?.stack || e).slice(0, 1500)}`);
+    if (made) return true;   // a picture or the video failing never turns a finished lesson into an error
+    await lessons.step(id, 'Chưa soạn được bài này. Không tốn lượt nào: lượt đã giữ được trả lại hết. Cô thử lại sau ít phút nhé.', 'This lesson could not be made. No credits were used: the held credits all came back. Please try again in a few minutes.').catch(() => {});
     await lessons.fail(id);
+    return false;
   } finally { pics?.onReady?.(); }
 }

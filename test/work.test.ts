@@ -33,6 +33,14 @@ test("Chi's sheet: totals, right answers by code and the kinds of mistake", () =
   assert.equal(slipOf(readCalc('36 + 27')!, '53')?.vi, 'Quên nhớ 1 sang hàng chục');
   assert.equal(slipOf(readCalc('52 − 28')!, '34')?.en, 'Forgot the borrowed 1 in the tens');
   assert.deepEqual(readCalc('? + 25 = 60'), { a: 0, op: '+', b: 25, c: 60, blank: 'a' });
+  // Chi #55: "find x" is a missing number too, worked out by code; a right answer is not flagged, an unmarked one is judged by code
+  assert.deepEqual(readCalc('273 + x = 321'), { a: 273, op: '+', b: 0, c: 321, blank: 'b' });
+  assert.deepEqual(readCalc('Tìm x: x − 218 = 609'), { a: 0, op: '-', b: 218, c: 609, blank: 'a' });
+  assert.deepEqual(readCalc('5 kg + y = 9 kg'), { a: 5, op: '+', b: 0, c: 9, blank: 'b', unit: 'kg' }, 'a unit stays a unit');
+  assert.equal(readCalc('I have a cat'), null);
+  const fx = typeWork({ questions: [{ q: '273 + x = 321', child: 'x = 48', mark: 'right', kind: 'other', right: '?' }, { q: 'x − 218 = 609', child: '827', mark: 'right', kind: 'other', right: '?' }, { q: '□ − 218 = 609', child: '391', mark: 'none' }] });
+  assert.deepEqual(fx.questions.map((q) => [q.kind, q.right, q.ok, !!q.unsure]), [['find_missing', '48', true, false], ['find_missing', '827', true, false], ['find_missing', '827', false, false]]);
+  assert.deepEqual([fx.right, fx.wrong, fx.check], [2, 1, undefined]);
   assert.equal(titled('Luyện tập chung', w, 'vi', true), 'Luyện tập chung · Soạn riêng cho MAI · từ bài làm ngày 31/10');
   assert.equal(titled('Review', { date: '2026-10-31' }, 'en', true), "Review · Made from your child's work of 31/10");
   assert.equal(greetOf(w)?.vi, 'Hôm trước con còn vướng phép trừ có nhớ và so sánh sau khi cộng, hôm nay mình luyện lại nhé.');
