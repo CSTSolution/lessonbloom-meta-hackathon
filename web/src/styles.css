@@ -320,3 +320,15 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 /* the child's page: the server did not answer (Chi #49) */
 .p-offline { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 50; display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: #fff4e5; color: #6b3d00; border: 1px solid #f3c27a; box-shadow: 0 6px 20px rgba(0,0,0,.12); font-weight: 600; }
 .p-offline button { border: 0; border-radius: 99px; padding: 8px 14px; background: #b45f06; color: #fff; font: inherit; cursor: pointer; }
+/* the guide for buttons people mix up (Chi #58): cards like slides, two side by side for a choice */
+.guide { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; gap: 12px; }
+.guide-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.guide-col { gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper, #fff); }
+.guide-art { display: flex; justify-content: center; }
+.guide-art svg { width: 100%; max-width: 220px; height: auto; }
+.guide-dots { display: flex; justify-content: center; gap: 6px; }
+.guide-dots i { width: 8px; height: 8px; border-radius: 99px; background: var(--line); cursor: pointer; }
+.guide-dots i.on { background: var(--ink-2, #555); }
+.help-dot { width: 22px; height: 22px; border-radius: 99px; border: 1px solid var(--line); background: #fff; color: var(--ink-2, #555); font: 600 13px/1 inherit; cursor: pointer; padding: 0; margin-left: -4px; }
+.help-dot:hover { border-color: var(--ink-2, #555); }
+@media (max-width: 560px) { .guide-cols { grid-template-columns: 1fr; } }

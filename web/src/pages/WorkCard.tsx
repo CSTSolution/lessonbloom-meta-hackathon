@@ -4,12 +4,13 @@
 // misread now and then, so the whole table can be corrected before anything is made or saved.
 // WorkPanel is the child's "Bài làm" in My children (and a pupil's in a class): upload, the dated records,
 // and "Make a lesson from these mistakes".
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type Work, type WorkQ } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { ask } from '../ask.tsx';
 import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
+import { guideOff, HelpDot, showGuide, TableArt, WorkArt, type GuideCard } from '../guide.tsx';
 
 const T = {
   vi: {
@@ -74,7 +75,16 @@ export function WorkTable({ work, parent, onChange, busy = false }: { work: Work
 
 // "Bài làm" for one child / pupil: upload a marked sheet (saved after she checks the table), the dated
 // records, and a lesson from one of them.
+const workGuide = (lang: string, parent: boolean): GuideCard[] => {
+  const en = lang === 'en', kid = parent ? (en ? 'your child' : 'con') : (en ? 'the pupil' : 'em');
+  return [{ title: en ? `Upload ${kid}'s marked work` : `Tải bài ${kid} đã làm`, cols: [
+    { art: <WorkArt />, title: en ? 'A photo of the marked sheet' : 'Ảnh bài đã chấm', body: en ? `Up to 5 photos of a sheet ${kid} did and an adult marked (ticks and crosses). No names or faces.` : `Tối đa 5 ảnh bài ${kid} đã làm và người lớn đã chấm (dấu đúng, sai). Không cần tên hay mặt.` },
+    { art: <TableArt />, title: en ? 'Check the table' : 'Xem lại bảng', body: en ? 'Each question, what was written and the right answer. Correct a misread answer, then save it to the profile.' : 'Từng câu, chữ viết và đáp án đúng. Sửa câu máy đọc nhầm, rồi lưu vào hồ sơ.' },
+  ], body: en ? `Saved work counts in the learning summary. "Make a lesson from these mistakes" makes a lesson just for ${kid} from your book.` : `Bài làm đã lưu được tính vào Tóm tắt học tập. "Soạn bài từ lỗi này" soạn bài riêng cho ${kid} từ sách của bạn.` }];
+};
+
 export function WorkPanel({ pupilId, name, parent }: { pupilId: string; name: string; parent: boolean }) {
+  const file = useRef<HTMLInputElement | null>(null);
   const t0 = useT(T), lang = useLang(), t = parent ? { ...t0, ...P[lang] } : t0;
   const [list, setList] = useState<Work[] | null>(null), [draft, setDraft] = useState<Work | null>(null), [busy, setBusy] = useState(''), [err, setErr] = useState(''), [msg, setMsg] = useState('');
   const load = () => api.pupilWork(pupilId).then((r) => setList(r.records)).catch(() => setList([]));
@@ -84,7 +94,9 @@ export function WorkPanel({ pupilId, name, parent }: { pupilId: string; name: st
   return (
     <div className="stack" style={{ gap: 10 }}>
       <div className="row"><h3 className="grow">{t.work} · {name}</h3>
-        <label className="btn small primary">{busy === 'read' ? t.reading : t.upload}<input type="file" accept="image/*" multiple hidden disabled={!!busy} onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) void read(fs); }} /></label></div>
+        {/* the first time, what this does before the photos are chosen (Chi #58); "Got it" opens the picker */}
+        <label className="btn small primary" onClick={(e) => { if (!guideOff('childwork') && !busy) { e.preventDefault(); void showGuide('childwork', workGuide(lang, parent)).then(() => file.current?.click()); } }}>{busy === 'read' ? t.reading : t.upload}<input ref={file} type="file" accept="image/*" multiple hidden disabled={!!busy} onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) void read(fs); }} /></label>
+        <HelpDot label={lang === 'en' ? 'What does this do?' : 'Nút này để làm gì?'} onClick={() => void showGuide('childwork', workGuide(lang, parent))} /></div>
       <p className="small muted">{t.uploadLead}</p>
       {err && <p className="note small">{err}</p>}
       {msg && <p className="banner small">{msg}</p>}

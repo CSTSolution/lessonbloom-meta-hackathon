@@ -12,6 +12,7 @@ import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
 import { WorkTable } from './WorkCard.tsx';
 import { pagesOf } from './Sources.tsx';
+import { BookArt, FindArt, firstGuide, HelpDot, PartArt, showGuide, TableArt, WorkArt, type GuideCard } from '../guide.tsx';
 
 export const STEPS = { vi: ['Tài liệu', 'Câu hỏi', 'Slide', 'Video', 'Bài tập', 'Giao bài'], en: ['Material', 'Questions', 'Slides', 'Video', 'Practice', 'Assign'] };
 // Chi's role table: Questions (2) is the teacher's step; a parent's run 1, 3, 4, 5, 6, shown as 1-5. The
@@ -27,7 +28,8 @@ export function Stepper({ at, onStep, done = at - 1, parent = false, open = {} }
 const T = {
   vi: {
     save: 'Lưu nháp và thoát', short: (left: number, need: number) => `Bạn có ${left} lượt, một bài cần ${need}. Nhập mã để có thêm lượt, rồi soạn tiếp ngay tại đây.`, shortDemo: 'Đăng nhập bằng email để nhập mã khuyến mãi.', promoPh: 'Mã khuyến mãi', apply: 'Dùng mã', promoOk: (n: number) => `Đã cộng ${n} lượt. Cô soạn tiếp nhé.`, usage: 'Xem lượt dùng', restored: 'Đã mở lại bài đang soạn dở.', discard: 'Bỏ nháp', h1: 'Chọn nguồn và tài liệu tạo bài', lead: 'Bài chỉ soạn trong nguồn cô chọn.', src: 'Nguồn kiến thức', srcLead: 'Để “Tự tìm”, LessonBloom tìm đúng trang.', source: 'Nguồn', part: 'Phạm vi kiến thức', auto: 'Tự tìm theo tài liệu tạo bài', openKnowledge: 'Mở Kho kiến thức',
-    mat: 'Tài liệu tạo bài', matLead: 'Một câu, ảnh bài giảng hoặc ảnh bài tập đã làm.', kinds: { one: 'Một câu mô tả', lesson: 'Ảnh bài giảng', work: 'Ảnh bài tập đã làm', paste: 'Dán văn bản' },
+    mat: 'Tài liệu tạo bài', matLead: 'Một câu, ảnh bài giảng hoặc ảnh bài tập đã làm.', kinds: { one: 'Một câu mô tả', lesson: 'Ảnh trang sách', work: 'Ảnh bài đã làm (đã chấm)', paste: 'Dán văn bản' },
+    help: 'Hai nút ảnh khác nhau thế nào?', helpPart: 'Tự tìm hay chọn phần?', looksWork: 'Ảnh này có vẻ là bài đã làm (có chữ viết tay, dấu chấm hoặc họ tên). Chuyển sang "Ảnh bài đã làm" để app tìm chỗ sai và soạn bài riêng?', toWork: 'Chuyển và đọc lại', pickFirst: 'Chọn con trước khi tải ảnh bài làm.', noChild: 'Chưa gắn với con nào: bài sẽ soạn chung và bài làm không được lưu vào hồ sơ.', noPupil: 'Chưa gắn với em nào: bài sẽ soạn chung và bài làm không được lưu vào hồ sơ.',
     what: 'Bài này cần học gì?', whatPh: 'Ví dụ: Phép cộng có nhớ trong phạm vi 100, tập trung vào nhớ 1 sang hàng chục.', pastePh: 'Dán đoạn văn bản (giáo án, đề bài…) vào đây.', say: '● Nói', stop: '■ Dừng', hearing: 'Đang nghe…',
     lessonPhoto: 'Chụp trang sách hoặc giáo án (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', workPhoto: 'Chụp bài con đã làm (tối đa 5 ảnh). AI nhận ra dạng bài và chỗ sai, rồi tạo bài luyện cùng dạng trong phạm vi đã chọn. Không chụp tên hay mặt.', pick: '+ Chọn ảnh', reading: 'AI đang đọc ảnh…',
     find: 'Tìm trong nguồn', finding: 'Đang tìm…', found: (c: string) => `Đã tìm thấy: ${c}. Bài chỉ dùng các trang này.`, quotes: 'Các đoạn AI đã dùng', mistakes: 'Chỗ con hay sai', notFound: 'Chưa có trong Kho kiến thức. Cô thêm tài liệu hoặc chọn phạm vi khác.',
@@ -42,7 +44,8 @@ const T = {
   },
   en: {
     save: 'Save draft and leave', short: (left: number, need: number) => `You have ${left} credits; a lesson needs ${need}. Enter a code for more, then carry on right here.`, shortDemo: 'Sign in with your email to use a promo code.', promoPh: 'Promo code', apply: 'Apply', promoOk: (n: number) => `${n} credits added. Carry on.`, usage: 'See usage', restored: 'Your unfinished lesson was opened again.', discard: 'Discard draft', h1: 'Choose the source and the material', lead: 'The lesson is made only from the source you choose.', src: 'Source', srcLead: 'With “Find it for me”, LessonBloom finds the right pages.', source: 'Source', part: 'Part', auto: 'Find it from the material', openKnowledge: 'Open Knowledge',
-    mat: 'Lesson material', matLead: 'A sentence, a photo of the lesson or of a finished exercise.', kinds: { one: 'One sentence', lesson: 'Lesson photo', work: 'Finished exercise', paste: 'Paste text' },
+    mat: 'Lesson material', matLead: 'A sentence, a photo of the lesson or of a finished exercise.', kinds: { one: 'One sentence', lesson: 'Photo of a book page', work: 'Photo of marked work', paste: 'Paste text' },
+    help: 'How are the two photo buttons different?', helpPart: 'Find it or choose a part?', looksWork: 'This photo looks like marked work (handwriting, marks or a name). Switch to "Photo of marked work" so the app finds the mistakes and makes a lesson just for them?', toWork: 'Switch and read again', pickFirst: 'Choose the child before adding the photos of their work.', noChild: 'Not linked to a child: the lesson will be general and the work is not kept in a profile.', noPupil: 'Not linked to a pupil: the lesson will be general and the work is not kept in a profile.',
     what: 'What should this lesson teach?', whatPh: 'e.g. Unit 6: colours, the words red, blue and green.', pastePh: 'Paste text (a plan, an exercise…) here.', say: '● Speak', stop: '■ Stop', hearing: 'Listening…',
     lessonPhoto: 'Photograph the book page or your plan (up to 5 photos). No faces, names or personal details.', workPhoto: "Photograph the child's finished exercise (up to 5 photos). The AI finds its kind and the mistakes, then makes practice of the same kind in the chosen part. No names or faces.", pick: '+ Choose photos', reading: 'Reading the photos…',
     find: 'Find in the source', finding: 'Searching…', found: (c: string) => `Found: ${c}. The lesson uses only these pages.`, quotes: 'Passages the AI used', mistakes: 'Mistakes seen', notFound: 'Not in your knowledge area yet. Add material or choose another part.',
@@ -64,6 +67,34 @@ type Kind = 'one' | 'lesson' | 'work' | 'paste';
 let owner = '';
 export const setOwner = (id: string) => { owner = id; };
 const DRAFT = () => `lbm-draft:${owner}`;
+// A photo read as a book page that looks like a child's marked sheet (Chi #57: a worksheet sent as "Lesson
+// photo" made a general lesson for 88 credits): a name line, a score, or several sums with answers.
+const workLike = (tx: string) => /(?:^|\n)\s*(?:họ (?:và )?tên|tên|name|lớp|class|điểm|score)\s*[:.…]/imu.test(tx) || (tx.match(/\d+\s*[+\-−×x:]\s*\d+\s*=\s*\d+/g) ?? []).length >= 3;
+
+// The guides beside the buttons people mix up (Chi #58): the two photo buttons side by side, and finding a part.
+export function guideCards(lang: string, parent: boolean): { photos: GuideCard[]; part: GuideCard[] } {
+  const en = lang === 'en', kid = parent ? (en ? 'your child' : 'con') : (en ? 'the pupil' : 'em');
+  return {
+    photos: [
+      { title: en ? 'Two photo buttons, two different jobs' : 'Hai nút ảnh, hai việc khác nhau', cols: [
+        { art: <BookArt />, title: en ? 'Photo of a book page' : 'Ảnh trang sách', body: en ? 'A page of the book or a lesson plan. The app teaches from what is on it: slides, a video and practice.' : 'Trang sách hoặc giáo án. App soạn bài từ nội dung trên trang: slide, video và bài tập.' },
+        { art: <WorkArt />, title: en ? 'Photo of marked work' : 'Ảnh bài đã làm (đã chấm)', body: en ? `A sheet ${kid} already did and an adult marked. The app reads each question, finds the mistakes and makes a lesson just for ${kid}.` : `Bài ${kid} đã làm và người lớn đã chấm. App đọc từng câu, tìm chỗ ${kid} sai và soạn bài riêng cho ${kid}.` },
+      ] },
+      { title: en ? 'After a photo of marked work' : 'Sau khi tải ảnh bài đã làm', art: <TableArt />,
+        body: en ? `A table shows each question, what ${kid} wrote and the right answer. Correct it if the handwriting was misread, choose whose work it is, then find the part in your book.
+The work is kept in ${kid}'s profile, never in Knowledge. No names or faces in the photo.`
+          : `Bảng hiện từng câu, ${kid} viết gì và đáp án đúng. Sửa nếu máy đọc nhầm chữ viết tay, chọn bài của ${parent ? 'con' : 'em'} nào, rồi tìm phần trong sách.
+Bài làm được lưu vào hồ sơ của ${kid}, không vào Kho kiến thức. Ảnh không cần tên hay mặt.` },
+    ],
+    part: [
+      { title: en ? 'Find it, or choose a part' : 'Tự tìm, hay chọn một phần', cols: [
+        { art: <FindArt />, title: en ? 'Find it from the material' : 'Tự tìm theo tài liệu', body: en ? 'Type a sentence or add a photo below; the app finds the right pages in your book.' : 'Gõ một câu hoặc thêm ảnh ở dưới; app tìm đúng trang trong sách của bạn.' },
+        { art: <PartArt />, title: en ? 'Choose a part' : 'Chọn một phần', body: en ? 'The lesson is made from that whole part. The material below becomes optional: add it only to narrow or stress something.' : 'Bài được soạn từ cả phần đó. Tài liệu ở dưới thành tuỳ chọn: chỉ thêm khi muốn thu hẹp hoặc nhấn mạnh.' },
+      ] },
+    ],
+  };
+}
+
 export interface Draft { areaId: string; sectionId: string; part?: string; kind: Kind; text: string; focus: string; match: Match | null; at: number; work?: Work | null; pupilId?: string }
 export const readDraft = (): Draft | null => {
   try { const d = JSON.parse(localStorage.getItem(DRAFT()) || 'null') as Draft | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; }
@@ -114,10 +145,15 @@ export function Create({ parent }: { parent: boolean }) {
     r.onstop = () => { stream.getTracks().forEach((x) => x.stop()); void run('voice', async () => setText((await api.voice(new Blob(chunks.current, { type: r.mimeType.split(';')[0] || 'audio/webm' }))).text.slice(0, 2000))); };
     r.start(); setRec(r); setTimeout(() => { if (r.state === 'recording') r.stop(); }, 2 * 60e3);
   };
+  const lastPhotos = useRef<File[]>([]), [looksWork, setLooksWork] = useState(false);
   const photos = (fs: File[], what: 'lesson' | 'work') => run('photo', async () => {
+    lastPhotos.current = fs; setLooksWork(false);
     const imgs = await Promise.all(fs.slice(0, 5).map((f) => shrink(f)));
-    if (what === 'work') { const r = await api.work(imgs); setText(r.request); setWork(r.work); setFocus(focusOf(r.work, lang)); if (!sectionId) bestFor(r.work, r.request); } else setText((await api.photos(imgs)).text.slice(0, 2000));
+    if (what === 'work') { const r = await api.work(imgs); setText(r.request); setWork(r.work); setFocus(focusOf(r.work, lang)); if (!sectionId) bestFor(r.work, r.request); }
+    else { const tx = (await api.photos(imgs)).text.slice(0, 2000); setText(tx); setLooksWork(workLike(tx)); }
   });
+  const guides = guideCards(lang, parent);
+  const pickKind = (k: Kind) => { setKind(k); setLooksWork(false); if (k === 'lesson' || k === 'work') void firstGuide('photos', guides.photos); };
   const find = () => run('find', async () => {
     setMissing(false);
     try { setMatch((await api.match(areaId, text)).match); } catch (e) { if (e instanceof ApiError && e.code === 'noMatch') setMissing(true); else throw e; }
@@ -181,7 +217,7 @@ export function Create({ parent }: { parent: boolean }) {
           {noBook}
           <div className="grid2">
             <label className="field">{t.source}<select value={areaId} disabled={!areas.length} onChange={(e) => { setAreaId(e.target.value); setSectionId(''); }}>{areas.length ? areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>) : <option value="">{t.noSource}</option>}</select></label>
-            <label className="field">{t.part}<select value={sectionId} disabled={!areaId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); }}><option value="">{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {pagesOf(s.page_from, s.page_to, s.printed_from, s.printed_to)}</option>)}</select></label>
+            <label className="field"><span className="row" style={{ gap: 6 }}>{t.part}<HelpDot label={t.helpPart} onClick={() => void showGuide('part', guides.part)} /></span><select value={sectionId} disabled={!areaId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); }}><option value="">{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {pagesOf(s.page_from, s.page_to, s.printed_from, s.printed_to)}</option>)}</select></label>
           </div>
           {areas.length > 0 && <button className="link small" style={{ alignSelf: 'start' }} onClick={() => go('/knowledge')}>{t.openKnowledge}</button>}
         </div>
@@ -192,9 +228,13 @@ export function Create({ parent }: { parent: boolean }) {
         </div>}
         {matOpen && <div className="card stack">
           <b><span className={`num ${chosen ? '' : 'cur'}`}>2</span> {t.mat}{chosen && <> <span className="tag">{t.matOpt}</span></>}</b><span className="small muted">{t.matLead}</span>
-          <div className="row">{(Object.keys(t.kinds) as Kind[]).map((k) => <button key={k} className={`btn small ${kind === k ? 'primary' : ''}`} onClick={() => setKind(k)}>{t.kinds[k]}</button>)}</div>
+          <div className="row">{(Object.keys(t.kinds) as Kind[]).map((k) => <span key={k} className="row" style={{ gap: 4 }}><button className={`btn small ${kind === k ? 'primary' : ''}`} onClick={() => pickKind(k)}>{t.kinds[k]}</button>
+            {(k === 'lesson' || k === 'work') && <HelpDot label={t.help} onClick={() => void showGuide('photos', guides.photos)} />}</span>)}</div>
           {(kind === 'lesson' || kind === 'work') && <><p className="small muted">{kind === 'work' ? t.workPhoto : t.lessonPhoto}</p>
-            <label className="btn" style={{ alignSelf: 'start' }}>{busy === 'photo' ? t.reading : t.pick}<input type="file" accept="image/*" multiple hidden disabled={!!busy} onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) void photos(fs, kind); }} /></label></>}
+            {/* whose work, before the photos are read (Chi #57): a parent of several children chooses first */}
+              {kind === 'work' && !pupilId && learners.length > 0 && <p className="banner warn small">{parent && learners.length > 1 ? t.pickFirst : parent ? t.noChild : t.noPupil}</p>}
+            <label className="btn" style={{ alignSelf: 'start' }} aria-disabled={kind === 'work' && parent && learners.length > 1 && !pupilId}>{busy === 'photo' ? t.reading : t.pick}<input type="file" accept="image/*" multiple hidden disabled={!!busy || (kind === 'work' && parent && learners.length > 1 && !pupilId)} onChange={(e) => { const fs = [...(e.target.files || [])]; e.target.value = ''; if (fs.length) void photos(fs, kind); }} /></label>
+            {kind === 'lesson' && looksWork && <div className="banner warn small row"><span className="grow">{t.looksWork}</span><button className="btn small primary" disabled={!!busy} onClick={() => { setKind('work'); setLooksWork(false); setText(''); void photos(lastPhotos.current, 'work'); }}>{t.toWork}</button></div>}</>}
           <label className="field">{t.what}<textarea rows={kind === 'paste' ? 7 : 3} maxLength={kind === 'paste' ? 6000 : 2000} value={text} placeholder={kind === 'paste' ? t.pastePh : t.whatPh} onChange={(e) => { setText(e.target.value); setMatch(null); setMissing(false); }} /></label>
           {kind === 'one' && (rec ? <button className="btn coral small" style={{ alignSelf: 'start' }} onClick={() => { rec.stop(); setRec(null); }}>{t.stop}</button>
             : <button className="btn small" style={{ alignSelf: 'start' }} disabled={!!busy} onClick={() => void record().catch((e) => setErr(String(e.message || e)))}>{busy === 'voice' ? t.hearing : t.say}</button>)}
