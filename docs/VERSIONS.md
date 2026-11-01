@@ -3,6 +3,12 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1440 (1 Nov, afternoon)
+
+- From the live test of 1424: a reason shown for a wrong English option may not call that option "the
+  answer" or "right" (one said "'Blue' is the answer, not the question word."); such a reason is dropped
+  and the model is told not to write it.
+
 ## v1.0.20261101.1424 (1 Nov, afternoon)
 
 The rest of Chi's review (Vietnamese books are no longer worked on):
