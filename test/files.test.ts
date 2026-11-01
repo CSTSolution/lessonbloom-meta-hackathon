@@ -167,7 +167,8 @@ test('"Read again to split into lessons" (Chi #48, #54d): from the kept text, fr
   const spent = before - await credits();
   assert.ok(spent > 0 && spent <= ask.estimate.need, `spent ${spent}`);
   assert.equal(store.objects.size, 5, 'the page pictures are still kept');
-  // now the text is kept: reading again is free
+  // now the text is kept: reading again is free (once the reading's job is over: the book shows ready a moment before)
+  for (let i = 0; i < 200 && (await s.sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [made.book.id])); i++) await wait(15);
   const free = (await call('POST', `/api/t/books/${made.book.id}/resplit`)).json;
   assert.equal(free.free, true);
   assert.equal((await ready(call, area.id, made.book.id)).status, 'ready');
