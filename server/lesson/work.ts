@@ -33,8 +33,9 @@ const CMP = /^(\d{1,7})(?: ?([+-]) ?(\d{1,7}))? ?\? ?(\d{1,7})$/;
 const num = (s: string) => (s === '?' ? undefined : Number(s));
 // "329 cm + 183 cm" is a sum too (Chi #54): one unit after the numbers is set aside and given back with the answer
 const UNIT = /(\d)\s*(cm|dm|mm|km|m|kg|g|ml|l|đồng|giờ|phút|ngày|tuổi|quyển|cái|con|bạn|quả)(?!\p{L})/giu;
-// the number in what she wrote ("486 quyển", "3,5") or in a right answer with its unit
-export const numIn = (s: string) => { const m = /\d+(?:[.,]\d+)?/.exec(s); return m ? Number(m[0].replace(',', '.')) : NaN; };
+// the number in what she wrote ("486 quyển", "3,5") or in a right answer with its unit; in her working
+// ("64 - 28 = 46 (quả)", live test 1 Nov) the one after the last "="
+export const numIn = (s: string) => { const m = /\d+(?:[.,]\d+)?/.exec(s.includes('=') ? s.slice(s.lastIndexOf('=') + 1) : s); return m ? Number(m[0].replace(',', '.')) : NaN; };
 
 export function readCalc(q: string): Calc | null {
   const units = new Set<string>(), t0 = tidy(q).replace(UNIT, (_, d: string, u: string) => { units.add(u.toLowerCase()); return d; });

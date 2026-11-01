@@ -166,3 +166,12 @@ test('Chi #54: "Make a lesson from these mistakes" picks the source whose range 
   assert.ok([small, 'big'].includes(small2.areaId));
   assert.equal((await call('POST', '/api/t/areas/best', { request: 'x', sums: [], subject: 'english' })).json.areaId, null);
 });
+
+test('a word problem answered with the working ("64 - 28 = 46 (quả)") is judged by the number after "=" (live test, 1 Nov)', () => {
+  const q = 'Lan có 64 quả táo, cho bạn 28 quả. Hỏi Lan còn lại bao nhiêu quả táo?';
+  const wrong = typeWork({ questions: [{ q, sum: '64 - 28', child: '64 - 28 = 46 (quả)', mark: 'wrong' }] }).questions[0];
+  assert.deepEqual([wrong.right, wrong.ok, wrong.unsure, wrong.kind], ['36', false, undefined, 'sub_borrow']);
+  assert.ok(wrong.slip, 'the slip is found from 46');
+  const right = typeWork({ questions: [{ q, sum: '64 - 28', child: '64 - 28 = 36 (quả)', mark: 'right' }] }).questions[0];
+  assert.deepEqual([right.ok, right.unsure], [true, undefined], 'a right answer with its working is not flagged');
+});

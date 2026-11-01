@@ -26,7 +26,7 @@ export const SCAN_SCHEMA = { type: 'object', properties: { usable: { type: 'bool
 // The marks come first: handwritten digits are misread now and then, so the model does not re-solve to judge.
 export const WORK_SYSTEM = `You read photos of a primary-school child's finished exercise sheet (Maths or English), usually marked by a parent or teacher. Copy out EVERY question, in order:
 - q: the question exactly as printed, e.g. "655 - 367", "245 + 615 ... 791" (a comparison: the two sides with "..." where the child writes the sign), "? + 25 = 60", or the English item's words. Copy the numbers digit by digit as printed.
-- child: what the child wrote as the answer, exactly ("322", ">", "blue"); "" if left empty. When the child crossed out a digit and wrote another, take the last one written.
+- child: what the child wrote as the answer, exactly ("322", ">", "blue"); for a word problem only the final answer ("46 quả"), not the working; "" if left empty. When the child crossed out a digit and wrote another, take the last one written.
 - mark: the adult's mark next to it: "wrong" for a cross, an "S", a red line or a circle around the answer; "right" for a tick or "Đ"; "none" when there is no mark. Judge by the mark, never by working the sum out yourself.
 - right: only for a question that is not a sum (English, a word problem): the right answer if the adult wrote it, else "".
 - sum: only for a word problem: the one calculation it needs, numbers only, e.g. "964 - 478" ("" if it needs more than one step or none).
