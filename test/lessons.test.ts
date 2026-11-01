@@ -215,3 +215,33 @@ test('a slide\'s and an item\'s page is always one of its own part\'s pages, as 
   assert.ok(pages.every((p: number) => p >= r.pageFrom - 1 && p <= r.pageTo - 1), `printed pages ${r.pageFrom - 1}–${r.pageTo - 1}: ${pages.join(', ')}`);
   assert.match(r.vi, new RegExp(`tr\\. ${r.pageFrom - 1}$`));
 });
+
+test('"Only what you gave" makes a short lesson from the pages found; the whole part stays the other choice (Chi #60, #61)', async () => {
+  const s = await testServer(), call = s.client('198.51.100.190');
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'toan2');
+  // one part of three pages (Bài 21-23), as a Cánh Diều chapter read as one part
+  const secs = () => call('GET', `/api/t/areas/${areaId}`).then((r) => r.json.sections);
+  const b21 = (await secs()).find((x: any) => /Bài 21/.test(x.title));
+  await call('POST', `/api/t/sections/${b21.id}/merge`); await call('POST', `/api/t/sections/${b21.id}/merge`);
+  const part = (await secs()).find((x: any) => x.id === b21.id);
+  assert.deepEqual([part.page_from, part.page_to], [3, 5]);
+  const m = (await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Bài 21: Phép cộng có nhớ 36 + 27' })).json.match;
+  assert.equal(m.sectionId, part.id);
+  assert.ok(m.narrow && m.narrow.pageFrom >= 3 && m.narrow.pageTo < 5, JSON.stringify(m.narrow));
+  const pages = { from: m.narrow.pageFrom, to: m.narrow.pageTo };
+  const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: part.id, pages })).json;
+  const { id } = (await call('POST', '/api/t/lessons', { areaId, sectionId: part.id, request: 'phép cộng có nhớ', setup, pages })).json;
+  let l: any; for (let i = 0; i < 400; i++) { l = (await call('GET', `/api/t/lessons/${id}`)).json.lesson; if (l.status !== 'working') break; await new Promise((r) => setTimeout(r, 20)); }
+  assert.equal(l.status, 'ready');
+  assert.equal(l.setup.scope, 'narrow');
+  assert.deepEqual([l.refs[0].pageFrom, l.refs[0].pageTo], [pages.from, pages.to], 'the lesson cites only those pages');
+  assert.ok(!/Bài 23/.test(l.source), 'the pages outside are not its source');
+  assert.match(l.setup.note, /Trọng tâm|Focus/, 'her material is the required focus');
+  assert.ok(l.slides.length <= 7 && l.items.length <= 12, `${l.slides.length} slides, ${l.items.length} items`);
+  // the whole part: up to 10 slides and 20 items
+  const w = (await call('POST', '/api/t/lessons', { areaId, sectionId: part.id, request: 'phép cộng có nhớ', setup: { ...setup, note: '' } })).json;
+  let l2: any; for (let i = 0; i < 400; i++) { l2 = (await call('GET', `/api/t/lessons/${w.id}`)).json.lesson; if (l2 && l2.status !== 'working') break; await new Promise((r) => setTimeout(r, 20)); }
+  assert.equal(l2.setup.scope, 'part');
+  assert.ok(l2.slides.length <= 10 && l2.items.length <= 20, `${l2.slides.length} slides, ${l2.items.length} items`);
+});

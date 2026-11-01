@@ -18,6 +18,7 @@ export interface Setup {
   make?: { video: boolean; cards: boolean }; // what to make besides slides and practice (Chi's step 2)
   forParent?: boolean;            // made by a parent for their own child at home (Chi #24): no "class", no "teacher"
   work?: Work;                    // made from a photo of the child's finished work (Chi #46): the focus, never the content
+  scope?: 'narrow' | 'part';      // only the pages her material points to, or the whole part (Chi #60); sets the size (#61)
 }
 
 // A skill ("dạng bài") with a kind from a fixed list, so code can check items against it (Chi's rule Q).

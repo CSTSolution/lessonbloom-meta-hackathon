@@ -33,6 +33,7 @@ const T = {
     help: 'Ảnh trang sách hay bài đã làm?', helpPart: 'Tự tìm hay chọn phần?', pickFirst: 'Chọn bài này của con nào, để lưu vào hồ sơ và soạn bài riêng cho con.', noChild: 'Chưa gắn với con nào: bài sẽ soạn chung và bài làm không được lưu vào hồ sơ.', noPupil: 'Chưa gắn với em nào: bài sẽ soạn chung và bài làm không được lưu vào hồ sơ.',
     what: 'Bài này cần học gì?', whatPh: 'Ví dụ: Phép cộng có nhớ trong phạm vi 100, tập trung vào nhớ 1 sang hàng chục.', pastePh: 'Dán đoạn văn bản (giáo án, đề bài…) vào đây.', say: '● Nói', stop: '■ Dừng', hearing: 'Đang nghe…',
     lessonPhoto: 'Chụp trang sách hoặc giáo án (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', workPhoto: 'Chụp bài con đã làm (tối đa 5 ảnh). AI nhận ra dạng bài và chỗ sai, rồi tạo bài luyện cùng dạng trong phạm vi đã chọn. Không chụp tên hay mặt.', pick: '+ Chọn ảnh', reading: 'AI đang đọc ảnh…',
+    scopeQ: 'Soạn bài theo phạm vi nào?', scopeNarrow: (p: string) => `Chỉ theo tài liệu vừa đưa vào · tr. ${p}`, scopeNarrowLead: 'Lấy đúng các trang dạy nội dung đó; bài ngắn hơn (tối đa 7 slide, 12 câu).', scopePart: (p: string) => `Cả phần sách · tr. ${p}`, scopePartLead: 'Dạy lại cả phần (tối đa 10 slide, 20 câu).',
     find: 'Tìm trong nguồn', finding: 'Đang tìm…', found: (c: string) => `Đã tìm thấy: ${c}. Bài chỉ dùng các trang này.`, quotes: 'Các đoạn AI đã dùng', mistakes: 'Chỗ con hay sai', notFound: 'Chưa có trong Kho kiến thức. Cô thêm tài liệu hoặc chọn phạm vi khác.',
     scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Bạn chưa có sách nào. Bài giảng chỉ được soạn từ sách của bạn.', booksReading: 'Sách của bạn đang được đọc; đọc xong là soạn bài được. Trong lúc chờ, bạn có thể dùng sách mẫu.', sample: 'Dùng sách mẫu',
     upPdf: 'Tải sách (PDF)', upPhotos: 'Chụp / tải ảnh trang sách', sampleOf: 'Sách mẫu do đội LessonBloom tự viết:', samples: { maths2: 'Maths 2 (tiếng Anh)', english3: 'Tiếng Anh 3', toan2: 'Toán 2' }, noSource: 'Chưa có sách', addingSample: 'Đang thêm sách mẫu…',
@@ -50,6 +51,7 @@ const T = {
     help: 'A book page or marked work?', helpPart: 'Find it or choose a part?', pickFirst: 'Choose which child did this work, so it is kept in their profile and the lesson is made for them.', noChild: 'Not linked to a child: the lesson will be general and the work is not kept in a profile.', noPupil: 'Not linked to a pupil: the lesson will be general and the work is not kept in a profile.',
     what: 'What should this lesson teach?', whatPh: 'e.g. Unit 6: colours, the words red, blue and green.', pastePh: 'Paste text (a plan, an exercise…) here.', say: '● Speak', stop: '■ Stop', hearing: 'Listening…',
     lessonPhoto: 'Photograph the book page or your plan (up to 5 photos). No faces, names or personal details.', workPhoto: "Photograph the child's finished exercise (up to 5 photos). The AI finds its kind and the mistakes, then makes practice of the same kind in the chosen part. No names or faces.", pick: '+ Choose photos', reading: 'Reading the photos…',
+    scopeQ: 'How much should the lesson cover?', scopeNarrow: (p: string) => `Only what you gave · p. ${p}`, scopeNarrowLead: 'Just the pages that teach it; a shorter lesson (up to 7 slides, 12 questions).', scopePart: (p: string) => `The whole part · p. ${p}`, scopePartLead: 'The whole part again (up to 10 slides, 20 questions).',
     find: 'Find in the source', finding: 'Searching…', found: (c: string) => `Found: ${c}. The lesson uses only these pages.`, quotes: 'Passages the AI used', mistakes: 'Mistakes seen', notFound: 'Not in your knowledge area yet. Add material or choose another part.',
     scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You have no books yet. Lessons are made only from your own books.', booksReading: 'Your book is being read; once it is done you can make a lesson. Meanwhile you can use a sample book.', sample: 'Use a sample book',
     upPdf: 'Upload a book (PDF)', upPhotos: 'Take or upload photos of pages', sampleOf: 'Sample books written by the LessonBloom team:', samples: { maths2: 'Maths 2', english3: 'English 3', toan2: 'Toán 2 (Vietnamese)' }, noSource: 'No book yet', addingSample: 'Adding the sample book…',
@@ -165,15 +167,18 @@ export function Create({ parent }: { parent: boolean }) {
   });
   const chosen = sections.find((s) => s.id === sectionId), a = areas?.find((x) => x.id === areaId);
   // pages as printed in the book when known, as Knowledge shows them (Chi #53: "tr. 1–5" here, "Trang 10–14" there)
-  const scopeText = chosen ? `${a?.name} · ${t.page} ${pagesOf(chosen.page_from, chosen.page_to, chosen.printed_from, chosen.printed_to)}` : match ? `${match.book} · ${t.page} ${pagesOf(match.pageFrom, match.pageTo, match.printedFrom, match.printedTo)}` : '';
+  const [whole, setWhole] = useState(false), narrow = match && !chosen && !whole ? match.narrow ?? null : null;
+  useEffect(() => setWhole(false), [match]);   // a new match starts on "only what you gave"
+  const pagesFor = narrow ? { from: narrow.pageFrom, to: narrow.pageTo } : undefined;
+  const scopeText = chosen ? `${a?.name} · ${t.page} ${pagesOf(chosen.page_from, chosen.page_to, chosen.printed_from, chosen.printed_to)}` : match ? `${match.book} · ${t.page} ${narrow ? pagesOf(narrow.pageFrom, narrow.pageTo, narrow.printedFrom, narrow.printedTo) : pagesOf(match.pageFrom, match.pageTo, match.printedFrom, match.printedTo)}` : '';
   const toStep2 = () => run('intake', async () => {
     // the work is saved to the child's profile first (Chi #46), as she corrected it; the lesson carries a copy
     let w = kind === 'work' ? work : null;
     if (w && pupilId) w = { ...(w.recordId && w.pupilId === pupilId ? (await api.updateWork(w.recordId, w)).record : (await api.saveWork(pupilId, w)).record) };
     if (w) setWork(w);
-    const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note, ...(w ? { work: w } : {}) };
+    const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId, pagesFor)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note, ...(w ? { work: w } : {}) };
     // a parent has no Questions step: the lesson is made straight from the setup the book gave
-    if (parent) { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: s }); writeDraft(null); go(`/lesson/${id}`); return; }
+    if (parent) { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: s, pages: pagesFor }); writeDraft(null); go(`/lesson/${id}`); return; }
     setSetup(s);
   });
   const set = <K extends keyof Setup>(k: K, v: Setup[K]) => setSetup((s) => (s ? { ...s, [k]: v } : s));
@@ -252,6 +257,10 @@ export function Create({ parent }: { parent: boolean }) {
           {!chosen && <div className="row"><span className="grow" /><button className="btn" disabled={!!busy || short || !areaId || text.trim().length < 3} onClick={find}>{busy === 'find' ? t.finding : t.find}</button></div>}
         </div>}
         {match && !chosen && <div className="banner"><b>✓ {t.found(scopeText)}</b><details className="small"><summary>{match.title} · {t.quotes}</summary>{match.cited.map((c) => <blockquote key={c.id}>“{c.quote}” <span className="muted">· {t.page} {c.page}</span></blockquote>)}</details></div>}
+        {/* how much the lesson covers, for every kind of material (Chi #60): only what she gave, chosen first */}
+        {match && !chosen && match.narrow && <div className="card stack" style={{ gap: 6 }} role="group" aria-label={t.scopeQ}><b className="small">{t.scopeQ}</b>
+          <label className="check small"><input type="radio" name="scope" checked={!whole} disabled={!!busy} onChange={() => { setWhole(false); setSetup(null); }} /> <span><b>{t.scopeNarrow(pagesOf(match.narrow.pageFrom, match.narrow.pageTo, match.narrow.printedFrom, match.narrow.printedTo))}</b> · <span className="muted">{t.scopeNarrowLead}</span></span></label>
+          <label className="check small"><input type="radio" name="scope" checked={whole} disabled={!!busy} onChange={() => { setWhole(true); setSetup(null); }} /> <span><b>{t.scopePart(pagesOf(match.pageFrom, match.pageTo, match.printedFrom, match.printedTo))}</b> · <span className="muted">{t.scopePartLead}</span></span></label></div>}
         {chosen && <div className="banner">✓ {t.found(`${chosen.title} · ${scopeText}`)}</div>}
         {/* a part chosen by hand answers it (live test, 1 Nov: the warning stayed under "Found") */}
         {missing && !sectionId && <div className="banner warn">{t.notFound}</div>}
@@ -288,7 +297,7 @@ export function Create({ parent }: { parent: boolean }) {
         {row('note', t.q.note, setup.note || t.none, <input value={setup.note || ''} maxLength={300} placeholder={t.notePh} onChange={(e) => set('note', e.target.value)} style={{ width: '100%' }} />, t.optional)}
         {shortBox}{err && <p className="note">{err}</p>}
         <div className="row"><button className="btn" onClick={() => setSetup(null)}>{t.back}</button><span className="grow" />
-          <button className="btn primary" disabled={!!busy || short || !setup.title.trim()} onClick={() => run('make', async () => { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: { ...setup, objectives: setup.objectives.filter(Boolean) } }); writeDraft(null); go(`/lesson/${id}`); })}>{t.create}</button></div>
+          <button className="btn primary" disabled={!!busy || short || !setup.title.trim()} onClick={() => run('make', async () => { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: { ...setup, objectives: setup.objectives.filter(Boolean) }, pages: pagesFor }); writeDraft(null); go(`/lesson/${id}`); })}>{t.create}</button></div>
       </div>
     </div>
   );

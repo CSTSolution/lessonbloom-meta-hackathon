@@ -85,6 +85,12 @@ export const REVIEW_SCHEMA = { type: 'object', properties: { flags: { type: 'arr
 
 export const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => String(v[k] ?? ''));
 export const slideCount = (minutes: number) => (minutes <= 15 ? 7 : minutes <= 25 ? 9 : 11);
+// How big a lesson may be (Chi #61: always 11-12 slides and 20-58 items, too long for grades 1-2 and costly). Son's
+// numbers: from a whole part 10 slides and 20 items; from narrow material (a sentence, a photo, the child's work) 7 and 12.
+export const sizeOf = (s: { minutes: number; scope?: 'narrow' | 'part' }) => {
+  const cap = s.scope === 'narrow' ? { slides: 7, items: 12 } : { slides: 10, items: 20 };
+  return { slides: Math.min(slideCount(s.minutes), cap.slides), items: cap.items, cards: 8 };
+};
 export const maxWords = (grade: number) => (grade <= 2 ? 12 : grade === 3 ? 16 : 20);
 
 // who uses the lesson: a teacher with a class (the default), or a parent with their own child at home

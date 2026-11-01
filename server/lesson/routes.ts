@@ -28,6 +28,9 @@ const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
 const UNREAD = { code: 'workUnread', error: 'Máy chưa đọc được bài của con: ảnh mờ, bị cắt, hoặc chưa có dấu chấm đúng/sai. Cô chụp lại thẳng, đủ sáng, cả trang, sau khi đã chấm bài nhé.', errorEn: "The work could not be read: the photo is blurry or cut off, or nothing is marked right or wrong yet. Take it again straight on, in good light, the whole page, after marking it." };
 const lessonsPerDay = (kind: string) => (kind === 'demo' ? config.guard.lessonsDemoDay : config.guard.lessonsDay);
 
+// a lesson from the child's work is narrow too (Chi #60): its focus is the kinds of mistake, not the whole part
+const rawWorkOf = (setup: unknown) => { const w = setup && typeof setup === 'object' ? (setup as { work?: { questions?: unknown[] } }).work : undefined; return !!(w && Array.isArray(w.questions) && w.questions.length); };
+
 export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs }) {
   const lessons = new Lessons(d.sql);
   const perTeacher = new Limiter(10, 200);           // AI requests per teacher (per minute, per day)
@@ -90,10 +93,23 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     try { return c.json({ text: (await d.as(c.get('teacher').id, () => d.ai.transcribe({ audio, mime: type.split(';')[0], lang: c.get('teacher').lang }))).slice(0, MAX_NOTES) }); } catch (e) { return aiError(c, e); }
   });
 
+  // "Only what you gave" (Chi #60): the part's passages on the pages her material was found on (places in the file),
+  // and the part's range shown as those pages. A range outside the part, or with no text, keeps the whole part.
+  type Part = NonNullable<Awaited<ReturnType<typeof sectionOf>>>;
+  const narrowed = async (m: Part, pages: unknown): Promise<Part & { narrow?: boolean }> => {
+    const p = pages as { from?: unknown; to?: unknown } | undefined, from = Math.round(Number(p?.from)), to = Math.round(Number(p?.to));
+    if (!(from >= 1 && to >= from)) return m;
+    const file = new Map((await d.sql.query<{ id: string; page: number }>('select id, page from passages where section_id = $1', [m.section.id])).map((x) => [x.id, Number(x.page)]));
+    const keep = m.passages.filter((x) => { const f = file.get(x.id) ?? 0; return f >= from && f <= to; });
+    if (!keep.length || keep.length === m.passages.length) return m;
+    const fs = keep.map((x) => file.get(x.id)!), lo = Math.min(...fs), hi = Math.max(...fs);
+    return { ...m, passages: keep, section: { ...m.section, pageFrom: lo, pageTo: hi, ...printedRange(await shownPages(d.sql, m.section.bookId), lo, hi) }, narrow: true };
+  };
+
   // The setup, pre-filled from the matched section of her book (subject and grade come from the area).
   app.post('/api/t/intake', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string }>().catch(() => ({} as { areaId?: string; sectionId?: string }));
-    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; pages?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; pages?: unknown }));
+    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m0 = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || '')), m = m0 && await narrowed(m0, b.pages);
     if (!a || !m) return fail(c, 'notFound', 404);
     // too few credits for the lesson itself: this step spends nothing either (Chi #30)
     if ((await spare(d.sql, t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
@@ -107,14 +123,17 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
 
   // A lesson always comes from one section of one knowledge area: that section is its only source.
   app.post('/api/t/lessons', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; request?: string; setup?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; request?: string; setup?: unknown }));
-    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
-    if (!a || !m) return fail(c, 'notFound', 404);
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown }));
+    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m0 = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
+    if (!a || !m0) return fail(c, 'notFound', 404);
+    const m = await narrowed(m0, b.pages), narrow = !!m.narrow;
     const setup0 = cleanSetup(b.setup), request = String(b.request ?? '').trim().slice(0, 2000);
     if (!setup0) return fail(c, 'setup');
-    // her request steers the lesson inside the section (Chi: only what the material points to); the section stays the only source
-    const ask = request && request.toLowerCase() !== m.section.title.toLowerCase() && request.length > m.section.title.length + 10 ? request.slice(0, 200) : '';
-    const setup1 = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(t.role === 'parent' ? { forParent: true } : {}), ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
+    // her request steers the lesson inside the section (Chi: only what the material points to); the section stays the only
+    // source. "Only what you gave" (Chi #60): it is the lesson's required focus, whatever its length
+    const ask = request && request.toLowerCase() !== m.section.title.toLowerCase() && (narrow || request.length > m.section.title.length + 10) ? request.slice(0, 200) : '';
+    const focusWord = setup0.lang === 'en' ? (narrow ? 'Focus (the whole lesson is about this only)' : 'Focus') : (narrow ? 'Trọng tâm (cả bài chỉ về điều này)' : 'Tập trung');
+    const setup1 = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], scope: (narrow || rawWorkOf(b.setup) ? 'narrow' : 'part') as Setup['scope'], ...(t.role === 'parent' ? { forParent: true } : {}), ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${focusWord}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
     // Chi #46: made from the child's work: typed again by code, her name taken from her own record (never the
     // browser's word), and the title says who it is for. Prompts get forPrompt(setup): no name, no "Made for".
     const rawWork = (b.setup && typeof b.setup === 'object' ? (b.setup as { work?: Partial<Work> }).work : undefined);

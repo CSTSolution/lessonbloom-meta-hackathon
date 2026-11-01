@@ -6,7 +6,7 @@ import { guardedJson, wrapUser } from '../guard/guard.ts';
 import { buildEnglish, buildMath, checkItem, contextOf, questionOf, rangeOf, type CheckContext, type RawEnglish, type RawMath } from './items.ts';
 import {
   CARDS_SCHEMA, CARDS_SYSTEM, ENG_ITEMS_SCHEMA, ENG_ITEMS_SYSTEM, fill, INTAKE_SCHEMA, INTAKE_SYSTEM, langName, MATH_ITEMS_SCHEMA, MATH_ITEMS_SYSTEM,
-  audienceLine, maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
+  audienceLine, maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, sizeOf, SLIDES_SCHEMA, SLIDES_SYSTEM,
 } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 import { findOf, forPrompt, typeWork, type Work } from './work.ts';
@@ -81,10 +81,10 @@ export function cleanSkills(raw: unknown, subject: Setup['subject']): Skill[] {
 }
 
 export async function planLesson(ai: AI, setup: Setup, source: string) {
-  const count = slideCount(setup.minutes);
+  const count = sizeOf(setup).slides;
   const r = await guardedJson<{ skills: Skill[]; outline: { kind: Slide['kind']; heading: string; objective?: string }[] }>(ai, {
     endpoint: 'plan', system: fill(PLAN_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), count }), prompt: material(setup, source), schema: PLAN_SCHEMA, fixture: { setup, source, count } });
-  return { skills: cleanSkills(r.skills, setup.subject), outline: (r.outline || []).slice(0, 14).map((o) => ({ kind: o.kind, heading: clip(o.heading, 80), objective: clip(o.objective, 200) })) };
+  return { skills: cleanSkills(r.skills, setup.subject), outline: (r.outline || []).slice(0, count).map((o) => ({ kind: o.kind, heading: clip(o.heading, 80), objective: clip(o.objective, 200) })) };
 }
 
 export async function writeSlides(ai: AI, setup: Setup, source: string, outline: { kind: string; heading: string }[]): Promise<Slide[]> {

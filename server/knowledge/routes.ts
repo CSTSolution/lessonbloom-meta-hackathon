@@ -589,7 +589,14 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (spent) return fail(c, spent === 'total' ? 'credit' : spent === 'credits' ? 'credits' : 'budget', 429);
     try {
       const m = await d.as(t.id, async () => { await requireOnTask(d.ai, request); return findSection(sql, d.ai, a.id, request); });
-      return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, printedFrom: m.section.printedFrom ?? null, printedTo: m.section.printedTo ?? null, cited: m.cited,
+      // "Only what you gave" (Chi #60): the pages the cited passages are on, and the next one (an example often runs on),
+      // when that is less than the whole part; null when it is the whole part anyway
+      // from the best citation's page, the cited pages next to it (a stray citation further on does not stretch it)
+      const pg = new Set(m.cited.map((x) => Number(x.page)).filter((x) => x >= m.section.pageFrom && x <= m.section.pageTo)), first = Number(m.cited[0]?.page) || 0;
+      let lo = pg.has(first) ? first : 0, top = lo; while (lo && pg.has(lo - 1)) lo--; while (top && pg.has(top + 1)) top++;
+      const hi = lo ? Math.min(m.section.pageTo, top + 1) : 0;
+      const narrow = lo && (lo > m.section.pageFrom || hi < m.section.pageTo) ? { pageFrom: lo, pageTo: hi, ...printedRange(await shownPages(sql, m.section.bookId), lo, hi) } : null;
+      return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, printedFrom: m.section.printedFrom ?? null, printedTo: m.section.printedTo ?? null, cited: m.cited, narrow,
         citation: citation(m, t.lang), preview: sourceOf(m, 1500) } });
     } catch (e) {
       if (e instanceof NoMatch) return fail(c, 'noMatch', 404);

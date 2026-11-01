@@ -11,7 +11,7 @@ import type { AI, ChatMsg, ToolCall, ToolSpec } from '../ai/types.ts';
 import { Blocked, checkOutput, guardedJson, newCanary, scopedSystem, wrapUser } from '../guard/guard.ts';
 import { checkItem, contextOf, rangeOf, regroups } from './items.ts';
 import { checkSlide, issueWords, type SlideIssue } from './slide-check.ts';
-import { fill, langName, maxWords, slideCount, SLIDES_SCHEMA } from './prompts.ts';
+import { fill, langName, maxWords, sizeOf, SLIDES_SCHEMA } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Op, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides, type ItemRequest } from './writer.ts';
 import { applyWork, forPrompt } from './work.ts';
@@ -43,7 +43,7 @@ Work in this order:
 4. write_cards.
 5. review, then fix only real problems: simplify_slide for text too hard for the grade, drop_item for an item that should not be there.
 6. finish: a note to the teacher in {{lang}} (2-3 sentences: what you made, what you checked and changed, anything she should look at herself), and one line per change.
-If SETUP has "level": "basic", give most practice at basic level (still some good); if "advanced", lean to good and advanced. If SETUP.note has a focus, aim the practice at it. If SETUP.work is there (the child's own marked work), the app itself adds an opening slide and practice made from the child's wrong sums: write the rest from the book as usual, aiming at the kinds in SETUP.work.types. Never add content that is not in the book section; harder items extend only within it. Practice is practice ("bài luyện tập" in Vietnamese), never a test; no scores. Write every note in the lesson's language. You have at most {{turns}} turns.`;
+If SETUP has "level": "basic", give most practice at basic level (still some good); if "advanced", lean to good and advanced. If SETUP.note has a focus, aim the practice at it. If SETUP.scope is "narrow", the lesson is ONLY about that focus (or, with SETUP.work, the kinds in SETUP.work.types): every teaching slide is about it and at least 70% of the practice practises it; leave out what else the pages teach (Chi #60). If SETUP.work is there (the child's own marked work), the app itself adds an opening slide and practice made from the child's wrong sums: write the rest from the book as usual, aiming at the kinds in SETUP.work.types. Never add content that is not in the book section; harder items extend only within it. Practice is practice ("bài luyện tập" in Vietnamese), never a test; no scores. Write every note in the lesson's language. You have at most {{turns}} turns.`;
 
 const MATHT = ['mcq', 'fill', 'truefalse', 'word', 'column'], ENGT = ['match', 'fill', 'listen', 'order'];
 const TOOLS = (subject: Setup['subject']): ToolSpec[] => [
@@ -130,6 +130,7 @@ const clip = (s: unknown, n = 200) => String(s ?? '').replace(/\s+/g, ' ').trim(
 const args = (c: ToolCall): Record<string, any> => { try { const a = JSON.parse(c.args || '{}'); return a && typeof a === 'object' ? a : {}; } catch { return {}; } };
 
 export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say = () => {}): Promise<Built> {
+  const maxItems = sizeOf(setup).items;   // Chi #61: 20 from a whole part, 12 from narrow material
   const canary = newCanary(), changes: string[] = [];
   let skills: Skill[] = [], outline: { kind: string; heading: string; objective?: string }[] = [], slides: Slide[] = [], items: Item[] = [], cards: Card[] = [];
   const rejected: Rejected[] = [];
@@ -170,7 +171,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     const a = args(c);
     switch (c.name) {
       case 'save_plan': {
-        const sk = cleanSkills(a.skills, setup.subject), ol = (Array.isArray(a.outline) ? a.outline : []).slice(0, 14).map((o: any) => ({ kind: clip(o?.kind, 20), heading: clip(o?.heading, 80), objective: clip(o?.objective) }));
+        const sk = cleanSkills(a.skills, setup.subject), ol = (Array.isArray(a.outline) ? a.outline : []).slice(0, sizeOf(setup).slides).map((o: any) => ({ kind: clip(o?.kind, 20), heading: clip(o?.heading, 80), objective: clip(o?.objective) }));
         if (sk.length < 1 || ol.length < 4) return { error: 'a plan needs 1-4 skills and at least 4 slides' };
         skills = sk; outline = ol;
         await say(`Đã lập kế hoạch: ${skills.length} dạng bài, ${outline.length} slide.`, `Plan saved: ${skills.length} skills, ${outline.length} slides.`);
@@ -185,12 +186,12 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
       }
       case 'write_items': {
         if (!skills.length) return { error: 'save_plan first' };
-        if (itemCalls >= LIMITS.maxItemCalls || items.length >= LIMITS.maxItems) return { error: 'item limit reached; move on' };
+        if (itemCalls >= LIMITS.maxItemCalls || items.length >= maxItems) return { error: 'item limit reached; move on' };
         itemCalls++;
         // one batch the writer cannot give (busy, cut off) is the agent's to ask again, not the end of its run (Chi #55)
         const r = await writeItems(ai, setup, source, skills, { skill: clip(a.skill, 40), template: clip(a.template, 20), level: (['basic', 'good', 'advanced'].includes(a.level) ? a.level : 'basic') as Level, count: Math.min(4, Number(a.count) || 3) }, nextId, items).catch((e) => e as Error);
         if (r instanceof Error) { console.warn(`[agent] write_items failed: ${String(r.message).slice(0, 200)}`); return { error: 'that batch could not be written; ask again or move on' }; }
-        const room = LIMITS.maxItems - items.length;
+        const room = maxItems - items.length;
         items.push(...r.kept.slice(0, room)); rejected.push(...r.rejected);
         // the teacher sees the skill's name and the level in words, never the internal tag (Chi, 29 Oct)
         const skillName = skills.find((k) => k.tag === a.skill)?.name || 'practice', lv = LEVEL_WORDS[a.level as Level] ?? LEVEL_WORDS.basic;
@@ -237,7 +238,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
 
   try {
     const messages: ChatMsg[] = [
-      { role: 'system', content: scopedSystem(fill(AGENT_SYSTEM, { grade: setup.grade, subject: setup.subject === 'math' ? 'Maths' : 'English', lang: langName(setup.lang), count: slideCount(setup.minutes), turns: LIMITS.maxTurns }), canary) },
+      { role: 'system', content: scopedSystem(fill(AGENT_SYSTEM, { grade: setup.grade, subject: setup.subject === 'math' ? 'Maths' : 'English', lang: langName(setup.lang), count: sizeOf(setup).slides, turns: LIMITS.maxTurns }), canary) },
       { role: 'user', content: wrapUser(JSON.stringify({ SETUP: forPrompt(setup), BOOK_SECTION: source })) },
     ];
     const tools = TOOLS(setup.subject);
@@ -289,7 +290,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
       if (!columnGaps(setup, source, skills, items).length) break;
       items.push(...await more({ skill: col.tag, template: 'column', level, count: 3 }));
     }
-    while (items.length > LIMITS.maxItems) {
+    while (items.length > maxItems) {
       const count = new Map<string, number>();
       for (const i of items) if (i.template !== 'column') count.set(i.template, (count.get(i.template) || 0) + 1);
       const most = [...count.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
@@ -298,18 +299,18 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     }
   }
   for (const k of skills) for (const level of ['basic', 'good'] as Level[]) {
-    if (items.length >= LIMITS.maxItems || items.some((i) => i.skill === k.tag && i.level === level)) continue;
+    if (items.length >= maxItems || items.some((i) => i.skill === k.tag && i.level === level)) continue;
     items.push(...await more({ skill: k.tag, template: templateFor(k, level), level, count: 3 }));
   }
   if (!cards.length) cards = await writeCards(ai, setup, source).catch((e) => { console.warn(`[agent] flashcards left out: ${String((e as Error)?.message).slice(0, 200)}`); return [] as Card[]; });
   // Last line of defence: every item passes the checks once more against the final skills.
-  items = items.filter((i) => !checkItem(i, { ...ctx(), items }).length).slice(0, LIMITS.maxItems);
+  items = items.filter((i) => !checkItem(i, { ...ctx(), items }).length).slice(0, maxItems);
   // Too few left (Chi #55): one more batch for the skill with the fewest items, at the level it lacks, before the AI review
   // (which never drops below the minimum); one call at most, within maxItems
   if (items.length < LIMITS.minItems && skills.length) {
     const has = (k: Skill) => items.filter((i) => i.skill === k.tag).length, k = [...skills].sort((x, y) => has(x) - has(y))[0];
     const level: Level = items.some((i) => i.skill === k.tag && i.level === 'basic') ? 'good' : 'basic';
-    const got = (await more({ skill: k.tag, template: templateFor(k, level), level, count: Math.min(4, LIMITS.minItems - items.length) })).slice(0, LIMITS.maxItems - items.length);
+    const got = (await more({ skill: k.tag, template: templateFor(k, level), level, count: Math.min(4, LIMITS.minItems - items.length) })).slice(0, maxItems - items.length);
     items.push(...got);
     if (got.length) await say(`Thêm ${got.length} câu luyện tập cho đủ bài.`, `Added ${got.length} practice item${got.length === 1 ? '' : 's'} so the lesson has enough.`);
   }
@@ -321,7 +322,8 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   let fromWork = '';
   if (setup.work?.wrong) {
     const w = applyWork(setup, source, { skills, slides, items }), L = setup.lang === 'en' ? 'en' : 'vi';
-    skills = w.skills; slides = w.slides; items = w.items;
+    // within the lesson's size (Chi #61): the child's own items come first, the book's tail goes
+    skills = w.skills; slides = w.slides.slice(0, sizeOf(setup).slides + 1); items = w.items.slice(0, maxItems);
     const kinds = w.inPart.map((x) => x[L].toLowerCase()).join(', '), out = w.outPart.map((x) => x[L].toLowerCase()).join(', ');
     if (w.inPart.length) {
       await say(`Từ bài con làm: thêm slide mở đầu và ${w.made} câu luyện lại (${w.inPart.map((x) => x.vi.toLowerCase()).join(', ')}).`, `From the child's work: an opening slide and ${w.made} practice items (${w.inPart.map((x) => x.en.toLowerCase()).join(', ')}).`);
