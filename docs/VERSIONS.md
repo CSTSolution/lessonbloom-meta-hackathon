@@ -3,6 +3,17 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1555 (1 Nov, afternoon)
+
+From live tests of the items not tried on live before:
+- **Choices with four options**: the right one was always last (the shuffle multiplied two 32-bit numbers
+  as a float and lost the low bits). Fixed; the child's page also mixes each choice again, so lessons made
+  before are fair too.
+- **A child's English worksheet** is looked for in the book by its unit and the kinds of its mistakes, not
+  by its instruction ("Fill in the missing word" found no part).
+- **The lesson's citation** shows the printed page like its slides (it kept the file's page after the
+  book's page 1 was set).
+
 ## v1.0.20261101.1440 (1 Nov, afternoon)
 
 - From the live test of 1424: a reason shown for a wrong English option may not call that option "the
