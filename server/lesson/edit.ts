@@ -111,8 +111,8 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     } else {
       const s = (k: string, v?: string) => (b[k] !== undefined ? clip(b[k], 300) : v);
       const list = (k: string, v?: string[]) => (Array.isArray(b[k]) ? (b[k] as unknown[]).map((x) => clip(x, 60)).filter(Boolean) : v);
-      const raw: RawEnglish = { template: it.template, skill: it.skill, level: it.level, prompt: s('prompt', it.prompt)!, sentence: s('sentence', it.sentence), say: s('say', it.say), options: list('options', it.options), words: list('words', it.words), answer: s('answer', it.answer), explain: s('explain', it.explain), pairs: it.pairs };
-      next = buildEnglish(raw, it.id);
+      const raw: RawEnglish = { template: it.template, skill: it.skill, level: it.level, prompt: s('prompt', it.prompt)!, sentence: s('sentence', it.sentence), say: s('say', it.say), options: list('options', it.options), words: list('words', it.words), answer: s('answer', it.answer), explain: s('explain', it.explain), pairs: it.pairs, why: (it as { why?: Record<string, string> }).why };   // her edit keeps each option's hint, checked again (Chi #52)
+      next = buildEnglish(raw, it.id, l.setup.lang);
     }
     next.page = it.page;
     const issues = checkItem(next, { ...contextOf(l.setup, l.skills, l.source), items: l.items });

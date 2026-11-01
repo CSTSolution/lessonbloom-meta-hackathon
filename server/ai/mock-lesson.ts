@@ -51,7 +51,7 @@ function englishItems(f: F) {
   const out: F[] = [];
   for (let i = 0; i < count; i++) {
     if (template === 'match') out.push({ prompt: en ? 'Match each word to its picture.' : 'Nối mỗi từ với hình đúng.', pairs: [0, 1, 2].map((j) => ({ word: pick(i + j), emoji: COLOURS[pick(i + j)] })), explain: en ? 'Say each colour aloud.' : 'Đọc to tên từng màu.' });
-    else if (template === 'fill') out.push({ prompt: en ? 'Choose the missing word.' : 'Chọn từ còn thiếu.', sentence: 'What colour ___ it?', options: ['is', 'are', 'am'], answer: 'is', explain: en ? '"it" goes with "is".' : '"it" đi với "is".' });
+    else if (template === 'fill') out.push({ prompt: en ? 'Choose the missing word.' : 'Chọn từ còn thiếu.', sentence: 'What colour ___ it?', options: ['is', 'are', 'am'], answer: 'is', explain: en ? '"it" goes with "is".' : '"it" đi với "is".', why: [{ option: 'are', why: en ? '"are" goes with more than one thing.' : '"are" đi với nhiều thứ.' }, { option: 'am', why: en ? '"am" goes only with "I".' : '"am" chỉ đi với "I".' }] });
     else if (template === 'listen') out.push({ prompt: en ? 'Listen and choose the right word.' : 'Nghe và chọn từ đúng.', say: pick(i), options: [pick(i), pick(i + 1), pick(i + 2)], answer: pick(i), explain: en ? 'Listen to the first sound.' : 'Nghe âm đầu của từ.' });
     else out.push({ prompt: en ? 'Put the words in order.' : 'Sắp xếp các từ thành câu.', words: ['colour', 'is', 'favourite', 'My', pick(i)], answer: `My favourite colour is ${pick(i)}.`, explain: en ? 'A sentence about your favourite colour.' : 'Câu nói về màu em thích.' });
   }

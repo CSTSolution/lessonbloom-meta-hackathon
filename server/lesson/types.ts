@@ -52,7 +52,7 @@ export interface MathItem extends ItemBase {
   subject: 'math';
   template: 'mcq' | 'fill' | 'truefalse' | 'word' | 'column';   // column: "đặt tính rồi tính" (Chi #47)
   a: number; op: Op; b: number;
-  blank?: 'a' | 'b' | 'result';   // fill: which number is hidden
+  blank?: 'a' | 'b' | 'result';   // fill: which number is hidden; a number-in-words mcq with blank 'a': the words are chosen (Chi #52)
   shown?: number;                 // truefalse: the result the statement claims
   distractors?: number[];         // mcq: wrong options, the mistakes children really make
   story?: string;                 // word: the problem, in the lesson's language, ending with the question
@@ -69,6 +69,7 @@ export interface EnglishItem extends ItemBase {
   say?: string;                                 // listen: read aloud, never shown
   words?: string[];                             // order: shuffled word cards
   options?: string[];
+  why?: Record<string, string>;                 // fill/listen: wrong option -> why it does not fit, the hint when she picks it (Chi #52); never names the answer
   answer: string;
 }
 export type Item = MathItem | EnglishItem;

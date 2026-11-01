@@ -31,6 +31,11 @@ const bookFile = (id: string) => join(config.dataDir, 'books', `${id}.pdf`);
 // not enough credit: the message, and the numbers the page shows (what is short, how many pages fit)
 const short = (c: Context, est: ReturnType<typeof scanEstimate>) => c.json({ code: 'scanCredits', error: MSG.scanCredits.vi, errorEn: MSG.scanCredits.en, estimate: est }, 402);
 const scanDir = (id: string) => join(config.dataDir, 'scan', id);
+// as web/src/pdf.ts hasText: five pages spread through the book, most of them with real text, is a text PDF
+const textLike = (pages: PdfPage[]) => {
+  const n = pages.length, probe = [...new Set([1, Math.ceil(n / 4), Math.ceil(n / 2), Math.ceil((3 * n) / 4), n])].filter((x) => x >= 1);
+  return probe.filter((p) => (pages[p - 1]?.text ?? '').replace(/\s/g, '').length >= 20).length / probe.length > 0.5;
+};
 
 // Reading a scanned book costs credits: the estimate she sees before anything runs, and what she must
 // have (Son: 50% more than the estimate, since a page can cost more than expected).
@@ -281,7 +286,9 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const r = pdf ? await readPdf(pdf).catch(() => null) : null;
     if (!pdf || !r || !r.pages.length) { await sql.query(`update books set status = 'error', error = 'failed' where id = $1`, [bk.id]); return fail(c, 'pdf', 400); }
     await sql.query('update books set pages = $2 where id = $1', [bk.id, r.pages.length]);
-    if (r.scanned / r.pages.length <= 0.5) {
+    // text or pictures, decided as the browser decides it (Chi #26: Safari's file read on our server went the
+    // text way and skipped the estimate, the hold and the page count that Chrome showed for the same scan)
+    if (textLike(r.pages)) {
       await d.jobs.add(t.id, 'book', bk.id, bk.title, () => d.as(t.id, () => readBook(bk.id, () => ingestPages(sql, d.ai, bk.area_id, bk.id, r.pages)), undefined, bk.id), () => dropBook(bk.id));
       return c.json({ ok: true, text: true, pages: r.pages.length });
     }
@@ -296,13 +303,17 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const b = await c.req.json<{ pages?: number[] }>().catch(() => ({} as { pages?: number[] }));
     const want = [...new Set((Array.isArray(b.pages) ? b.pages : []).map((x) => Math.round(Number(x))).filter((x) => x >= 1 && x <= bk.pages))].sort((x, y) => x - y);
     if (!want.length || want.length > config.scan.maxPages) return fail(c, 'scanPages', 400);
+    if (await sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [bk.id])) return c.json({ ok: true });
+    // as the scan path (Chi #26): the AI budget, then enough credits, then the hold
+    const g = await d.budget.check(t.id);
+    if (g && g !== 'credits') return fail(c, 'budget', 503);
     const est = scanEstimate(want.length, (await spare(sql, t.id)).spare);
     if (!est.enough) return short(c, est);
-    if (await sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [bk.id])) return c.json({ ok: true });
     await holdCredits(t.id, est.need, bk.id);
     const hold = { used: 0 };
     await d.jobs.add(t.id, 'book', bk.id, bk.title, async (job) => {
       await d.held(t.id, hold, () => readBook(bk.id, async () => {
+        await job.progress(`0/${want.length}`);   // "Reading page 0/N" from the start, while the pages are drawn
         const pdf = await d.store!.get(fileKey(t.id, bk.id, 'original.pdf'));
         if (!pdf) throw new Error('original missing');
         const dir = scanDir(bk.id), src = join(dir, 'original.pdf');

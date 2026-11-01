@@ -91,7 +91,9 @@ export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Set
       b.slides = b.slides.filter((s) => !loose.includes(s));
       b.agent.changes.push(...loose.map((s) => `${s.id}: left out, its words are not in the book section`));
     }
-    await lessons.step(id, 'Xong! Cô xem bài giảng và ghi chú của trợ lý nhé. Hình minh họa đang được vẽ thêm.', 'Done! Have a look at the lesson and the agent\'s note. Pictures are on their way.');
+    // the count the child's page shows (Chi #53: the lines above added up to 26, the child's page said 20)
+    const n = b.items.length;
+    await lessons.step(id, `Xong! Bài có ${b.slides.length} slide và ${n} câu luyện tập (sau khi bỏ câu trùng, câu chưa đạt). Cô xem bài giảng và ghi chú của trợ lý nhé. Hình minh họa đang được vẽ thêm.`, `Done! The lesson has ${b.slides.length} slides and ${n} practice question${n === 1 ? '' : 's'} (after dropping repeats and items that failed the checks). Have a look at the lesson and the agent's note. Pictures are on their way.`);
     if (setup.make && !setup.make.cards) b.cards = [];   // she asked for no flashcards
     await lessons.finish(id, b);
     pics?.onReady?.();   // the lesson is there: her next job may start while pictures and the video follow

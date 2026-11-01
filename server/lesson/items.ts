@@ -130,10 +130,10 @@ export function readSlips(n: number): number[] {
   return out.slice(0, 3);
 }
 const READ = {
-  vi: { mcq: (w: string) => `Số nào đọc là “${w}”?`, fill: (w: string) => `Viết số: ${w}`, truefalse: (n: number, w: string) => `Đúng hay sai? Số ${n} đọc là “${w}”.` },
-  en: { mcq: (w: string) => `Which number is “${w}”?`, fill: (w: string) => `Write this number in digits: ${w}`, truefalse: (n: number, w: string) => `True or false? ${n} in words is “${w}”.` },
+  vi: { mcq: (w: string) => `Số nào đọc là “${w}”?`, fill: (w: string) => `Viết số: ${w}`, truefalse: (n: number, w: string) => `Đúng hay sai? Số ${n} đọc là “${w}”.`, words: (n: number) => `Số ${n} đọc là gì?` },
+  en: { mcq: (w: string) => `Which number is “${w}”?`, fill: (w: string) => `Write this number in digits: ${w}`, truefalse: (n: number, w: string) => `True or false? ${n} in words is “${w}”.`, words: (n: number) => `Which is ${n} in words?` },
 };
-const READ_PROMPT = /^(?:Which number is “|Write this number in digits: |True or false\? \d+ in words is “|Số nào đọc là “|Viết số: |Đúng hay sai\? Số \d+ đọc là “)/;
+const READ_PROMPT = /^(?:Which number is “|Write this number in digits: |True or false\? \d+ in words is “|Which is \d+ in words\?|Số nào đọc là “|Viết số: |Đúng hay sai\? Số \d+ đọc là “|Số \d+ đọc là gì\?)/;
 // a number-in-words item is sent as a + 0 (b = 0), so a teacher's edit, rebuilt from a, op and b, stays one
 export const isReading = (e: MathItem) => e.op === '+' && e.b === 0 && READ_PROMPT.test(e.prompt);
 // a skill about saying, reading or writing numbers ("Say, read and write numbers to 1000", "Đọc, viết số")
@@ -154,12 +154,18 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
   const a = Math.trunc(Number(r.a)), b = Math.trunc(Number(r.b)), op = (['+', '-', '×', ':'] as Op[]).includes(r.op) ? r.op : '+';
   const result = compute(a, op, b), calc = `${a} ${SIGN[op]} ${b}`;
   const base = { id, subject: 'math' as const, template: r.template, skill: String(r.skill || ''), level: r.level, a, op, b, explain: String(r.explain || '').trim() };
-  // Chi #52: a number in words (a + 0): words -> number as a choice or written in digits, number -> words as true or false
-  // (a choice of word options is not possible yet: a pupil's maths answer is checked as a number)
+  // Chi #52: a number in words (a + 0): words -> number as a choice or written in digits, number -> words as a choice of
+  // words or true or false
   if (op === '+' && b === 0 && numberWords(a, lang)) {
     const w = numberWords(a, lang), explain = readExplain(a, w, lang);
+    // "Which is 321 in words?": the right words and the words of the slips children make (312, 231, 30021), checked as
+    // text (isRight). Kept as an mcq with blank 'a' (the number shown, its words chosen), so a teacher's edit stays one
+    if (r.template === 'word' || (r.template === 'mcq' && r.blank === 'a')) {
+      const distractors = readSlips(a).filter((d) => numberWords(d, lang));
+      return { ...base, template: 'mcq', blank: 'a', explain, distractors, prompt: READ[lang].words(a), options: shuffle([a, ...distractors].map((n) => numberWords(n, lang)), id + a), answer: w };
+    }
     if (r.template === 'mcq') { const distractors = readSlips(a); return { ...base, explain, distractors, prompt: READ[lang].mcq(w), options: shuffle([a, ...distractors].map(String), id + a), answer: String(a) }; }
-    if (r.template === 'truefalse' || r.template === 'word') {
+    if (r.template === 'truefalse') {
       const s = Math.trunc(Number(r.shown)), shown = r.shown != null && numberWords(s, lang) ? s : a;
       return { ...base, template: 'truefalse', explain, shown, prompt: READ[lang].truefalse(a, numberWords(shown, lang)), answer: shown === a ? 'true' : 'false' };
     }
@@ -194,7 +200,8 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
 
 // --- English: kept as written, checked by code ---
 
-export interface RawEnglish { template: EnglishItem['template']; skill: string; level: Level; prompt: string; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; options?: string[]; answer?: string; explain?: string }
+// why: from the model a list of {option, why}; from code or an edit already a map
+export interface RawEnglish { template: EnglishItem['template']; skill: string; level: Level; prompt: string; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; options?: string[]; answer?: string; explain?: string; why?: Record<string, string> | { option: string; why: string }[] }
 
 // Chi #52: the model copied the book's own instruction ("Read and play the game.") onto matching, and a child did not
 // know to match. Code writes that instruction, like the maths ones; lang: the lesson's (else the model's prompt says it).
@@ -208,7 +215,24 @@ export function buildEnglish(r: RawEnglish, id: string, lang?: Lang): EnglishIte
   if (r.template === 'fill') { it.sentence = clean(r.sentence); it.options = (r.options || []).map(clean).slice(0, 4); }
   if (r.template === 'listen') { it.say = clean(r.say); it.options = (r.options || []).map(clean).slice(0, 4); }
   if (r.template === 'order') it.words = (r.words || []).map(clean).filter(Boolean).slice(0, 12);
+  const why = it.template === 'fill' || it.template === 'listen' ? whyOf(r.why, it.options || [], it.answer) : undefined;
+  if (why) it.why = why;
   return it;
+}
+
+// Chi #52: one reason for each wrong option ("floor": the floor is lava, you must not step on it), the hint when she
+// picks that one. A reason is kept only when its key is a wrong option and it is short and never names the answer.
+function whyOf(raw: RawEnglish['why'], options: string[], answer: string): Record<string, string> | undefined {
+  const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const list = Array.isArray(raw) ? raw.map((x) => [x?.option, x?.why]) : raw && typeof raw === 'object' ? Object.entries(raw) : [];
+  const aw = words(answer), phrase = ` ${aw.join(' ')} `, content = aw.filter((w) => !FUNCTION_WORDS.has(w)), out: [string, string][] = [];
+  for (const [k, v] of list) {
+    const o = options.find((x) => x.toLowerCase() === clean(k).toLowerCase()), why = clean(v), ww: string[] = [...words(why)];
+    if (!o || o.toLowerCase() === answer.toLowerCase() || out.some(([x]) => x === o) || !why || why.length > 140) continue;
+    if (!aw.length || ` ${ww.join(' ')} `.includes(phrase) || content.some((w) => ww.includes(w))) continue;
+    out.push([o, why]);
+  }
+  return out.length ? Object.fromEntries(out) : undefined;
 }
 
 // --- the rules ---

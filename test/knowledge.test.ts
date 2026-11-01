@@ -97,6 +97,26 @@ test('Chân trời sáng tạo: capital titles (also "EM LÀM ĐƯỢC NHỮNG G
   ]);
 });
 
+test('the same scan read twice gives a lesson the same pages: a scrap before the next heading, or a page read empty, moves nothing (Chi #51d)', () => {
+  const book = (p7: string, p8: string) => [
+    { page: 4, text: 'Bài 6\nLUYỆN TẬP CHUNG\n1 Tính nhẩm.\n30 + 40 = ?' },
+    { page: 5, text: '2 Đặt tính rồi tính.\n46 + 27' },
+    { page: 6, text: '3 Giải bài toán.\nLan có 25 quyển vở.' },
+    { page: 7, text: p7 },
+    { page: 8, text: p8 },
+  ].filter((p) => p.text);
+  const every = [4, 5, 6, 7, 8], p8 = 'Bài 7\nPHÉP TRỪ CÓ NHỚ\n1 Tính.\n52 − 18';
+  // one reading: page 7 a picture with no text, the next lesson at the top of page 8, and no scrap
+  const a = sectionsFrom(paragraphs(book('', p8)), every).map((s) => [s.title, s.pageFrom, s.pageTo]);
+  // another: page 7 read as "4 Số?" (it is Bài 6's), and a running header copied above "Bài 7"
+  const b = sectionsFrom(paragraphs(book('4 Số? 12 + 8', `Toán 2\n${p8}`)), every).map((s) => [s.title, s.pageFrom, s.pageTo]);
+  assert.deepEqual(a, [['Bài 6: Luyện tập chung', 4, 7], ['Bài 7: Phép trừ có nhớ', 8, 8]]);
+  assert.deepEqual(b, a);
+  // a lesson that really goes on above the next heading keeps that page
+  const c = sectionsFrom(paragraphs(book('', `5 Một cửa hàng có 45 kg gạo, đã bán 18 kg. Hỏi còn lại bao nhiêu ki-lô-gam gạo?\n${p8}`)), every);
+  assert.deepEqual(c.map((s) => [s.title, s.pageFrom, s.pageTo]), [['Bài 6: Luyện tập chung', 4, 8], ['Bài 7: Phép trừ có nhớ', 8, 8]]);
+});
+
 test('Kết nối tri thức keeps to "Bài N": a "LUYỆN TẬP" banner inside a lesson starts no new part (Chi #48)', () => {
   const pages = [
     { page: 7, text: 'Bài 1\nÔN TẬP CÁC SỐ ĐẾN 100\n1 Hoàn thành bảng sau.' },

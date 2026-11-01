@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkItem, contextOf } from '../server/lesson/items.ts';
+import { hintOf, isRight } from '../server/classes/check.ts';
 import { checkSlide } from '../server/lesson/slide-check.ts';
 import type { Setup } from '../server/lesson/types.ts';
 import { applyWork, forPrompt, greetOf, slipOf, readCalc, titled, typeWork, workSlide } from '../server/lesson/work.ts';
@@ -182,4 +183,41 @@ test('the opening slide shows a sum with units as printed, without a trailing "=
   assert.equal(s.bullets[0], 'Phép cộng có nhớ: 329 cm + 183 cm, con viết 999 cm. Đúng là 512 cm.');
   assert.equal(s.bullets[1], 'Phép cộng có nhớ: 47 + 25, con viết 62. Đúng là 72.');
   assert.equal(s.example, '329 cm + 183 cm = 512 cm');
+});
+
+test("Chi #54: a child's English sheet: her own wrong items again, built by code where the reading gives the answer", () => {
+  const w = typeWork({ questions: [
+    { q: 'The sky is ___.', child: 'green', mark: 'wrong', right: 'blue', typeName: 'Colours' },
+    { q: 'What colour is a banana?', child: 'red', mark: 'wrong', right: 'yellow', typeName: 'Colours' },
+    { q: 'Order the words: name / my / is / Mai', child: 'Mai my name is', mark: 'wrong', right: 'my name is Mai', typeName: 'Word order' },
+    { q: 'I ___ a cat.', child: 'has', mark: 'wrong', right: 'have', typeName: 'Word order' },
+    { q: 'Draw your family and write about it.', child: 'My family', mark: 'wrong', right: '', typeName: 'Writing' },
+    { q: 'My favourite colour is ___.', child: 'red', mark: 'wrong', right: 'blue', typeName: 'Writing' },
+    { q: 'The grass is ___.', child: 'green', mark: 'right' },
+  ] }, { subject: 'english', date: '2026-10-31' });
+  assert.deepEqual([w.total, w.wrong], [7, 6]);
+  const source = 'Unit 3: Colours\nThe sky is blue. The grass is green. A banana is yellow. The sun is yellow. The apple is red. My name is Mai. I have a cat. What colour is it?';
+  const setup = { subject: 'english', grade: 3, title: 'Colours', objectives: [], minutes: 25, lang: 'en', forParent: true, work: { ...w, base: 'Colours' } } as Setup;
+  const skills = [{ tag: 'colours', name: 'Colours', kind: 'vocabulary' as const }];
+  const book = Array.from({ length: 6 }, (_, i) => ({ id: `ex${i + 1}`, subject: 'english' as const, template: 'listen' as const, skill: 'colours', level: 'basic' as const, prompt: 'Listen and choose the right word.', say: 'blue', options: ['blue', 'red', 'green'], explain: 'x', answer: 'blue' }));
+  const r = applyWork(setup, source, { skills, slides: [{ id: 'sl01', kind: 'title', heading: 'Colours', bullets: [], notes: '', source: '', narration: '', imagePrompt: '' }], items: book });
+  const mine = r.items.filter((i) => i.fromWork) as any[];
+  assert.ok(r.items.slice(0, mine.length).every((i) => i.fromWork), 'her items come first');
+  const sky = mine.find((i) => i.sentence === 'The sky is ___.');
+  assert.ok(sky && sky.template === 'fill' && sky.answer === 'blue', JSON.stringify(mine.map((i) => i.prompt + ' ' + (i.sentence || i.answer))));
+  assert.deepEqual([...sky.options].sort(), ['blue', 'green'], 'the right answer against hers');
+  assert.ok(isRight(sky, 'blue') && !isRight(sky, 'green'));
+  const h = hintOf(sky, 'green', 'en');
+  assert.ok(h.startsWith('On your sheet you wrote “green”') && !h.includes('blue'), h);
+  assert.ok(mine.some((i) => i.sentence === 'What colour is a banana? ___' && i.answer === 'yellow' && i.prompt === 'Choose the right answer.'), 'a question becomes a choice');
+  const order = mine.find((i) => i.template === 'order');
+  assert.equal(order?.answer, 'My name is Mai.'); assert.notEqual(order.words.join(' '), 'My name is Mai.');
+  assert.ok(mine.some((i) => i.sentence === 'I ___ a cat.' && i.answer === 'have'));
+  assert.ok(!mine.some((i) => /family|favourite/i.test(`${i.sentence} ${i.answer}`)), 'no right answer: left to the model; a sentence about likes fails the same checks as any item');
+  assert.ok(r.skills.some((k) => k.tag === 'bai_lam_en1') && r.skills.some((k) => k.tag === 'bai_lam_en2'));
+  for (const it of r.items) assert.deepEqual(checkItem(it, { ...contextOf(setup, r.skills, source), items: r.items }), [], it.prompt);
+  const open = r.slides[1];
+  assert.deepEqual(open.bullets.slice(0, 3), ['Colours: “The sky is ___.”, you wrote green. The answer is blue.', 'Word order: “Order the words: name / my / is / Mai”, you wrote Mai my name is. The answer is my name is Mai.', 'Writing: “Draw your family and write about it.”, you wrote My family.'], 'no "The answer is ." when the reading has none');
+  assert.ok(!/column|sums/.test(`${open.notes} ${open.bullets.join(' ')}`), 'an English sheet is not sums');
+  assert.deepEqual(checkSlide(open), []);
 });

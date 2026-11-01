@@ -38,7 +38,8 @@ const T = {
   },
 };
 
-export function Assign({ lessonId, parent = false, checked, redone, removed }: { lessonId: string; parent?: boolean; checked?: number; redone?: number; removed?: number }) {
+// pupilId: the lesson was made from this child's work, so the child (or the pupil's class) is picked first
+export function Assign({ lessonId, parent = false, checked, redone, removed, pupilId }: { lessonId: string; parent?: boolean; checked?: number; redone?: number; removed?: number; pupilId?: string }) {
   const t0 = useT(T), lang = useLang(), t = parent ? { ...t0, ...P[lang] } : t0;
   const [classes, setClasses] = useState<ClassRow[] | null>(null), [pick, setPick] = useState(''), [view, setView] = useState<ClassView | null>(null);
   const [due, setDue] = useState(''), [retry, setRetry] = useState(true), [hints, setHints] = useState(true), [ticked, setTicked] = useState(false);
@@ -46,7 +47,10 @@ export function Assign({ lessonId, parent = false, checked, redone, removed }: {
   const [earlier, setEarlier] = useState<LessonAssignment[]>([]);
   // after Assign the button block becomes a success card (Chi #33); a repeat asks first (Chi #34)
   const [doneFor, setDoneFor] = useState(''), [dup, setDup] = useState<string | null>(null);
-  const loadClasses = () => api.classes().then((r) => { setClasses(r.classes); setPick((p) => p || r.classes[0]?.id || ''); }).catch(() => setClasses([]));
+  const loadClasses = () => Promise.all([api.classes(), pupilId ? api.learners().catch(() => null) : null]).then(([r, ls]) => {
+    const own = ls?.learners.find((x) => x.id === pupilId)?.class_id;   // Chi: the Assign step did not pick the child whose work it was
+    setClasses(r.classes); setPick((p) => p || (own && r.classes.some((k) => k.id === own) ? own : r.classes[0]?.id) || '');
+  }).catch(() => setClasses([]));
   useEffect(() => { void loadClasses(); api.lessonAssignments(lessonId).then((r) => setEarlier(r.assignments)).catch(() => {}); }, [lessonId]);
   useEffect(() => { setView(null); setTicked(false); setDoneFor(''); setDup(null); if (pick) api.classView(pick).then(setView).catch(() => {}); }, [pick]);
   if (!classes) return null;

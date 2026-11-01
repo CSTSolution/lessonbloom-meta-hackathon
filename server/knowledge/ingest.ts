@@ -111,18 +111,33 @@ export function paragraphs(pages: PdfPage[]): { page: number; text: string; head
   return out;
 }
 
-export function sectionsFrom(pars: { page: number; text: string; heading: boolean }[]): Section[] {
+// A part's pages do not hang on what one reading of a scan happened to see (Chi #51d: the same file read
+// twice gave "Bài 6" pages 4-7, then 4-6). `pages`: every page of the book, with text or not.
+//  - a scrap before a lesson's heading on its page (a header or label the scan copied one time and not the
+//    next, under FURNITURE letters and digits) goes with that lesson: the one before ends on the page before;
+//  - a page with no text between two lessons (a picture page, a page the scan could not read this time)
+//    belongs to the lesson before it: a lesson ends where the next starts. The last ends on its last text.
+const FURNITURE = 20;
+const alnum = (s: string) => s.replace(/[^\p{L}\p{N}]/gu, '').length;
+export function sectionsFrom(pars: { page: number; text: string; heading: boolean }[], pages?: number[]): Section[] {
   const out: Section[] = [];
   let cur: Section | null = null;
   for (const p of pars) {
     // the same title again on the next page (a banner printed on each page of a lesson) goes on the same lesson
     if (p.heading && cur?.title && cur.title.toLowerCase() === p.text.slice(0, 120).toLowerCase() && p.page <= cur.pageTo + 1) continue;
-    if (p.heading) { cur = { title: p.text.slice(0, 120), pageFrom: p.page, pageTo: p.page, paragraphs: [] }; out.push(cur); continue; }
+    if (p.heading) {
+      const next: Section = { title: p.text.slice(0, 120), pageFrom: p.page, pageTo: p.page, paragraphs: [] };
+      const k = cur ? cur.paragraphs.findIndex((x) => x.page === p.page) : -1;
+      if (cur && k > 0 && alnum(cur.paragraphs.slice(k).map((x) => x.text).join('')) < FURNITURE) { next.paragraphs = cur.paragraphs.splice(k); cur.pageTo = cur.paragraphs[cur.paragraphs.length - 1].page; }
+      cur = next; out.push(cur); continue;
+    }
     if (!cur) { cur = { title: '', pageFrom: p.page, pageTo: p.page, paragraphs: [] }; out.push(cur); }   // front matter
     cur.paragraphs.push({ page: p.page, text: p.text });
     cur.pageTo = p.page;
   }
-  return out.filter((s) => s.paragraphs.length);
+  const kept = out.filter((s) => s.paragraphs.length);
+  for (const [i, s] of kept.entries()) { const nx = kept[i + 1]; if (nx && pages) s.pageTo = Math.max(s.pageTo, ...pages.filter((n) => n > s.pageTo && n < nx.pageFrom)); }
+  return kept;
 }
 
 // Paragraphs into passages of at most MAX_PASSAGE characters, never across a page.
@@ -201,6 +216,7 @@ export async function ingestBook(sql: Sql, ai: AI, areaId: string, bookId: strin
 // pictures (a scanned book). Pages keep their place in the file, and the number printed on them when it
 // can be read, so every lesson can cite the page as the paper book shows it.
 export async function ingestPages(sql: Sql, ai: AI, areaId: string, bookId: string, pages: PdfPage[]) {
+  const every = pages.map((p) => p.page);   // with the pages that have no text, so a lesson ends where the next starts (Chi #51d)
   pages = pages.filter((p) => p.text.trim());
   const asRead = pages.slice(0, 400);   // kept with the book, so it can be split again later for free (Chi #54d)
   if (!pages.length) throw new NotText();
@@ -213,7 +229,7 @@ export async function ingestPages(sql: Sql, ai: AI, areaId: string, bookId: stri
     return at === undefined ? p : { ...p, text: l.filter((_, i) => i !== at).join('\n') };
   }).filter((p) => p.text.trim());
   if (!pages.length) throw new NotText();
-  let sections = sectionsFrom(paragraphs(pages));
+  let sections = sectionsFrom(paragraphs(pages), every);
   if (sections.filter((s) => s.title).length < 2) sections = await sectionsByModel(ai, pages);
   // no lesson heading at all (a photo of a page in the middle of a lesson): the whole source is one part,
   // named after the source, so a lesson can always be made from it; she can rename it (Chi #25)

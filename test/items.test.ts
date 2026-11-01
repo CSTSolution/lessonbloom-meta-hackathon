@@ -263,7 +263,7 @@ test('Chi #52 (d): a reading-and-writing-numbers skill gets numbers in words, ne
   assert.equal(tf.prompt, 'True or false? 321 in words is “three hundred and twelve”.');
   assert.ok(isRight(tf, 'false'));
   assert.equal(num({ template: 'truefalse' }).answer, 'true');
-  assert.equal(num({ template: 'word', story: 'x' }).template, 'truefalse', 'a word-problem request on this skill becomes true or false');
+  assert.equal(num({ template: 'word', story: 'x' }).prompt, 'Which is 321 in words?', 'a word-problem request on this skill becomes choosing the words');
   assert.deepEqual(checkItem(num({ template: 'column', a: 640 }), cam), [], 'a column request becomes writing the number');
   assert.equal(num({}, 'vi').prompt, 'Số nào đọc là “ba trăm hai mươi mốt”?');
   assert.equal(num({ template: 'truefalse', shown: 231 }, 'vi').prompt, 'Đúng hay sai? Số 321 đọc là “hai trăm ba mươi mốt”.');
@@ -274,4 +274,36 @@ test('Chi #52 (d): a reading-and-writing-numbers skill gets numbers in words, ne
   assert.ok(checkItem(num({ a: 45 }), cam).some((i) => i.code === 'scope'), '45 belongs to an earlier chapter');
   assert.ok(checkItem(num({ a: 4321 }), cam).some((i) => i.code === 'scope'), 'above 1000');
   assert.ok(!checkItem(num({}), { ...cam, scope: scopeOf('Subtraction\n652 − 287') }).some((i) => i.code === 'scope'), 'a number in words is no addition, whatever the section\'s signs');
+});
+
+test('Chi #52: a hint for the very option she picked, never the answer', () => {
+  const fill = { template: 'fill' as const, skill: 'body', level: 'basic' as const, prompt: 'Choose the missing word.', sentence: 'You must only step on the ___.', options: ['stones', 'floor', 'grass'], answer: 'stones', explain: 'The floor is lava, so you step only on the stones, not on the floor or the grass.' };
+  const it = buildEnglish({ ...fill, why: [{ option: 'Floor', why: 'The floor is lava, so you must not step on the floor.' }, { option: 'grass', why: 'Step on the stones, not the grass.' }, { option: 'stones', why: 'Right!' }, { option: 'sand', why: 'No sand here.' }] }, 'ex01', 'en');
+  assert.deepEqual(it.why, { floor: 'The floor is lava, so you must not step on the floor.' }, 'a reason naming the answer, for the answer, or for no option is dropped');
+  assert.equal(hintOf(it, 'floor', 'en'), 'The floor is lava, so you must not step on the floor.');
+  const other = hintOf(it, 'grass', 'en');
+  assert.ok(other.includes('___') && !other.includes('stones'), `no reason for "grass": the explanation with the answer hidden: ${other}`);
+  assert.equal(forPupil(it).hasOwnProperty('why'), false, 'pupils never receive the reasons');
+  assert.equal(buildEnglish({ ...fill, why: { grass: 'x'.repeat(141) } }, 'ex02', 'en').why, undefined, 'a long reason is dropped');
+  assert.deepEqual(buildEnglish({ ...fill, why: { grass: 'Grass is soft, but the rule says no.' } }, 'ex03', 'en').why, { grass: 'Grass is soft, but the rule says no.' }, 'a map (from code or an edit) is kept too');
+  assert.equal(buildEnglish({ ...fill, sentence: 'What colour ___ it?', options: ['is', 'are', 'am'], answer: 'is', why: { are: 'This is for many things.', am: '"am" goes only with "I".' } }, 'ex04', 'en').why?.are, undefined, 'a grammar word: a reason saying "is" gives it away');
+});
+
+test('Chi #52 (d): "Which is 321 in words?" with word options, checked as text', () => {
+  const m = num({ template: 'word' });
+  assert.equal(m.template, 'mcq'); assert.equal(m.blank, 'a'); assert.equal(m.answer, 'three hundred and twenty-one');
+  assert.deepEqual([...m.options!].sort(), ['thirty thousand and twenty-one', 'three hundred and twelve', 'three hundred and twenty-one', 'two hundred and thirty-one'], 'the right words and the words of the slips');
+  assert.ok(isRight(m, 'three hundred and twenty-one') && isRight(m, ' Three Hundred and twenty one ') && !isRight(m, 'three hundred and twelve') && !isRight(m, '321'));
+  assert.deepEqual(checkItem(m, cam), []);
+  assert.deepEqual(forPupil(m).options, m.options);
+  const h = hintOf(m, 'three hundred and twelve', 'en');
+  assert.ok(h.startsWith('“three hundred and twelve” is 312, not 321.') && !h.includes('twenty-one'), h);
+  assert.equal(hintOf(num({}), '312', 'en'), '312 in words is “three hundred and twelve”. Read it by place: the hundreds, then the tens, then the ones.', 'picking a number: its words said back');
+  // a teacher's edit is rebuilt from a, op, b (and the template and blank it keeps): still choosing the words
+  const e = buildMath({ template: m.template, blank: m.blank, skill: m.skill, level: m.level, a: 640, op: '+', b: 0, distractors: m.distractors, explain: m.explain }, m.id, 'en');
+  assert.equal(e.prompt, 'Which is 640 in words?'); assert.equal(e.answer, 'six hundred and forty'); assert.deepEqual(checkItem(e, cam), []);
+  const v = num({ template: 'word' }, 'vi');
+  assert.equal(v.prompt, 'Số 321 đọc là gì?'); assert.ok(v.options!.includes('ba trăm mười hai') && isRight(v, 'Ba trăm hai mươi mốt'));
+  assert.deepEqual(checkItem(v, { ...cam, lang: 'vi' }), []);
+  assert.ok(hintOf(v, 'ba trăm mười hai', 'vi').startsWith('“ba trăm mười hai” là số 312, không phải 321.'));
 });

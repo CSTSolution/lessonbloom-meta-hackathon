@@ -16,7 +16,7 @@ const PAIRS = 4;  // pairs in the game (Chi's design: "Tìm 4 cặp", 8 cards fi
 const S = {
   vi: {
     hiKid: 'Chào con!', joinSub: 'Nhập mã lớp cô đưa, rồi chọn tên con nhé.', codeLabel: 'Mã lớp', next: 'Tiếp', who: 'Con là ai?', notMe: 'Đổi lớp', noName: 'Không thấy tên con? Hỏi cô giáo nhé.',
-    hello: (n: string, k: string) => (k && k !== n ? `Chào ${n} · ${k}` : `Chào ${n}`), todayIs: (t: string) => `Bài hôm nay: ${t}`, fromWork: 'Luyện lại từ bài con làm', nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!', leave: 'Thoát', remind: 'Nhớ nhé!',
+    hello: (n: string, k: string) => (k && k !== n ? `Chào ${n} · ${k}` : `Chào ${n}`), todayIs: (t: string) => `Bài hôm nay: ${t}`, other: (t: string) => `Bài khác: ${t}`, fromWork: 'Luyện lại từ bài con làm', nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!', leave: 'Thoát', remind: 'Nhớ nhé!',
     video: 'Xem video', slides: 'Xem bài', seen: 'đã xem', cards: 'Thẻ nhớ', nCards: (n: number) => `${n} thẻ`, doneMark: 'đã xong', practise: 'Làm bài tập', nItems: (n: number) => `${n} câu`, pairs: 'Lật thẻ', nPairs: (n: number) => `Tìm ${n} cặp`,
     gotSoFar: 'Con đã đi được', back: 'Quay lại', done: 'Xong', subject: { math: 'Toán', english: 'Tiếng Anh' } as Record<string, string>,
     qOf: (k: number, n: number) => `Câu ${k}/${n}`, pick: 'Con chọn câu trả lời đúng nhé', listenQ: 'Nghe câu hỏi', almost: 'Gần đúng rồi! Thử lại nhé', notThis: 'Chưa đúng rồi. Mình sang câu khác nhé', right: 'Đúng rồi, giỏi quá!',
@@ -29,7 +29,7 @@ const S = {
   },
   en: {
     hiKid: 'Hi there!', joinSub: 'Type the class code from your teacher, then tap your name.', codeLabel: 'Class code', next: 'Next', who: 'Who are you?', notMe: 'Change class', noName: "Can't see your name? Ask your teacher.",
-    hello: (n: string, k: string) => (k && k !== n ? `Hi ${n} · ${k}` : `Hi ${n}`), todayIs: (t: string) => `Today: ${t}`, fromWork: 'Practice again from your work', nothing: 'Nothing for today yet. Come back later!', leave: 'Leave', remind: 'Remember!',
+    hello: (n: string, k: string) => (k && k !== n ? `Hi ${n} · ${k}` : `Hi ${n}`), todayIs: (t: string) => `Today: ${t}`, other: (t: string) => `Another lesson: ${t}`, fromWork: 'Practice again from your work', nothing: 'Nothing for today yet. Come back later!', leave: 'Leave', remind: 'Remember!',
     video: 'Watch the video', slides: 'Look at the lesson', seen: 'watched', cards: 'Flashcards', nCards: (n: number) => `${n} cards`, doneMark: 'done', practise: 'Practise', nItems: (n: number) => `${n} questions`, pairs: 'Find the pairs', nPairs: (n: number) => `Find ${n} pairs`,
     gotSoFar: "How far you've got", back: 'Back', done: 'Done', subject: { math: 'Maths', english: 'English' } as Record<string, string>,
     qOf: (k: number, n: number) => `Question ${k}/${n}`, pick: 'Pick the right answer', listenQ: 'Listen to the question', almost: 'Almost! Try again', notThis: "Not this time. Let's go on", right: "That's right, well done!",
@@ -120,12 +120,13 @@ function PupilPage() {
     <Frame t={t} title={<span className="p-soft">{t.hello(today.pupil.name, today.class.name)}</span>}>
       {today.reminder && <div className="p-note" role="note"><span className="p-bang">!</span><span><b>{t.remind}</b> {lang === 'en' ? today.reminder.en : today.reminder.vi}</span></div>}
       {!today.lessons.length && <p className="p-soft">{t.nothing}</p>}
-      {today.lessons.map((l) => {
+      {today.lessons.map((l, n) => {
         const parts = [l.video ? l.video_seen : l.slides > 0 ? l.slides_seen : null, l.cards > 0 ? l.cards_seen : null, l.items > 0 ? l.done : null].filter((x) => x !== null) as boolean[];
         return (
           <section key={l.id} className="p-lesson">
             <span className="p-chip">{t.subject[l.subject] || l.subject}</span>
-            <h1>{t.todayIs(l.title)}</h1>
+            {/* only the newest is today's (Chi #51b: five lessons all said "Bài hôm nay") */}
+            {n === 0 ? <h1>{t.todayIs(l.title)}</h1> : <h2>{t.other(l.title)}</h2>}
             {/* made from her own marked work (Chi #46): what she found tricky last time */}
             {l.greet && <p className="p-soft">{lang === 'en' ? l.greet.en : l.greet.vi}</p>}
             <div className="p-acts">

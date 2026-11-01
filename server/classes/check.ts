@@ -1,14 +1,19 @@
 // A pupil's answer, checked on the server against the answer code worked out (pupils never receive it),
 // and the item as a pupil may see it: no answer, no explanation, no words that are read aloud.
+import { numberWords } from '../lesson/items.ts';
 import type { Item } from '../lesson/types.ts';
 
 const norm = (s: unknown) => String(s ?? '').normalize('NFC').toLowerCase().replace(/[“”"'’.!?,;:]/g, ' ').replace(/\s+/g, ' ').trim();
+// a number in words, as text: case, spaces and hyphens do not count ("Three hundred and twenty-one")
+const say = (s: unknown) => norm(s).replace(/[-‐–]/g, ' ').replace(/\s+/g, ' ').trim();
 const pairsOf = (s: string) => new Set(String(s).split(',').map((p) => p.split('=').map(norm).join('=')).filter((p) => p.includes('=')));
 
 export function isRight(it: Item, given: unknown): boolean {
   const g = String(given ?? '').slice(0, 500);
   if (it.subject === 'math') {
     if (it.template === 'truefalse') return norm(g) === it.answer;
+    // "Which is 321 in words?" (Chi #52): the answer is words, not a number
+    if (!/^\d+$/.test(it.answer)) return say(g) !== '' && say(g) === say(it.answer);
     const n = Number(g.trim().replace(',', '.'));
     return g.trim() !== '' && Number.isFinite(n) && n === Number(it.answer);
   }
@@ -119,18 +124,33 @@ function mathMethod(it: MathIt, k: string, lang: 'vi' | 'en', full: boolean): st
 
 // wrongBefore: her wrong tries at this item before this one (Chi #50: the first gets a nudge, then the method)
 export function mathHint(it: MathIt, given: string, lang: 'vi' | 'en', wrongBefore = 0): string {
-  if (it.op === '+' && it.b === 0) return NUDGE.words[lang];
+  if (it.op === '+' && it.b === 0) return readHint(it, given, lang);
   const k = kindOf(it, given);
   return (wrongBefore >= 1 && mathMethod(it, k, lang, wrongBefore >= 2).replace(/\?\./g, '?')) || NUDGE[k][lang];
+}
+
+// A number in words (Chi #52): the number she picked, said back to her ("312 is “three hundred and twelve”"), then how to
+// read it by place. It never says the words or the digits of the answer, only what the question already shows.
+function readHint(it: MathIt, given: string, lang: 'vi' | 'en'): string {
+  const g = String(given).trim(), vi = lang === 'vi', tail = NUDGE.words[lang];
+  if (it.template === 'truefalse' || !g) return tail;
+  if (!/^\d+$/.test(it.answer)) {
+    const n = (it.distractors || []).find((d) => say(numberWords(d, lang)) === say(g));
+    return n === undefined ? tail : vi ? `“${numberWords(n, lang)}” là số ${n}, không phải ${it.a}. ${tail}` : `“${numberWords(n, lang)}” is ${n}, not ${it.a}. ${tail}`;
+  }
+  const n = Number(g), w = /^\d+$/.test(g) && n !== Number(it.answer) ? numberWords(n, lang) : '';
+  return w ? (vi ? `Số ${n} đọc là “${w}”. ${tail}` : `${n} in words is “${w}”. ${tail}`) : tail;
 }
 
 export function hintOf(it: Item, given = '', lang: 'vi' | 'en' = 'vi', wrongBefore = 0): string {
   if (it.subject === 'math') return mathHint(it, given, lang, wrongBefore);
   const x = String(it.explain || '');
   // English: these explanations are the answer itself (the sentence, the pairs): no hint; others hide the word
-  if (!x || it.template === 'match' || it.template === 'order') return '';
-  const esc = it.answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return x.replace(new RegExp(`(?<!\\p{L})${esc}(?!\\p{L})`, 'giu'), '___');
+  if (it.template === 'match' || it.template === 'order') return '';
+  const esc = it.answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), hide = (s: string) => (esc ? s.replace(new RegExp(`(?<!\\p{L})${esc}(?!\\p{L})`, 'giu'), '___') : s);
+  // Chi #52: the reason for the very option she picked ("floor": the floor is lava), else the explanation, the answer hidden
+  const why = Object.entries(it.why || {}).find(([o]) => norm(o) === norm(given))?.[1];
+  return why ? hide(why) : x ? hide(x) : '';
 }
 
 // Deterministic shuffle, so a pupil sees the same order every time she opens the item.

@@ -12,7 +12,7 @@ const T = {
   vi: {
     title: 'Tóm tắt học tập', advice: 'Tư vấn riêng cho từng em', adviceSub: (n: number) => `${n} em có kết quả để tư vấn.`, seeEach: 'Xem chi tiết từng em ›', lesson: 'Bài học', allLessons: 'Tất cả bài', cls: 'Lớp', child: 'Con',
     tt27: 'Hỗ trợ nhận xét thường xuyên trong quá trình học: không chấm điểm, không so sánh học sinh. Mức hoàn thành cuối cùng vẫn do cô quyết định; LessonBloom không dùng cho kiểm tra, đánh giá định kỳ.', tt27p: 'Hỗ trợ nhận xét thường xuyên trong quá trình học: không chấm điểm, không so sánh con với bạn khác. Đây là gợi ý để bố mẹ luyện thêm cùng con ở nhà; mức hoàn thành ở trường vẫn do giáo viên của con quyết định.',
-    grid: 'Xem bảng dạng bài × lớp', clsRepeat: (n: number) => `${n} dạng bài cả lớp lặp lỗi`, kidsRepeat: (n: number) => `${n} lượt em lặp lỗi`,
+    grid: 'Xem bảng dạng bài × lớp', clsRepeat: (n: number) => `${n} dạng bài cả lớp lặp lỗi`, clsRepeatP: (n: number) => `${n} dạng bài con lặp lỗi`, kidsRepeat: (n: number) => `${n} lượt em lặp lỗi`,
     overview: 'Tổng quan các lớp', overviewP: 'Tổng quan các con', ratio: 'Tỉ lệ dạng bài · tất cả các lớp', byClass: 'Theo từng lớp', byChild: 'Theo từng con', detail: 'Xem chi tiết ›', labels: { solid: 'Đã vững', practising: 'Đang luyện', repeat: 'Lỗi lặp lại' },
     legend: 'Lỗi lặp lại: cần luyện thêm cùng dạng · Đang luyện: chưa đủ lượt làm để kết luận · Đã vững: có thể chuyển bài nâng cao', edit: 'Chỉnh tiêu chí ›', count: (n: number) => `${n} lượt dạng bài`,
     one: (n: string) => `Chi tiết lớp · ${n}`, oneP: (n: string) => `Chi tiết · ${n}`, mist: (n: string) => `Dạng lỗi đang lặp lại · ${n}`, solid: (n: string) => `Đã vững và buổi sau · ${n}`, comments: (n: string) => `Gợi ý lời nhận xét · ${n}`,
@@ -21,7 +21,7 @@ const T = {
   en: {
     title: 'Learning summary', advice: 'Advice for each learner', adviceSub: (n: number) => `${n} learner${n === 1 ? ' has' : 's have'} results to advise on.`, seeEach: 'See each learner ›', lesson: 'Lesson', allLessons: 'All lessons', cls: 'Class', child: 'Child',
     tt27: 'Supports ongoing feedback while pupils learn: comments, no scores, no comparing pupils. Final achievement levels remain the teacher\'s decision; LessonBloom is not used for periodic tests or assessments.', tt27p: 'Supports ongoing feedback while your child learns: no scores, no comparing with other children. It is a guide for practising together at home; your child\'s achievement level at school remains their teacher\'s decision.',
-    grid: 'Skills × classes table', clsRepeat: (n: number) => `${n} class skill${n === 1 ? '' : 's'} with a repeated mistake`, kidsRepeat: (n: number) => `${n} learner${n === 1 ? '' : 's'} repeating it`,
+    grid: 'Skills × classes table', clsRepeat: (n: number) => `${n} class skill${n === 1 ? '' : 's'} with a repeated mistake`, clsRepeatP: (n: number) => `${n} skill${n === 1 ? '' : 's'} with a repeated mistake`, kidsRepeat: (n: number) => `${n} learner${n === 1 ? '' : 's'} repeating it`,
     overview: 'All classes', overviewP: 'All children', ratio: 'Skills · all classes', byClass: 'By class', byChild: 'By child', detail: 'Details ›', labels: { solid: 'Mastered', practising: 'Practising', repeat: 'Repeated mistake' },
     legend: 'Repeated mistake: practise more of the same · Practising: not enough answers yet · Mastered: ready for harder items', edit: 'Edit criteria ›', count: (n: number) => `${pl(n, 'class skill')}`,
     one: (n: string) => `Class detail · ${n}`, oneP: (n: string) => `Detail · ${n}`, mist: (n: string) => `Repeated mistakes · ${n}`, solid: (n: string) => `Mastered and next · ${n}`, comments: (n: string) => `Suggested comments · ${n}`,
@@ -65,7 +65,7 @@ export function Insights({ parent }: { parent: boolean }) {
       </div>
       <p className="banner blue small" style={{ marginBottom: 10 }}>ⓘ {parent ? t.tt27p : t.tt27}</p>
       {!s.classes.some((x) => x.skills.length) ? <div className="card"><p className="muted">{t.none}</p></div> : <div className="stack">
-        {section('overview', parent ? t.overviewP : t.overview, t.count(s.total.solid + s.total.practising + s.total.repeat), s.total.repeat ? <span className="tag repeat">{t.clsRepeat(s.total.repeat)}</span> : null, <>
+        {section('overview', parent ? t.overviewP : t.overview, t.count(s.total.solid + s.total.practising + s.total.repeat), s.total.repeat ? <span className="tag repeat">{(parent ? t.clsRepeatP : t.clsRepeat)(s.total.repeat)}</span> : null, <>
           <div className="grid2">
             <div className="card row"><Donut v={s.total} /><div className="stack" style={{ gap: 4 }}>{(['solid', 'practising', 'repeat'] as Label[]).map((l) => <span key={l} className="small"><b style={{ color: COLOR[l] }}>●</b> {t.labels[l]} · {s.total[l]} · {pct(s.total[l])}</span>)}</div></div>
             <div className="card stack" style={{ gap: 6 }}><b className="small">{parent ? t.byChild : t.byClass}</b>{s.classes.map((x) => { const c = x.skills.reduce((a, sk) => ({ solid: a.solid + (sk.label === 'solid' ? 1 : 0), practising: a.practising + (sk.label === 'practising' ? 1 : 0), repeat: a.repeat + (sk.label === 'repeat' ? 1 : 0) }), { solid: 0, practising: 0, repeat: 0 }); const n = c.solid + c.practising + c.repeat || 1; return (

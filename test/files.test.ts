@@ -14,8 +14,9 @@ async function ready(call: any, areaId: string, bookId: string) {
   for (let i = 0; i < 400; i++) { b = (await call('GET', `/api/t/areas/${areaId}`)).json.books.find((x: any) => x.id === bookId); if (b && b.status !== 'processing') return b; await wait(15); }
   return b;
 }
-// a PDF of pages that are only pictures (a scanned book), built with a real JPEG so poppler can draw it
-function scannedPdf(pages: number) {
+// a PDF of pages that are only pictures (a scanned book), built with a real JPEG so poppler can draw it;
+// `text`: pages that also carry a line of real text (a scan with a few typed pages)
+function scannedPdf(pages: number, text: Record<number, string> = {}) {
   const img = jpeg.encode({ data: Buffer.alloc(200 * 280 * 4, 255), width: 200, height: 280 }, 80).data;
   const parts: Buffer[] = [], offs: number[] = []; let len = 0;
   const push = (b: Buffer | string) => { const x = typeof b === 'string' ? Buffer.from(b, 'latin1') : b; parts.push(x); len += x.length; };
@@ -24,10 +25,10 @@ function scannedPdf(pages: number) {
   const kids = Array.from({ length: pages }, (_, p) => 5 + p * 3);
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>'); obj(2, `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${pages} >>`);
   for (let p = 0; p < pages; p++) {
-    const im = 3 + p * 3, ct = im + 1, pg = im + 2, cs = 'q 595 0 0 842 0 0 cm /Im0 Do Q';
+    const im = 3 + p * 3, ct = im + 1, pg = im + 2, cs = `q 595 0 0 842 0 0 cm /Im0 Do Q${text[p + 1] ? ` BT /F1 12 Tf 50 800 Td (${text[p + 1]}) Tj ET` : ''}`;
     obj(im, `<< /Type /XObject /Subtype /Image /Width 200 /Height 280 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.length} >>\nstream\n`, img, '\nendstream');
     obj(ct, `<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
-    obj(pg, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${ct} 0 R /Resources << /XObject << /Im0 ${im} 0 R >> >> >>`);
+    obj(pg, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents ${ct} 0 R /Resources << /XObject << /Im0 ${im} 0 R >> /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>`);
   }
   const total = 3 + pages * 3, x = len;
   push(`xref\n0 ${total}\n0000000000 65535 f \n${Array.from({ length: total - 1 }, (_, i) => `${String(offs[i + 1]).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF`);
@@ -79,6 +80,47 @@ test('files: a PDF the browser could not open goes to R2 and is read on our serv
   assert.equal((await call('POST', `/api/t/books/${o2.book.id}/original/scan`, { pages: [1, 2, 3] })).status, 200);
   assert.equal((await ready(call, area.id, o2.book.id)).status, 'ready');
   assert.deepEqual(read.sort(), [1, 2, 3], 'each page drawn on the server and read');
+});
+
+test('files: a scanned PDF read on our server (Safari, Chi #26) goes as in Chrome: the estimate, enough credits, the hold, page k/N, then settled', async () => {
+  const store = new MemoryStore(), s = await testServer({ store }), call = s.client('198.51.100.171');
+  await call('POST', '/api/auth/demo', { lang: 'vi' });
+  const { area } = (await call('POST', '/api/t/areas', { name: 'Toán 2', subject: 'math', grade: 2 })).json;
+  // 12 pages, half of them with a typed line but none of the five Chrome looks at (1, 3, 6, 9, 12): Chrome
+  // says scanned, and our server, counting every page, used to say text and read it free, with no estimate
+  const typed = Object.fromEntries([2, 4, 5, 7, 8, 10].map((n) => [n, `Trang ${n} co mot dong chu go san trong ban scan`]));
+  const scan = scannedPdf(12, typed);
+  const o = (await call('POST', `/api/t/areas/${area.id}/books/original`, { size: scan.length, title: 'Toán 2 scan' })).json;
+  await store.put(o.url.slice('memory://'.length), scan, 'application/pdf');
+  const d = (await call('POST', `/api/t/books/${o.book.id}/original/done`, { read: true })).json;
+  assert.equal(d.text, false, 'scanned, as Chrome says'); assert.equal(d.pages, 12);
+  assert.equal(d.estimate.pages, 12); assert.ok(d.estimate.need > d.estimate.predicted, 'what she must have: the estimate and 50% more');
+  const credits = async () => (await call('GET', '/api/t/me')).json.credits.left;
+  const before = await credits();
+  // not enough credits: nothing is read, nothing held, and the numbers come back for the page
+  await s.sql.query(`update teachers set credits = 1 where id = (select teacher_id from areas where id = $1)`, [area.id]);
+  const no = await call('POST', `/api/t/books/${o.book.id}/original/scan`, { pages: Array.from({ length: 12 }, (_, k) => k + 1) });
+  assert.equal(no.status, 402); assert.equal(no.json.code, 'scanCredits'); assert.equal(no.json.estimate.enough, false);
+  assert.ok(!(await s.sql.one(`select 1 from credit_log where ref = $1`, [o.book.id])), 'nothing held');
+  await s.sql.query(`update teachers set credits = $2 where id = (select teacher_id from areas where id = $1)`, [area.id, before]);
+  // enough: held, read page by page with k/N for "Reading page k/N", then what was not used comes back
+  const seen: string[] = [];
+  s.ai.answers.set('ocr', (r) => {
+    const p = (r.fixture as { page: number }).page;
+    void s.sql.one<{ progress: string }>(`select progress from jobs where ref = $1 and status = 'running'`, [o.book.id]).then((j) => { if (j) seen.push(j.progress); });
+    return { usable: true, text: `Bài ${Math.ceil(p / 2)}: Phép cộng\n${p} + 27 = ?`, printed: p };
+  });
+  const go = (await call('POST', `/api/t/books/${o.book.id}/original/scan`, { pages: Array.from({ length: 12 }, (_, k) => k + 1) })).json;
+  assert.equal(go.ok, true);
+  const hold = await s.sql.one<{ n: string }>(`select -credits as n from credit_log where reason = 'hold' and ref = $1`, [o.book.id]);
+  assert.equal(Number(hold?.n), go.estimate.need, 'the estimate\'s need is held');
+  assert.equal((await ready(call, area.id, o.book.id)).status, 'ready');
+  for (let i = 0; i < 200 && !(await s.sql.one(`select 1 from credit_log where reason = 'refund' and ref = $1`, [o.book.id])); i++) await wait(15);
+  assert.ok(seen.some((x) => /^\d+\/12$/.test(x)), `job progress k/12, saw ${JSON.stringify(seen)}`);
+  assert.equal((await s.sql.one<{ progress: string }>(`select progress from jobs where ref = $1`, [o.book.id]))?.progress, '12/12');
+  const spent = before - await credits(), book = (await call('GET', '/api/t/areas')).json.areas.find((x: any) => x.id === area.id).books[0];
+  assert.ok(spent > 0 && spent <= go.estimate.need, `spent ${spent}`);
+  assert.equal(Number(book.used), spent, 'used, as the book shows it, is what came off'); assert.equal(Number(book.returned), go.estimate.need - spent);
 });
 
 test('files: her allowance is checked before anything is sent', async () => {

@@ -139,3 +139,18 @@ test('API: the demo lesson limit and the money check stop new lessons', async ()
   await s.sql.query(`insert into ai_usage (endpoint, model, usd, at) values ('agent', 'muse-wonder-1.0', 1000, now() - interval '3 days')`);
   assert.equal((await call('POST', `/api/t/areas/${areaId}/match`, { request: 'Unit 5 animals' })).json.code, 'credit', 'the Meta credit cap says so, not "try tomorrow"');
 });
+
+test('a lesson shows its slides\' and items\' pages as printed in the book, like Knowledge (Chi #53)', async () => {
+  const s = await testServer(), call = s.client('198.51.100.180');
+  await call('POST', '/api/auth/demo');
+  const { areaId, bookId } = await areaWithBook(call, 'toan2');
+  const a = await lessonFrom(call, areaId, 'Bài 21');
+  const filePages = a.lesson.slides.map((x: any) => x.page).filter(Boolean);
+  assert.ok(filePages.length, 'slides carry their page');
+  // the book's page 1 is the file's page 2 (a cover first): every page shown one lower
+  assert.equal((await call('PUT', `/api/t/books/${bookId}/page-one`, { pageOne: 2 })).status, 200);
+  const l = (await call('GET', `/api/t/lessons/${a.id}`)).json.lesson;
+  assert.deepEqual(l.slides.map((x: any) => x.page).filter(Boolean), filePages.map((p: number) => p - 1));
+  const sec = (await call('GET', `/api/t/areas/${areaId}`)).json.sections.find((x: any) => x.id === a.match.sectionId);
+  assert.equal(sec.printed_from, sec.page_from - 1, 'Knowledge shows the same numbering');
+});

@@ -11,6 +11,7 @@ import { useLang, useT } from '../i18n.ts';
 import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
 import { WorkTable } from './WorkCard.tsx';
+import { pagesOf } from './Sources.tsx';
 
 export const STEPS = { vi: ['Tài liệu', 'Câu hỏi', 'Slide', 'Video', 'Bài tập', 'Giao bài'], en: ['Material', 'Questions', 'Slides', 'Video', 'Practice', 'Assign'] };
 // Chi's role table: Questions (2) is the teacher's step; a parent's run 1, 3, 4, 5, 6, shown as 1-5. The
@@ -122,7 +123,8 @@ export function Create({ parent }: { parent: boolean }) {
     try { setMatch((await api.match(areaId, text)).match); } catch (e) { if (e instanceof ApiError && e.code === 'noMatch') setMissing(true); else throw e; }
   });
   const chosen = sections.find((s) => s.id === sectionId), a = areas?.find((x) => x.id === areaId);
-  const scopeText = chosen ? `${a?.name} · ${t.page} ${chosen.page_from}${chosen.page_to > chosen.page_from ? `–${chosen.page_to}` : ''}` : match ? `${match.book} · ${t.page} ${match.pageFrom}${match.pageTo > match.pageFrom ? `–${match.pageTo}` : ''}` : '';
+  // pages as printed in the book when known, as Knowledge shows them (Chi #53: "tr. 1–5" here, "Trang 10–14" there)
+  const scopeText = chosen ? `${a?.name} · ${t.page} ${pagesOf(chosen.page_from, chosen.page_to, chosen.printed_from, chosen.printed_to)}` : match ? `${match.book} · ${t.page} ${pagesOf(match.pageFrom, match.pageTo, match.printedFrom, match.printedTo)}` : '';
   const toStep2 = () => run('intake', async () => {
     // the work is saved to the child's profile first (Chi #46), as she corrected it; the lesson carries a copy
     let w = kind === 'work' ? work : null;
@@ -179,7 +181,7 @@ export function Create({ parent }: { parent: boolean }) {
           {noBook}
           <div className="grid2">
             <label className="field">{t.source}<select value={areaId} disabled={!areas.length} onChange={(e) => { setAreaId(e.target.value); setSectionId(''); }}>{areas.length ? areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>) : <option value="">{t.noSource}</option>}</select></label>
-            <label className="field">{t.part}<select value={sectionId} disabled={!areaId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); }}><option value="">{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {s.page_from}</option>)}</select></label>
+            <label className="field">{t.part}<select value={sectionId} disabled={!areaId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); }}><option value="">{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {pagesOf(s.page_from, s.page_to, s.printed_from, s.printed_to)}</option>)}</select></label>
           </div>
           {areas.length > 0 && <button className="link small" style={{ alignSelf: 'start' }} onClick={() => go('/knowledge')}>{t.openKnowledge}</button>}
         </div>

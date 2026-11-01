@@ -4,8 +4,8 @@
 // The model only reads the page (each question, what the child wrote, the adult's mark); code works out
 // the right answer and the kind of mistake (carrying, borrowing, comparing), builds the practice from the
 // child's own sums and the opening slide, so a parent SEES the lesson was made from her child's work.
-import { buildMath, checkItem, compute, contextOf, SIGN } from './items.ts';
-import type { Item, Lang, MathItem, Op, Setup, Skill, Slide } from './types.ts';
+import { buildEnglish, buildMath, checkItem, compute, contextOf, SIGN } from './items.ts';
+import type { EnglishItem, Item, Lang, MathItem, Op, Setup, Skill, Slide } from './types.ts';
 
 export type WorkKind = 'add_carry' | 'add_no_carry' | 'sub_borrow' | 'sub_no_borrow' | 'compare' | 'find_missing' | 'multiply' | 'divide' | 'other';
 export const WORK_KINDS: WorkKind[] = ['add_carry', 'add_no_carry', 'sub_borrow', 'sub_no_borrow', 'compare', 'find_missing', 'multiply', 'divide', 'other'];
@@ -208,6 +208,7 @@ const TIP: Partial<Record<WorkKind, Words>> = {
   find_missing: { vi: 'Thử lại bằng phép tính ngược để kiểm tra.', en: 'Check with the opposite sum.' },
 };
 const TIP_ANY: Words = { vi: 'Làm từ hàng đơn vị, cẩn thận từng hàng.', en: 'Start from the ones, one column at a time.' };
+const TIP_EN: Words = { vi: 'Đọc cả câu trước khi chọn. Tìm từ gợi ý.', en: 'Read the whole sentence first. Find the word that gives the clue.' };
 // the sum as printed, without a trailing "=" or "= ?" (live test 1 Nov: "329 cm + 183 cm =, con viết…")
 const show = (q: string) => tidy(q).replace(/\s*=\s*\??\s*$/, '').replace(/ - /g, ' − ').replace(/ \? /g, ' … ');
 
@@ -216,11 +217,13 @@ export function workSlide(w: Work, kinds: WorkKind[], lang: Lang, parent: boolea
   const types = w.types.filter((t) => kinds.includes(t.kind)).slice(0, 3);
   // the child's own wrong sums, kind by kind: one of each kind first, then a second of the same kind (3 at most)
   const own = types.flatMap((t) => w.questions.filter((q) => !q.ok && q.kind === t.kind && q.label.en === t.label.en).map((q, k) => ({ q, t, k })));
-  const bullets = [...own.filter((x) => x.k === 0), ...own.filter((x) => x.k > 0)].slice(0, 3).map(({ q: x, t }) => {
+  const en = w.subject === 'english', bullets = [...own.filter((x) => x.k === 0), ...own.filter((x) => x.k > 0)].slice(0, 3).map(({ q: x, t }) => {
+    // English (Chi #54): the sentence in quotes with its gap; a right answer the reading did not give is left out, never "The answer is ."
+    if (en) { const s = `“${clip(x.q.replace(GAP, '___'), 60)}”`, said = L === 'en' ? `${t.label.en}: ${s}, you wrote ${x.child || '…'}.` : `${t.label.vi}: ${s}, ${you} viết ${x.child || '…'}.`; return x.right ? `${said} ${L === 'en' ? `The answer is ${x.right}.` : `Đúng là ${x.right}.`}` : said; }
     if (t.kind === 'compare') return L === 'en' ? `${t.label.en}: ${show(x.q)}, you put ${x.child || '…'}. The right sign is ${x.right}.` : `${t.label.vi}: ${show(x.q)}, ${you} điền dấu ${x.child || '…'}. Đúng là dấu ${x.right}.`;
     return L === 'en' ? `${t.label.en}: ${show(x.q)}, you wrote ${x.child || '…'}. The answer is ${x.right}.` : `${t.label.vi}: ${show(x.q)}, ${you} viết ${x.child || '…'}. Đúng là ${x.right}.`;
   });
-  const top = types[0], tip = (top && TIP[top.kind]) || TIP_ANY;
+  const top = types[0], tip = en ? TIP_EN : (top && TIP[top.kind]) || TIP_ANY;
   bullets.push(tip[L]);
   const first = top && w.questions.find((q) => !q.ok && q.kind === top.kind && q.calc && !q.calc.cmp && q.calc.blank === 'result');
   // with the unit on every number when the sheet had one ("329 cm + 183 cm = 512 cm")
@@ -232,10 +235,12 @@ export function workSlide(w: Work, kinds: WorkKind[], lang: Lang, parent: boolea
     id: 'sl00', kind: 'warmup', fromWork: true,
     heading: L === 'en' ? 'Today we go over what you still find tricky' : `Hôm nay ôn lại điều ${you} còn vướng`,
     bullets: bullets.slice(0, 4), ...(example ? { example } : {}),
-    notes: L === 'en'
+    notes: en ? (L === 'en'
+      ? `These are ${parent ? "your child's" : "the pupil's"} own answers from the work of ${dm(w.date)}. Ask ${parent ? 'your child' : 'them'} to read each sentence aloud again and find the word that gives the clue before looking at the answer.`
+      : `Đây là các câu ${you} làm sai trong bài ngày ${dm(w.date)}. Cho ${you} đọc to lại từng câu, tự tìm từ gợi ý rồi mới xem đáp án.`) : L === 'en'
       ? `These are ${parent ? "your child's" : "the pupil's"} own sums from the work of ${dm(w.date)}. Ask ${parent ? 'your child' : 'them'} to do each one again on paper, column by column, and find the slip before looking at the answer.${slip ? ` The usual slip: ${lower(slip)}.` : ''}`
       : `Đây là các phép tính ${you} làm sai trong bài ngày ${dm(w.date)}. Cho ${you} làm lại từng phép tính trên giấy, đọc to từng hàng, tự tìm chỗ sai rồi mới xem đáp án.${slip ? ` Lỗi hay gặp: ${lower(slip)}.` : ''}`,
-    source: '', imagePrompt: 'a child doing sums with a pencil at a desk, an open exercise book, warm light, no text',
+    source: '', imagePrompt: en ? 'a child reading an English picture book at a desk, warm light, no text' : 'a child doing sums with a pencil at a desk, an open exercise book, warm light, no text',
     narration: L === 'en' ? `Last time you still found ${names} tricky. Today we practise it again. ${tip.en}` : `Hôm trước ${you} còn vướng ${names}. Hôm nay mình luyện lại nhé. ${tip.vi}`,
   };
 }
@@ -305,6 +310,33 @@ export function workItems(qs: WorkQ[], kind: WorkKind, skill: string, lang: Lang
   return out;
 }
 
+// English (Chi #54): her own wrong items again, built by code where the reading gives the right answer. A sentence with one
+// gap becomes a fill-in and a question a choice, the right answer against hers (an adult marked it wrong), with a hint
+// for hers; a right answer of 3-10 words becomes putting its words in order. A row with no right answer, or too free
+// for this (an essay, a drawing), is left to the model as before. Every item still passes the same code checks.
+const GAP = /_{2,}|…|\.{2,}|\(\s*\)|\[\s*\]|□/g;
+export function englishWorkItems(qs: WorkQ[], skill: string, lang: Lang, parent: boolean, id: () => string): EnglishItem[] {
+  const out: EnglishItem[] = [], vi = lang !== 'en', you = parent ? 'con' : 'em';
+  for (const q of qs) {
+    const right = clip(q.right, 40), child = clip(q.child, 40), n = right.split(' ').length, gaps = (q.q.match(GAP) || []).length;
+    if (!right || gaps > 1) continue;
+    if (!gaps && n >= 3 && n <= 10) {
+      const answer = `${right[0].toUpperCase()}${right.slice(1)}${/[.!?]$/.test(right) ? '' : '.'}`, cards = answer.split(' '), r = rng(answer);
+      let words = cards.map((w) => [r(), w] as const).sort((x, y) => x[0] - y[0]).map(([, w]) => w);
+      if (words.join(' ') === answer) words = [...words.slice(1), words[0]];
+      out.push({ ...buildEnglish({ template: 'order', skill, level: 'basic', prompt: vi ? 'Sắp xếp các từ thành câu đúng.' : 'Put the words in order.', words, answer, explain: vi ? `Câu đúng: ${answer}` : `The right sentence: ${answer}` }, id(), lang), fromWork: true });
+      continue;
+    }
+    if (n > 3 || !child || child.toLowerCase() === right.toLowerCase()) continue;
+    const sentence = gaps ? q.q.replace(GAP, '___') : `${q.q} ___`, options = rng(q.q)() < 0.5 ? [right, child] : [child, right];
+    const why = { [child]: vi ? `Trong bài làm, ${you} viết “${child}”, chưa hợp ở đây. ${you === 'con' ? 'Con' : 'Em'} đọc lại cả câu nhé.` : `On your sheet you wrote “${child}”, which does not fit here. Read the whole sentence again.` };
+    const prompt = gaps ? (vi ? 'Chọn từ đúng điền vào chỗ trống.' : 'Choose the right word for the gap.') : vi ? 'Chọn câu trả lời đúng.' : 'Choose the right answer.';
+    const explain = gaps ? (vi ? `Đúng là “${right}”: ${q.q.replace(GAP, right)}` : `The right answer is “${right}”: ${q.q.replace(GAP, right)}`) : vi ? `Đúng là “${right}”.` : `The right answer is “${right}”.`;
+    out.push({ ...buildEnglish({ template: 'fill', skill, level: 'basic', prompt, sentence, options, answer: right, explain, why }, id(), lang), fromWork: true });
+  }
+  return out;
+}
+
 export interface WorkApplied { skills: Skill[]; slides: Slide[]; items: Item[]; made: number; inPart: Words[]; outPart: Words[] }
 
 // After the agent: the opening slide on the child's mistakes (right after the title slide), the practice
@@ -328,8 +360,17 @@ export function applyWork(setup: Setup, source: string, b: { skills: Skill[]; sl
   const coded = wrongTypes.filter((t) => setup.subject === 'math' && qsOf(t).some((q) => q.calc));
   let probe = 0;
   const taught = coded.filter((t) => build(t, qsOf(t), 0, () => `probe${++probe}`).kept.length);
+  let en = 0;
   for (const t of wrongTypes) {
-    if (!coded.includes(t)) { inKinds.push(t.kind); inPart.push(t.label); continue; }   // read, not built by code: the slide still shows it
+    if (!coded.includes(t)) {
+      // English (Chi #54): her own wrong items again where the reading is enough; the rest of the practice is the model's
+      if (setup.subject === 'english') {
+        const skill: Skill = { tag: `bai_lam_en${++en}`, name: t.label[lang === 'en' ? 'en' : 'vi'], kind: 'other' }, ctx = contextOf(setup, [...skills, skill], source);
+        const kept = englishWorkItems(qsOf(t).filter((q) => !q.calc), skill.tag, lang, parent, id).filter((it) => !checkItem(it, { ...ctx, items: [...b.items, ...made] }).length);
+        if (kept.length) { skills = [...skills, skill]; made.push(...kept); }
+      }
+      inKinds.push(t.kind); inPart.push(t.label); continue;   // read, not built by code: the slide still shows it
+    }
     if (!taught.includes(t)) { outPart.push(t.label); continue; }
     const { skill, kept } = build(t, qsOf(t), taught.length === 1 ? 4 : 2, id);
     if (!kept.length) { outPart.push(t.label); continue; }
