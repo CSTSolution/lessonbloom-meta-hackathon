@@ -3,6 +3,31 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1129 (1 Nov, late morning)
+
+Fixes from the live test of v1.0.20261101.1113:
+- **A worksheet finds its part of the book by its mistakes**: a sheet headed only "Đặt tính rồi tính"
+  found nothing; the search now adds its most frequent mistake as books word it ("phép cộng có nhớ,
+  adding with regrouping"). Tried live: Lesson 21 found with no part chosen.
+- **Drafts are kept per account**: a new account in the same browser was offered another's "Continue".
+- "Not in your knowledge area yet" no longer stays under "Found" once a part is chosen by hand.
+- Marked work with no lesson assigned yet shows its mistakes in the account's language.
+
+## v1.0.20261101.1113 (1 Nov, morning)
+
+- **The same book added twice** (file fingerprint made in the browser): "This book is already in your
+  library: '…' (added …)" with "Open the existing book" (no credits) or "Add a new copy anyway". (Chi #44)
+- **Page numbers as printed in the book**: read with each page; "page N in the file" in View source; a
+  book with none read can be told once where its page 1 is. (Chi #45)
+- **Lessons from a child's marked work** (Chi's three layers): the photo is read into a table (question,
+  what the child wrote, right answer, kind of mistake) the parent can correct; it is kept as a dated
+  record on the child's profile (My children → Work), counts in the summary, and the lesson opens with the
+  child's own wrong sums and practises them first, "Made for <child> · from the work of <date>". (Chi #46)
+- **Number range of the part** (to 1000) for practice, with column sums; items far below it are rejected.
+  (Chi #47)
+- **Books whose lessons have no number** (Cánh Diều, Chân trời sáng tạo: a title in capitals at the top of
+  the page) are split into their lessons. (Chi #48)
+
 ## v1.0.20261031.2215 (31 Oct, evening)
 
 - **The server no longer runs out of memory while making videos** (31 Oct, 9:00–9:30: lessons failed with
