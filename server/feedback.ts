@@ -56,7 +56,7 @@ export function feedbackRoutes(app: Hono<Env>, d: { sql: Sql; mail: Mailer }) {
         text || '(no text)', '', `Page: ${page || '-'}`, `Version: ${version || '-'}`,
         ...(lessonId ? [`Lesson: ${lessonId}${itemId ? ` · item ${itemId}` : ''}`] : []), ...(reason ? [`Reason: ${reason}`] : []), ...(rating ? [`Rating: ${rating > 0 ? '👍' : '👎'}`] : []),
         `Screenshot: ${image ? 'yes (in the admin view, Feedback)' : 'no'}`, `Feedback id: ${id}`];
-      void mail.send(to, `LessonBloom feedback: ${NAMES[kind]}${text ? ` · ${text.slice(0, 60).replace(/\s+/g, ' ')}` : ''}`, lines.join('\n'))
+      void mail.send(to, `lessonbloom-meta: ${NAMES[kind]}${text ? ` · ${text.slice(0, 60).replace(/\s+/g, ' ')}` : ''}`, lines.join('\n'))
         .catch((e) => console.error(`[mail] feedback ${id} not sent: ${(e as Error).message}`));
     }
     return c.json({ ok: true, id });
