@@ -233,6 +233,8 @@ test("Chi #54: a child's English sheet: her own wrong items again, built by code
 test('an English sheet is looked for by its unit and its mistakes, not by its instruction (live test, 1 Nov)', async () => {
   const { findOf } = await import('../server/lesson/work.ts');
   const w = typeWork({ questions: [{ q: 'The sky is ___', child: 'green', mark: 'wrong', right: 'blue', typeName: 'Colours' }, { q: '___ colour is it?', child: 'Where', mark: 'wrong', right: 'What', typeName: 'Question words' }] }, { topic: 'Unit 6: Colours - Fill in the missing word', subject: 'english' });
-  assert.equal(findOf(w), 'Unit 6: Colours – Colours, Question words');
-  assert.equal(findOf({ ...w, topic: 'Fill in the missing word' }), 'Colours, Question words');
+  assert.equal(findOf(w), 'Unit 6: Colours – The sky is blue – What colour is it? – Colours – Question words');
+  // the kind named after the exercise is left out (live test 1 Nov: "Fill in the missing word" found no part)
+  const v = typeWork({ questions: [{ q: '___ colour is it?', child: 'Where', mark: 'wrong', right: 'What', typeName: 'Fill in the missing word' }] }, { topic: 'Unit 6: Colours - Fill in the missing word', subject: 'english' });
+  assert.equal(findOf(v), 'Unit 6: Colours – What colour is it?');
 });

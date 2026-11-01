@@ -106,12 +106,18 @@ const FIND: Partial<Record<WorkKind, string>> = {
   compare: 'so sánh các số, comparing numbers', find_missing: 'tìm số còn thiếu, missing number', multiply: 'phép nhân, multiplication', divide: 'phép chia, division',
 };
 // What to look for in the book: the sheet's heading and its most frequent mistake
-export const findOf = (w: Pick<Work, 'topic' | 'types'> & { subject?: Work['subject'] }) => {
+// an exercise's instruction, not what it teaches
+const INSTRUCTION = /\b(fill in|fill the|choose|circle|match|write|complete|tick|underline|read and|look and|listen and)\b/i;
+export const findOf = (w: Pick<Work, 'topic' | 'types'> & { subject?: Work['subject']; questions?: WorkQ[] }) => {
   // an English sheet: its unit and what its mistakes are about, never its instruction (live test 1 Nov: "Unit 6: Colours -
   // Fill in the missing word" found nothing, as no part teaches "filling in"; "Unit 6: Colours" found it)
   if (w.subject === 'english') {
-    const unit = /(?:unit|lesson|bài)\s*\d+\s*[:.]?\s*[^-–—\n]*/iu.exec(w.topic)?.[0].trim(), kinds = [...new Set(w.types.map((t) => t.label.en))].slice(0, 3).join(', ');
-    return [unit, kinds].filter(Boolean).join(' – ').slice(0, 300) || w.topic;
+    // what the wrong questions say, with the right answer in the gap ("What colour is it?"): the model names the kind of an
+    // English mistake after the exercise ("Fill in the missing word", live test 1 Nov), which no part of a book teaches
+    const unit = /(?:unit|lesson|bài)\s*\d+\s*[:.]?\s*[^-–—\n]*/iu.exec(w.topic)?.[0].trim();
+    const said = [...new Set((w.questions ?? []).filter((q) => !q.ok && q.right).map((q) => q.q.replace(/_{2,}|…|\.{3,}/, q.right).replace(/\s+/g, ' ').trim()))].slice(0, 3);
+    const kinds = [...new Set(w.types.map((t) => t.label.en))].filter((k) => !INSTRUCTION.test(k)).slice(0, 2);
+    return [unit, ...said, ...kinds].filter(Boolean).join(' – ').slice(0, 300) || w.topic;
   }
   const k = w.types[0]?.kind, words = k && k !== 'other' ? FIND[k] : w.types[0]?.label.vi;
   return [w.topic, words].filter(Boolean).join(' – ').slice(0, 300);
