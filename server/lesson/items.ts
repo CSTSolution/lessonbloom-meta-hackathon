@@ -96,7 +96,8 @@ export function compute(a: number, op: Op, b: number): number {
 function shuffle<T>(xs: T[], seed: string): T[] {
   let h = [...seed].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7);
   const out = [...xs];
-  for (let i = out.length - 1; i > 0; i--) { h = (h * 1103515245 + 12345) >>> 0; const j = h % (i + 1); [out[i], out[j]] = [out[j], out[i]]; }
+  // Math.imul: h * 1103515245 as a float loses its low bits, so with 4 options the right one always went last (live test, 1 Nov)
+  for (let i = out.length - 1; i > 0; i--) { h = (Math.imul(h, 1103515245) + 12345) >>> 0; const j = (h >>> 16) % (i + 1); [out[i], out[j]] = [out[j], out[i]]; }
   return out;
 }
 

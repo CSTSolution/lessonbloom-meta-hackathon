@@ -313,3 +313,13 @@ test('a reason that calls the wrong option "the answer" is dropped (live test, 1
   const it = buildEnglish({ template: 'fill', skill: 'q', level: 'basic', prompt: 'Choose the missing word.', sentence: 'What colour is ___?', options: ['it', 'red', 'blue'], answer: 'it', explain: 'We ask about the thing with it.', why: [{ option: 'blue', why: "'Blue' is the answer, not the question word." }, { option: 'red', why: 'Red is a colour, not the thing we ask about.' }] }, 'x1', 'en') as any;
   assert.deepEqual(it.why, { red: 'Red is a colour, not the thing we ask about.' });
 });
+
+test('the right option is not always in the same place (live test, 1 Nov: four options, the answer always last)', async () => {
+  const { buildMath } = await import('../server/lesson/items.ts');
+  const places = new Set<number>();
+  for (const a of [321, 405, 760, 305, 640, 518, 907, 254, 613, 432]) {
+    const it = buildMath({ template: 'mcq', skill: 'read', level: 'basic', a, op: '+', b: 0, explain: '' }, `ex${a}`, 'en') as any;
+    places.add(it.options.indexOf(it.answer));
+  }
+  assert.ok(places.size >= 3, `the answer sat at ${[...places]}`);
+});

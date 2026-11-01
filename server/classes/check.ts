@@ -165,7 +165,8 @@ function shuffle<T>(xs: T[], seed: string): T[] {
 export interface PupilItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean; fromWork?: boolean; stack?: { a: number; op: string; b: number } }
 export function forPupil(it: Item): PupilItem {
   const out: PupilItem = { id: it.id, template: it.template, prompt: it.prompt };
-  if (it.options?.length) out.options = it.options;
+  // mixed again for the child, by the item (a lesson made before 1 Nov kept the right option last); answers are checked by value
+  if (it.options?.length) out.options = shuffle(it.options, it.id + 'o');
   if (it.fromWork) out.fromWork = true;   // "Luyện lại từ bài con làm" (Chi #46)
   if (it.subject === 'math') {
     if (it.template === 'word' && it.unit) out.unit = it.unit;

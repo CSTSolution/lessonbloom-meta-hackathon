@@ -103,7 +103,13 @@ const FIND: Partial<Record<WorkKind, string>> = {
   compare: 'so sánh các số, comparing numbers', find_missing: 'tìm số còn thiếu, missing number', multiply: 'phép nhân, multiplication', divide: 'phép chia, division',
 };
 // What to look for in the book: the sheet's heading and its most frequent mistake
-export const findOf = (w: Pick<Work, 'topic' | 'types'>) => {
+export const findOf = (w: Pick<Work, 'topic' | 'types'> & { subject?: Work['subject'] }) => {
+  // an English sheet: its unit and what its mistakes are about, never its instruction (live test 1 Nov: "Unit 6: Colours -
+  // Fill in the missing word" found nothing, as no part teaches "filling in"; "Unit 6: Colours" found it)
+  if (w.subject === 'english') {
+    const unit = /(?:unit|lesson|bài)\s*\d+\s*[:.]?\s*[^-–—\n]*/iu.exec(w.topic)?.[0].trim(), kinds = [...new Set(w.types.map((t) => t.label.en))].slice(0, 3).join(', ');
+    return [unit, kinds].filter(Boolean).join(' – ').slice(0, 300) || w.topic;
+  }
   const k = w.types[0]?.kind, words = k && k !== 'other' ? FIND[k] : w.types[0]?.label.vi;
   return [w.topic, words].filter(Boolean).join(' – ').slice(0, 300);
 };
@@ -246,7 +252,7 @@ export function workSlide(w: Work, kinds: WorkKind[], lang: Lang, parent: boolea
 }
 
 // A deterministic stand-in for random numbers (the same work always gives the same practice).
-function rng(seed: string) { let h = [...seed].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7); return () => { h = (h * 1103515245 + 12345) >>> 0; return h / 4294967296; }; }
+function rng(seed: string) { let h = [...seed].reduce((s, c) => (s * 31 + c.charCodeAt(0)) >>> 0, 7); return () => { h = (Math.imul(h, 1103515245) + 12345) >>> 0; return h / 4294967296; }; }   // Math.imul: exact (see shuffle in items.ts)
 const digits = (n: number) => String(n).length;
 const between = (r: () => number, lo: number, hi: number) => lo + Math.floor(r() * (hi - lo + 1));
 
