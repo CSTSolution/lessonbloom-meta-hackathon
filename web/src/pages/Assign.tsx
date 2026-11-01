@@ -20,7 +20,8 @@ const T = {
     opts: 'Tuỳ chọn', due: 'Hạn làm bài', retry: 'Làm lại không giới hạn', hints: 'Gợi ý khi làm sai', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'Không hạn'} · ${r ? 'làm lại không giới hạn' : 'mỗi câu một lần'} · ${h ? 'có gợi ý' : 'không gợi ý'}`,
     kids: (n: string) => `Học sinh lớp ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} đã vào học · mã lớp ${c}`, none: 'Lớp chưa có học sinh: cô thêm tên gọi trong mục Lớp học.', noPupils: 'Lớp chưa có học sinh nên chưa ai thấy bài. Cô thêm tên gọi của các em ở Lớp học trước nhé.',
     parents: 'Gửi cho phụ huynh', parentsSub: 'Link riêng cho từng em, không cần đăng nhập', isNew: 'Mới',
-    checkedN: (n: number, r: number, ai = 0) => `Đã kiểm tra ${n} câu bằng code · ${r} câu tạo lại${ai ? ` · AI rà soát bỏ ${ai} câu` : ''}`, confirm: 'Tôi đã đọc và kiểm tra slide, video và bài tập AI soạn trước khi giao bài.', confirmSub: 'Tick lại mỗi lần giao bài.', go: 'Giao bài', tickFirst: 'Tick ô xác nhận ở trên để giao bài.',
+    // the number the child practises first (Chi #55d: "42/58 câu" here, 20 on the child's page)
+    checkedN: (n: number, r: number, ai = 0, items = 0) => `${items ? `Bài có ${items} câu luyện tập · ` : ''}code đã kiểm tra ${n} câu · ${r} câu chưa đạt được viết lại${ai ? ` · AI rà soát bỏ ${ai} câu` : ''}`, confirm: 'Tôi đã đọc và kiểm tra slide, video và bài tập AI soạn trước khi giao bài.', confirmSub: 'Tick lại mỗi lần giao bài.', go: 'Giao bài', tickFirst: 'Tick ô xác nhận ở trên để giao bài.',
     done: (n: string) => `Đã giao cho lớp ${n}`, doneSub: 'Học sinh thấy bài ngay ở “Hôm nay con học gì”.', openLink: 'Mở link lớp', copyLink: 'Chép link lớp', codeIs: (c: string) => `Mã lớp ${c}`, path: 'Xem lộ trình học',
     already: (n: string, d: string) => `Bài này đã giao cho ${n} ngày ${d}.`, again: 'Vẫn giao lại', cancel: 'Huỷ',
     earlier: 'Đã giao', progress: (d: number, n: number) => `${d}/${n} em làm xong`,
@@ -31,7 +32,7 @@ const T = {
     opts: 'Options', due: 'Due date', retry: 'Unlimited retries', hints: 'Hints after a wrong answer', optsSub: (d: string, r: boolean, h: boolean) => `${d || 'No due date'} · ${r ? 'unlimited retries' : 'one try per item'} · ${h ? 'hints' : 'no hints'}`,
     kids: (n: string) => `Pupils of ${n}`, kidsSub: (j: number, n: number, c: string) => `${j}/${n} joined · class code ${c}`, none: 'No pupils yet: add their first names under Classes.', noPupils: 'This class has no pupils yet, so nobody will see the lesson. Add their first names under Classes first.',
     parents: 'Send to parents', parentsSub: 'A private link for each child, no sign-in', isNew: 'New',
-    checkedN: (n: number, r: number, ai = 0) => `Code checked ${pl(n, 'item')} · ${r} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, confirm: 'I have read and checked the AI-generated slides, video and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
+    checkedN: (n: number, r: number, ai = 0, items = 0) => `${items ? `The lesson has ${pl(items, 'practice question')} · ` : ''}code checked ${pl(n, 'item')} · ${r} that failed were written again${ai ? ` · ${ai} removed by the AI review` : ''}`, confirm: 'I have read and checked the AI-generated slides, video and exercises before assigning them.', confirmSub: 'Tick again every time you assign.', go: 'Assign', tickFirst: 'Tick the box above to assign.',
     done: (n: string) => `Assigned to ${n}`, doneSub: 'Pupils see it straight away under “Today”.', openLink: 'Open the class link', copyLink: 'Copy class link', codeIs: (c: string) => `Class code ${c}`, path: 'See the learning path',
     already: (n: string, d: string) => `This lesson was already assigned to ${n} on ${d}.`, again: 'Assign again', cancel: 'Cancel',
     earlier: 'Assigned', progress: (d: number, n: number) => `${d}/${pl(n, 'pupil')} finished`,
@@ -39,7 +40,7 @@ const T = {
 };
 
 // pupilId: the lesson was made from this child's work, so the child (or the pupil's class) is picked first
-export function Assign({ lessonId, parent = false, checked, redone, removed, pupilId }: { lessonId: string; parent?: boolean; checked?: number; redone?: number; removed?: number; pupilId?: string }) {
+export function Assign({ lessonId, parent = false, checked, redone, removed, pupilId, items }: { lessonId: string; parent?: boolean; checked?: number; redone?: number; removed?: number; pupilId?: string; items?: number }) {
   const t0 = useT(T), lang = useLang(), t = parent ? { ...t0, ...P[lang] } : t0;
   const [classes, setClasses] = useState<ClassRow[] | null>(null), [pick, setPick] = useState(''), [view, setView] = useState<ClassView | null>(null);
   const [due, setDue] = useState(''), [retry, setRetry] = useState(true), [hints, setHints] = useState(true), [ticked, setTicked] = useState(false);
@@ -107,7 +108,7 @@ export function Assign({ lessonId, parent = false, checked, redone, removed, pup
             <div key={p.id} className="row small"><b style={{ minWidth: 90 }}>{p.name}</b><span className="grow muted ellipsis">{p.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(p.url, p.id)}>{copied === p.id ? t.copied : t.copy}</button></div>
           ))}</div> : <p className="small muted">{t.none}</p>}
         </Group></>}
-        {checked !== undefined && <div className="banner">✓ {t.checkedN(checked, redone ?? 0, removed ?? 0)}</div>}
+        {checked !== undefined && <div className="banner">✓ {t.checkedN(checked, redone ?? 0, removed ?? 0, items ?? 0)}</div>}
         {doneFor === k.id ? <Done title={t.done(k.name)} sub={parent ? t.doneSub : `${t.doneSub} ${t.codeIs(view.class.code)}`}>
           {(() => { const url = parent ? view.pupils[0]?.url : view.class.url; return url && <>
             <a className="btn primary" href={url} target="_blank" rel="noreferrer">{t.openLink}</a>

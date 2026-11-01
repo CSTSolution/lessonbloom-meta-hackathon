@@ -79,7 +79,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(4)} />}
       {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} parent={parent} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
-      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} /></div>}
+      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} items={l.items.length} /></div>}
     </div>
   );
 }
