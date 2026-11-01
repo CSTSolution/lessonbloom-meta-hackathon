@@ -3,7 +3,9 @@
 // (or, for S, made impossible because code writes the question). Add a row for each new one.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { askedThing, buildEnglish, buildMath, checkItem, type CheckContext, type RawEnglish, type RawMath } from '../server/lesson/items.ts';
+import { askedThing, buildEnglish, buildMath, checkItem, contextOf, rangeOf, regroups, scopeOf, type CheckContext, type RawEnglish, type RawMath } from '../server/lesson/items.ts';
+import { rangeLine } from '../server/lesson/writer.ts';
+import { forPupil } from '../server/classes/check.ts';
 import type { Item } from '../server/lesson/types.ts';
 
 const vi2: CheckContext = { subject: 'math', grade: 2, lang: 'vi', source: '', skills: [
@@ -117,4 +119,69 @@ test('levels (Chi #31): a good or advanced item never repeats a basic one', () =
   assert.deepEqual(colour({ level: 'basic', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex01'), [], 'the basic item itself passes');
   assert.ok(!colour({ level: 'advanced', template: 'listen', say: 'blue', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex06').includes('dup'), 'another template is another question');
   assert.ok(!colour({ level: 'good', skill: 'what_colour', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex07').includes('dup'), 'levels belong to one skill');
+});
+
+// Chi #47 (31 Oct): "Cộng, trừ trong phạm vi 1000" (Toán 2 tập 2, pp. 58-77) got 100 − 28, 48 + 37, 83 − 36, 59 + 24…
+const SGK1000 = 'Cộng, trừ trong phạm vi 1000\nĐặt tính rồi tính: 456 + 278; 352 − 127. Bài toán: Trường có 425 học sinh nam và 387 học sinh nữ.';
+const vi1000: CheckContext = { ...vi2, source: SGK1000, scope: scopeOf(SGK1000) };
+
+test('the range of a part (Chi #47): "phạm vi 1000" in its title, the numbers in its text, the child\'s work', () => {
+  assert.deepEqual(scopeOf('Phép cộng (có nhớ) trong phạm vi 1000\n456 + 278 = 734.'), { max: 1000, ops: ['+'] });
+  assert.equal(scopeOf(SGK1000).max, 1000);
+  assert.deepEqual(scopeOf(SGK1000).ops, ['+', '-'], '"Cộng, trừ": both operations');
+  assert.equal(scopeOf('Bài 60: Phép cộng có nhớ\nVí dụ: 456 + 278 = 734. Luyện tập: 254 + 172.').max, 1000, 'no range named: 3-digit calculations mean within 1000');
+  assert.equal(scopeOf('Bài 61: Luyện tập [tr. 58]\n36 + 27 = 63.').max, undefined, '2-digit calculations and page numbers set no range: the grade decides');
+  assert.equal(scopeOf('Các số trong phạm vi 10 000\n4 325 = 4000 + 300 + 20 + 5').max, 10000, '"10 000" is one number');
+  assert.equal(scopeOf('Phép cộng trong phạm vi 100\nÔn tập. Tiết sau: phạm vi 1000.').max, 100, 'the part\'s own title wins over a mention further on');
+  assert.equal(scopeOf('Luyện tập chung\n36 + 27', 'Cộng có nhớ trong phạm vi 1000').max, 1000, 'the lesson\'s title when the part says nothing');
+  const work = contextOf({ subject: 'math', grade: 2, title: 'Luyện tập', objectives: [], minutes: 25, lang: 'vi', note: 'Tập trung vào lỗi: Quên nhớ 1 sang hàng trăm (356 + 172 = 428)' }, [], 'Luyện tập\nTính nhẩm.');
+  assert.equal(work.scope?.max, 1000, 'a lesson from a photo of the child\'s work: the numbers of her exercise');
+  assert.deepEqual(rangeOf(vi1000), { max: 1000, floor: 100 });
+  assert.deepEqual(rangeOf(vi2), { max: 100 }, 'the grade\'s own range sets no floor');
+  assert.match(rangeLine(vi1000), /within 1000.*above 100.*3-digit/);
+  assert.match(rangeLine(vi2), /Grade 2 uses numbers up to 100/);
+});
+
+test('Chi #47: in a "within 1000" lesson, numbers too small are refused like numbers too big', () => {
+  // her table: every item that stayed was under 100
+  assert.ok(math({ skill: 'tru_co_nho', a: 100, op: '-', b: 28, distractors: [82, 62] }, vi1000).includes('scope'), '100 − 28');
+  assert.ok(math({ a: 48, b: 37, distractors: [75, 86] }, vi1000).includes('scope'), '48 + 37');
+  assert.ok(math({ skill: 'tru_co_nho', a: 83, op: '-', b: 36, distractors: [57, 46] }, vi1000).includes('scope'), '83 − 36');
+  assert.ok(math({ template: 'word', skill: 'loi_van', a: 59, b: 24, story: 'Lan có 59 quả xoài, mẹ cho thêm 24 quả xoài. Hỏi Lan có tất cả bao nhiêu quả xoài?', unit: 'quả xoài' }, vi1000).includes('scope'), '59 + 24 in a story');
+  // the chapter's own numbers pass in a grade-2 book, although grade 2 alone stops at 100
+  assert.deepEqual(math({ a: 456, b: 278, distractors: [724, 634] }, vi1000), []);
+  assert.deepEqual(math({ skill: 'tru_co_nho', a: 352, op: '-', b: 287, distractors: [75, 135] }, vi1000), [], 'a small result is fine: the calculation is 3-digit');
+  assert.ok(math({ a: 456, b: 678, distractors: [1034, 1124] }, vi1000).includes('scope'), 'above 1000');
+  assert.ok(math({ a: 456, b: 278, distractors: [724, 634] }).includes('range'), 'without the section, grade 2 still stops at 100');
+  // "within 100": only sums of numbers up to 10 are too small
+  const vi100: CheckContext = { ...vi2, scope: scopeOf('Phép cộng có nhớ trong phạm vi 100') };
+  assert.ok(math({ skill: 'khong_nho', a: 4, b: 5, distractors: [8, 10] }, vi100).includes('scope'));
+  assert.ok(!math({ a: 8, b: 7, distractors: [5, 16] }, vi100).includes('scope'), '8 + 7 = 15 is not under the floor');
+});
+
+test('carrying in any column (Chi #47): 254 + 172 carries in the tens; its forgotten 1 is 326', () => {
+  assert.deepEqual(regroups(254, '+', 172), { any: true, first: 10 });
+  assert.deepEqual(regroups(432, '+', 215), { any: false, first: 0 });
+  assert.deepEqual(regroups(352, '-', 127), { any: true, first: 1 });
+  assert.deepEqual(regroups(528, '-', 172), { any: true, first: 10 }, '2 tens take 7 tens: borrow from the hundreds');
+  assert.deepEqual(math({ a: 254, b: 172, distractors: [436, 416] }, vi1000), [], 'an add_carry skill: the tens carry');
+  assert.ok(math({ skill: 'khong_nho', a: 254, b: 172, distractors: [436, 416] }, vi1000).includes('Q'), 'not "without carrying"');
+  const m = buildMath({ template: 'mcq', skill: 'cong_co_nho', level: 'basic', a: 254, op: '+', b: 172, distractors: [436], explain: 'x' }, 'ex09', 'vi');
+  assert.ok(m.options!.includes('326'), 'the forgotten carry in the tens is one of the wrong options');
+});
+
+test('column items (Chi #47): "đặt tính rồi tính" with 3-digit numbers, checked by code', () => {
+  const c = buildMath({ template: 'column', skill: 'dat_tinh', level: 'basic', a: 456, op: '+', b: 278, explain: '6 + 8 = 14, viết 4 nhớ 1.' }, 'ex10', 'vi');
+  assert.equal(c.prompt, 'Đặt tính rồi tính: 456 + 278');
+  assert.equal(c.answer, '734');
+  assert.equal(buildMath({ template: 'column', skill: 'dat_tinh', level: 'basic', a: 658, op: '-', b: 234, explain: 'x' }, 'ex11', 'en').prompt, 'Write in columns, then work it out: 658 − 234');
+  const col = (r: Partial<RawMath>, ctx = vi1000) => math({ template: 'column', skill: 'dat_tinh', ...r }, ctx);
+  assert.deepEqual(col({ a: 456, b: 278 }), [], 'with carrying');
+  assert.deepEqual(col({ a: 432, b: 215 }), [], 'without carrying: a column skill takes both');
+  assert.deepEqual(col({ a: 658, op: '-', b: 234 }), []);
+  assert.ok(col({ a: 48, b: 37 }).includes('scope'), '2-digit columns in a "within 1000" lesson');
+  assert.ok(col({ a: 456, b: 278, skill: 'khong_nho' }).includes('Q'), 'carrying under a "without carrying" skill');
+  assert.ok(col({ a: 4, b: 5 }, vi2).includes('shape'), 'one-digit numbers need no columns');
+  assert.ok(col({ a: 84, op: ':', b: 4 }, vi2).includes('shape'), 'no column division here');
+  assert.deepEqual(forPupil(c), { id: 'ex10', template: 'column', prompt: 'Đặt tính rồi tính: 456 + 278', stack: { a: 456, op: '+', b: 278 } }, 'the pupil gets the numbers to stack, never the answer');
 });

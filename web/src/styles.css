@@ -187,6 +187,9 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .p-pic { width: 100%; border-radius: 14px; aspect-ratio: 4 / 3; object-fit: cover; }
 .p-ex { font-size: 30px; font-weight: 700; text-align: center; padding: 10px; background: var(--sun-2); border-radius: 12px; margin-top: 4px; }
 .p-q { font-size: 24px; font-weight: 700; margin: 4px 0; } .p-sum { font-size: 44px; font-weight: 800; margin: 6px 0; letter-spacing: -.01em; }
+/* a column calculation: the sign left of the lower number, digits right-aligned in columns, a rule under them */
+.p-col { display: inline-grid; grid-template-columns: auto auto; column-gap: 14px; justify-items: end; justify-self: center; font-size: 44px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; margin: 6px auto; }
+.p-col i { grid-column: 1 / -1; justify-self: stretch; border-top: 3px solid currentColor; margin-top: 4px; }
 .p-opts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; } .p-opts.words { display: flex; flex-wrap: wrap; }
 .p-opt { min-height: 72px; border-radius: 16px; border: 2px solid var(--line); background: var(--card); font: inherit; font-size: 28px; font-weight: 700; cursor: pointer; color: var(--ink); }
 .p-opt.right { border-color: var(--ok); background: var(--p-green); } .p-opt.wrong { border-color: #E8833A; background: #FFF6EC; }

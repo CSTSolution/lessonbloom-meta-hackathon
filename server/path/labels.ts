@@ -39,12 +39,13 @@ export function mistakeOf(it: Item | undefined, given: string, lang: 'vi' | 'en'
   return vi ? 'Tính sai' : 'Wrong calculation';
 }
 
-export interface Answer { item_id: string; skill: string; correct: boolean; answer: string; at: string; day: string }
+// mistake: set for an answer on the child's marked work (Chi #46), where code typed it already
+export interface Answer { item_id: string; skill: string; correct: boolean; answer: string; at: string; day: string; mistake?: string | null }
 export function labelOf(answers: Answer[], items: Map<string, Item>, c: Criteria, lang: 'vi' | 'en' = 'vi'): { label: Label; right: number; of: number; mistake: string | null } {
   const recent = answers.slice(-c.recent), right = recent.filter((a) => a.correct).length, of = recent.length;
   const days = [...new Set(answers.map((a) => a.day))].slice(-c.sessions);
   const counts = new Map<string, number>();
-  for (const a of answers) if (!a.correct && days.includes(a.day)) { const m = mistakeOf(items.get(a.item_id), a.answer, lang); if (m) counts.set(m, (counts.get(m) || 0) + 1); }
+  for (const a of answers) if (!a.correct && days.includes(a.day)) { const m = a.mistake ?? mistakeOf(items.get(a.item_id), a.answer, lang); if (m) counts.set(m, (counts.get(m) || 0) + 1); }
   const top = [...counts.entries()].sort((x, y) => y[1] - x[1])[0];
   const repeatedMistake = top && top[1] >= c.same ? top[0] : null;
   if (repeatedMistake) return { label: 'repeat', right, of, mistake: repeatedMistake };

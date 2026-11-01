@@ -14,13 +14,15 @@ import { holdCredits as holdC, settleHold, spare } from '../credits.ts';
 import type { Store } from '../storage.ts';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { OCR_SCHEMA, SCAN_SYSTEM } from '../lesson/prompts.ts';
+import { SCAN_SCHEMA, SCAN_SYSTEM } from '../lesson/prompts.ts';
 import { fail, MSG } from '../http.ts';
 import { ingestBook, ingestPages, NotText } from './ingest.ts';
 import { readPdf } from './pdf.ts';
 import type { PdfPage } from './pdf.ts';
-import { citation, findSection, NoMatch, sourceOf } from './search.ts';
+import { citation, findSection, NoMatch, printedRange, shownPages, sourceOf } from './search.ts';
 
+// a file's SHA-256 in hex, for a scanned PDF with the pages read (":3-22")
+const FINGERPRINT = /^[0-9a-f]{64}(:\d{1,4}-\d{1,4})?$/;
 export const LIMITS = { areas: 10, booksPerArea: 6, pdfBytes: 30e6 };   // 30 MB a file (Chi, 29 Oct); the browser checks it before sending
 export interface Area { id: string; teacher_id: string; name: string; subject: 'math' | 'english'; grade: number }
 
@@ -48,7 +50,11 @@ export async function sectionOf(sql: Sql, teacherId: string, areaId: string, sec
      where s.id = $1 and a.id = $2 and a.teacher_id = $3 and b.status = 'ready' and s.title <> '—'`, [sectionId, areaId, teacherId]);
   if (!s) return null;
   const passages = await sql.query<{ id: string; page: number; text: string }>('select id, page, text from passages where section_id = $1 order by ord', [s.id]);
-  return { section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to }, passages };
+  // the lesson cites the page as printed in her book (Chi #45): its source and each slide's or item's page
+  // carry the printed number when known; the section keeps its file pages (pageFrom/pageTo)
+  const shown = await shownPages(sql, s.book_id);
+  return { section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to, ...printedRange(shown, s.page_from, s.page_to) },
+    passages: passages.map((p) => ({ ...p, page: shown(p.page) ?? p.page })) };
 }
 
 const pdftoppm = (args: string[]) => promisify(execFile)('pdftoppm', args, { timeout: 120e3 });
@@ -59,7 +65,9 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
 
   app.get('/api/t/areas', async (c) => {
     const rows = await sql.query(`select a.id, a.name, a.subject, a.grade,
-        coalesce(json_agg(json_build_object('id', b.id, 'title', b.title, 'status', b.status, 'pages', b.pages, 'error', b.error, 'source', b.source,
+        coalesce(json_agg(json_build_object('id', b.id, 'title', b.title, 'status', b.status, 'pages', b.pages, 'error', b.error, 'source', b.source, 'page_one', b.page_one,
+          -- printed page numbers read from the book itself; without them she can say where page 1 is (Chi #45)
+          'printed', exists (select 1 from passages p where p.book_id = b.id and p.printed is not null),
           'sections', (select count(*) from sections s where s.book_id = b.id and s.title <> '—'),
           -- what its reading cost and gave back, once the hold is settled (Chi #29)
           'used', (select -sum(l.credits) from credit_log l where l.teacher_id = a.teacher_id and l.ref = b.id and l.reason in ('hold', 'refund') having count(*) filter (where l.reason = 'refund') > 0),
@@ -68,24 +76,39 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     return c.json({ areas: rows });
   });
 
+  // the same file added before (Chi #44): her newest source with this fingerprint that was not a failed reading
+  app.post('/api/t/areas/same', async (c) => {
+    const b = await c.req.json<{ fingerprint?: string }>().catch(() => ({} as { fingerprint?: string }));
+    if (!FINGERPRINT.test(String(b.fingerprint))) return fail(c, 'bad');
+    const same = await sql.one(`select a.id, a.name, a.created_at from areas a where a.teacher_id = $1 and a.fingerprint = $2
+        and exists (select 1 from books b where b.area_id = a.id and b.status <> 'error') order by a.created_at desc limit 1`, [c.get('teacher').id, b.fingerprint]);
+    return c.json({ same: same ?? null });
+  });
+
   app.post('/api/t/areas', async (c) => {
-    const b = await c.req.json<{ name?: string; subject?: string; grade?: number }>().catch(() => ({} as { name?: string; subject?: string; grade?: number }));
-    const name = clip(b.name, 80), grade = Math.round(Number(b.grade));
+    const b = await c.req.json<{ name?: string; subject?: string; grade?: number; fingerprint?: string }>().catch(() => ({} as { name?: string; subject?: string; grade?: number; fingerprint?: string }));
+    const name = clip(b.name, 80), grade = Math.round(Number(b.grade)), fingerprint = FINGERPRINT.test(String(b.fingerprint)) ? b.fingerprint : null;
     if (!name || (b.subject !== 'math' && b.subject !== 'english') || !(grade >= 1 && grade <= 5)) return fail(c, 'bad');
     if (Number((await sql.one<{ n: string }>('select count(*) as n from areas where teacher_id = $1', [c.get('teacher').id]))?.n) >= LIMITS.areas) return fail(c, 'limitReached', 429);
     const id = newId(10);
-    await sql.query('insert into areas (id, teacher_id, name, subject, grade) values ($1, $2, $3, $4, $5)', [id, c.get('teacher').id, name, b.subject, grade]);
+    await sql.query('insert into areas (id, teacher_id, name, subject, grade, fingerprint) values ($1, $2, $3, $4, $5, $6)', [id, c.get('teacher').id, name, b.subject, grade, fingerprint]);
     return c.json({ area: { id, name, subject: b.subject, grade, books: [] } });
   });
 
   app.get('/api/t/areas/:id', async (c) => {
     const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
     if (!a) return fail(c, 'notFound', 404);
-    const sections = await sql.query(`select s.id, s.book_id, s.title, s.page_from, s.page_to,
+    const sections = await sql.query<{ id: string; book_id: string; page_from: number; page_to: number }>(`select s.id, s.book_id, s.title, s.page_from, s.page_to,
         (select count(*) from lessons l where l.refs->0->>'sectionId' = s.id)::int as lessons
       from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
-    const books = await sql.query('select id, title, status, pages, error, source from books where area_id = $1 order by created_at', [a.id]);
-    return c.json({ area: { id: a.id, name: a.name, subject: a.subject, grade: a.grade }, books, sections });
+    const books = await sql.query<{ id: string }>(`select id, title, status, pages, error, source, page_one,
+        exists (select 1 from passages p where p.book_id = books.id and p.printed is not null) as printed from books where area_id = $1 order by created_at`, [a.id]);
+    // each part's pages as printed in the book, and each page's printed number for "Split from page" (Chi #45)
+    const shown = new Map(await Promise.all(books.map(async (b) => [b.id, await shownPages(sql, b.id)] as const)));
+    return c.json({ area: { id: a.id, name: a.name, subject: a.subject, grade: a.grade }, books, sections: sections.map((s) => {
+      const f = shown.get(s.book_id), r = f ? printedRange(f, s.page_from, s.page_to) : { printedFrom: null, printedTo: null };
+      return { ...s, printed_from: r.printedFrom, printed_to: r.printedTo, printed: f ? Array.from({ length: Math.min(400, s.page_to - s.page_from + 1) }, (_, i) => f(s.page_from + i)) : [] };
+    }) });
   });
 
   // The PDF arrives as the raw body. It is kept privately (opened only by its owner) and read in the background.
@@ -304,8 +327,10 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       await job.progress(`${i}/${want.length}`);
       const read = await Promise.all(batch.map(async (n) => {
         const data = await readFile(join(dir, `${n}.jpg`));
-        const r = await guardedJson<{ usable: boolean; text: string }>(d.ai, { endpoint: 'ocr', system: SCAN_SYSTEM, prompt: 'One page of the book.', images: [{ data, mime: 'image/jpeg' }], schema: OCR_SCHEMA, fixture: { page: n } }).catch((e) => { console.warn(`[scan] ${bookId} page ${n}: ${String((e as Error)?.message).slice(0, 200)}`); return { usable: false, text: '' }; });
-        return { page: n, text: r.usable ? String(r.text || '').slice(0, 20000) : '' };
+        const r = await guardedJson<{ usable: boolean; text: string; printed?: number }>(d.ai, { endpoint: 'ocr', system: SCAN_SYSTEM, prompt: 'One page of the book.', images: [{ data, mime: 'image/jpeg' }], schema: SCAN_SCHEMA, fixture: { page: n } }).catch((e) => { console.warn(`[scan] ${bookId} page ${n}: ${String((e as Error)?.message).slice(0, 200)}`); return { usable: false, text: '', printed: 0 }; });
+        // the number printed on the page, kept beside its place in the file (Chi #45); checked in printedPages
+        const printed = Math.trunc(Number(r.printed));
+        return { page: n, text: r.usable ? String(r.text || '').slice(0, 20000) : '', printed: printed >= 1 && printed <= 2000 ? printed : null };
       }));
       out.push(...read);
     }
@@ -392,6 +417,17 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     });
     return c.json({ ok: true });
   });
+  // "Page 1 of the book is page … in the file" (Chi #45): for a book whose printed page numbers could not
+  // be read, once per book; empty clears it. Only what is shown changes.
+  app.put('/api/t/books/:id/page-one', async (c) => {
+    const bk = await bookMine(c);
+    if (!bk) return fail(c, 'notFound', 404);
+    const b = await c.req.json<{ pageOne?: number | null }>().catch(() => ({} as { pageOne?: number | null }));
+    const n = b.pageOne == null || (b.pageOne as unknown) === '' ? null : Math.round(Number(b.pageOne));
+    if (n !== null && !(n >= 1 && n <= 2000)) return fail(c, 'bad');
+    await sql.query('update books set page_one = $2 where id = $1', [bk.id, n]);
+    return c.json({ ok: true, pageOne: n });
+  });
   app.delete('/api/t/areas/:id', async (c) => {
     const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
     if (!a) return fail(c, 'notFound', 404);
@@ -419,8 +455,12 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (!s) return fail(c, 'notFound', 404);
     const bk = await sql.one<{ id: string; title: string; source: string | null }>('select id, title, source from books where id = $1', [s.book_id]);
     const rows = await sql.query<{ page: number; text: string }>('select page, text from passages where section_id = $1 order by page, ord', [s.id]);
-    const pages: { page: number; text: string }[] = [];
+    const pages: { page: number; text: string; printed?: number | null }[] = [];
     for (const r of rows) { const last = pages.at(-1); if (last && last.page === r.page) last.text += `\n${r.text}`; else pages.push({ page: r.page, text: r.text }); }
+    // each page's number as printed in the book, beside its place in the file (Chi #45)
+    const shown = await shownPages(sql, s.book_id);
+    for (const p of pages) p.printed = shown(p.page);
+    const printed = Object.fromEntries(Array.from({ length: Math.min(400, s.page_to - s.page_from + 1) }, (_, i) => [s.page_from + i, shown(s.page_from + i)]).filter(([, n]) => n != null));
     // the original: a PDF kept on this server, or its original in R2, or the kept page pictures
     let original: { kind: 'pdf'; url: string } | { kind: 'pages'; pages: Record<number, string> } | null = null;
     if ((bk?.source ?? 'pdf') === 'pdf' && await stat(bookFile(s.book_id)).then(() => true, () => false)) original = { kind: 'pdf', url: `/api/t/books/${s.book_id}/file` };
@@ -430,7 +470,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       if (pics.length) original = { kind: 'pages', pages: Object.fromEntries(await Promise.all(pics.map(async (f) => [f.page, await d.store!.getUrl(f.key)]))) };
       else if (orig) original = { kind: 'pdf', url: await d.store.getUrl(orig.key) };
     }
-    return c.json({ section: { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to }, book: { id: bk?.id, title: bk?.title, source: bk?.source ?? 'pdf' }, pages, original });
+    return c.json({ section: { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to, ...printedRange(shown, s.page_from, s.page_to) }, book: { id: bk?.id, title: bk?.title, source: bk?.source ?? 'pdf' }, pages, printed, original });
   });
 
   // The knowledge map (Son, 30 Oct): her book → its parts → the lessons made from each part → the skills
@@ -451,7 +491,8 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       if (!x.lessons.includes(l.id)) x.lessons.push(l.id);
       skills.set(key, x);
     }
-    return c.json({ area: { id: a.id, name: a.name }, books, sections: sections.map((s) => ({ id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to, bookId: s.book_id })),
+    const shown = new Map(await Promise.all(books.map(async (b) => [b.id, await shownPages(sql, b.id)] as const)));
+    return c.json({ area: { id: a.id, name: a.name }, books, sections: sections.map((s) => { const f = shown.get(s.book_id); return { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to, bookId: s.book_id, ...(f ? printedRange(f, s.page_from, s.page_to) : {}) }; }),
       lessons: lessons.map((l) => ({ id: l.id, title: l.title, section: l.section, status: l.status, classes: l.classes, skills: (l.skills ?? []).map((k) => skills.get(String(k.name || k.tag).trim().toLowerCase())!.id) })),
       skills: [...skills.values()] });
   });
@@ -470,7 +511,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     if (spent) return fail(c, spent === 'total' ? 'credit' : spent === 'credits' ? 'credits' : 'budget', 429);
     try {
       const m = await d.as(t.id, async () => { await requireOnTask(d.ai, request); return findSection(sql, d.ai, a.id, request); });
-      return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, cited: m.cited,
+      return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, printedFrom: m.section.printedFrom ?? null, printedTo: m.section.printedTo ?? null, cited: m.cited,
         citation: citation(m, t.lang), preview: sourceOf(m, 1500) } });
     } catch (e) {
       if (e instanceof NoMatch) return fail(c, 'noMatch', 404);

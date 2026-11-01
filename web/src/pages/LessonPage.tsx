@@ -25,7 +25,7 @@ const T = {
     video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', parts: 'Các đoạn', subs: 'Phụ đề', toItems: 'Tiếp: bài tập',
     items: 'Bài tập', itemsLead: 'Đọc kỹ từng câu trước khi giao bài.', checked: (n: number, r: number, ai = 0) => `Đã kiểm tra ${n + r} câu · ${r - ai} câu tạo lại${ai ? ` · AI rà soát bỏ ${ai} câu` : ''}`, details: 'Chi tiết', why: 'Lý do tạo lại hoặc bỏ',
     levels: { basic: 'Cơ bản', good: 'Khá', advanced: 'Nâng cao' }, allLevels: 'Tất cả', kind: 'Dạng', explain: 'Lời giải', page: 'Nguồn', remove: 'Xóa', removeAsk: 'Xoá câu này khỏi bài?', seeAll: (n: number) => `Xem cả ${n} câu`, n: (n: number) => `${n} câu`, q: (i: number) => `Câu ${i}.`, tf: { true: 'Đúng', false: 'Sai' }, answer: 'Đáp án',
-    groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ', pairs: 'Lật thẻ tìm cặp' }, pairsLead: 'Trò chơi cho em, làm từ thẻ nhớ (4 cặp).', toAssign: 'Duyệt xong, sang giao bài',
+    groups: { mcq: 'Trắc nghiệm', fill: 'Điền vào ô trống', truefalse: 'Đúng / Sai', word: 'Toán có lời văn', column: 'Đặt tính rồi tính', match: 'Nối từ với hình', listen: 'Nghe và chọn', order: 'Sắp xếp câu', cards: 'Thẻ nhớ', pairs: 'Lật thẻ tìm cặp' }, pairsLead: 'Trò chơi cho em, làm từ thẻ nhớ (4 cặp).', toAssign: 'Duyệt xong, sang giao bài',
   },
   en: {
     working: 'The agent is making your lesson…', queued: (n: number) => `Waiting (number ${n} in your line): the lesson is made once the job before it is done. Each account runs one job at a time.`, left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
@@ -37,7 +37,7 @@ const T = {
     video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
     items: 'Practice', itemsLead: 'Read each item before assigning.', checked: (n: number, r: number, ai = 0) => `Checked ${pl(n + r, 'item')} · ${r - ai} written again${ai ? ` · ${ai} removed by the AI review` : ''}`, details: 'Details', why: 'Why they were written again or removed',
     levels: { basic: 'Basic', good: 'Good', advanced: 'Advanced' }, allLevels: 'All', kind: 'Skill', explain: 'Explanation', page: 'Source', remove: 'Delete', removeAsk: 'Remove this item from the lesson?', seeAll: (n: number) => `See all ${n}`, n: (n: number) => `${pl(n, 'item')}`, q: (i: number) => `${i}.`, tf: { true: 'True', false: 'False' }, answer: 'Answer',
-    groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards', pairs: 'Find the pairs' }, pairsLead: 'A game for the child, made from the flashcards (4 pairs).', toAssign: 'Reviewed: go to assigning',
+    groups: { mcq: 'Multiple choice', fill: 'Fill in the blank', truefalse: 'True / false', word: 'Word problems', column: 'Column calculation', match: 'Match words and pictures', listen: 'Listen and choose', order: 'Put the words in order', cards: 'Flashcards', pairs: 'Find the pairs' }, pairsLead: 'A game for the child, made from the flashcards (4 pairs).', toAssign: 'Reviewed: go to assigning',
   },
 };
 type Dict = (typeof T)['vi'];
@@ -67,6 +67,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
   return (
     <div className="page">
       <Stepper parent={parent} at={l.status === 'ready' ? step : 3} done={l.status === 'ready' ? seen : 2} onStep={l.status === 'ready' ? setStep : undefined} />
+      {l.setup.work && <MadeFor l={l} parent={parent} />}
       {l.status !== 'ready' && (
         <div className="card stack" style={{ maxWidth: 720, margin: '0 auto' }}>
           <h2>{l.setup.title}</h2><b>{l.status === 'working' ? t.working : t.failed}</b>
@@ -76,7 +77,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       )}
       {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(4)} />}
       {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
-      {l.status === 'ready' && step === 5 && <Practice l={l} t={t} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
+      {l.status === 'ready' && step === 5 && <Practice l={l} t={t} parent={parent} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
       {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} /></div>}
     </div>
   );
@@ -186,11 +187,14 @@ function Video({ l, t, onNext, onStarted }: { l: Lesson; t: Dict; onNext: () => 
   );
 }
 
-function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; refText: string; onChange: (items: Item[]) => void; onNext: () => void }) {
+// a column item as the pupil sees it: the sign left of the lower number, ones under ones (Chi #47)
+const colOf = (it: Item) => { const a = String(it.a ?? ''), b = `${it.op === '-' ? '−' : it.op ?? ''} ${it.b ?? ''}`, w = Math.max(a.length, b.length); return `${a.padStart(w)}\n${b.padStart(w)}\n${'─'.repeat(w)}`; };
+
+function Practice({ l, t, refText, onChange, onNext, parent = false }: { l: Lesson; t: Dict; refText: string; onChange: (items: Item[]) => void; onNext: () => void; parent?: boolean }) {
   const lang = useLang(), [level, setLevel] = useState<'' | Item['level']>(''), [open, setOpen] = useState(''), [all, setAll] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState(''), [busy, setBusy] = useState(''), [msg, setMsg] = useState(''), [tpl, setTpl] = useState<{ skill: string; template: string; level: string } | null>(null);
   const run = async (key: string, fn: () => Promise<void>) => { setBusy(key); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(''); } };
-  const templates = l.setup.subject === 'math' ? ['mcq', 'fill', 'truefalse', 'word'] : ['match', 'fill', 'listen', 'order'];
+  const templates = l.setup.subject === 'math' ? ['mcq', 'fill', 'truefalse', 'word', 'column'] : ['match', 'fill', 'listen', 'order'];
   const items = l.items.filter((i) => !level || i.level === level), skillName = (tag: string) => l.skills.find((k) => k.tag === tag)?.name || tag;
   const kinds = [...new Set(l.items.map((i) => i.template))] as (keyof Dict['groups'])[];
   const first = open || kinds[0];
@@ -215,14 +219,15 @@ function Practice({ l, t, refText, onChange, onNext }: { l: Lesson; t: Dict; ref
           {first === k && <div className="stack" style={{ paddingTop: 8 }}>
             {shown.map((it, j) => (
               <div key={it.id} className="list-row" style={{ display: 'grid', gap: 6 }}>
-                <div className="row"><b className="small grow">{t.q(j + 1)} {it.prompt}</b><span className="tag next">{t.kind}: {skillName(it.skill)}</span><span className="tag">{t.levels[it.level]}</span></div>
+                <div className="row"><b className="small grow">{t.q(j + 1)} {it.prompt}</b>{it.fromWork && <span className="tag repeat">{parent ? (lang === 'en' ? "Practice again from your child's work" : 'Luyện lại từ bài con làm') : (lang === 'en' ? "Practice again from the pupil's work" : 'Luyện lại từ bài em làm')}</span>}<span className="tag next">{t.kind}: {skillName(it.skill)}</span><span className="tag">{t.levels[it.level]}</span></div>
                 {it.sentence && <p className="small">{it.sentence}</p>}
                 {it.say && <p className="small muted">“{it.say}”</p>}
                 {it.options && <div className="opts">{it.options.map((o) => <span key={o} className={right(it, o) ? 'opt right' : 'opt'}>{o}</span>)}</div>}
                 {it.template === 'truefalse' && <div className="opts">{(['true', 'false'] as const).map((o) => <span key={o} className={right(it, o) ? 'opt right' : 'opt'}>{t.tf[o]}</span>)}</div>}
                 {it.pairs && <div className="opts">{it.pairs.map((p) => <span key={p.word} className="opt right">{p.word} {p.emoji}</span>)}</div>}
                 {it.words && <div className="opts">{it.words.map((w, x) => <span key={x} className="opt">{w}</span>)}</div>}
-                {(it.template === 'word' || it.template === 'fill' || it.template === 'order') && <p className="small"><b>{t.answer}:</b> {it.answer}{it.unit ? ` ${it.unit}` : ''}</p>}
+                {it.template === 'column' && <pre className="small" style={{ margin: 0 }}>{colOf(it)}</pre>}
+                {(it.template === 'word' || it.template === 'fill' || it.template === 'order' || it.template === 'column') && <p className="small"><b>{t.answer}:</b> {it.answer}{it.unit ? ` ${it.unit}` : ''}</p>}
                 <div className="row small"><details className="grow"><summary className="link">{t.details}</summary><p><b>{t.explain}:</b> {it.explain}</p>{!!it.redone?.length && <p className="muted">↻ <b>{t.redoneWhy}:</b> {it.redone.join('; ')}</p>}{refText && <p className="muted">{t.page}: {ref(refText, it.page)}</p>}</details>
                   <button className="btn small noprint" onClick={() => setEditing(editing === it.id ? '' : it.id)}>{t.edit}</button>
                   <button className="btn small noprint" disabled={!!busy} onClick={() => run(it.id, async () => onChange((await api.similarItem(l.id, it.id)).items))}>{busy === it.id ? t.working2 : t.similar}</button>
@@ -275,4 +280,14 @@ function Progress({ steps, t }: { steps: { at: string }[]; t: Dict }) {
   const pct = Math.min(95, Math.round((steps.length / 12) * 100)), since = steps[0] ? (Date.now() - Date.parse(steps[0].at)) / 60000 : 0;
   const left = Math.max(1, Math.round(4 * (1 - pct / 100) + Math.max(0, 3 - since) * 0.2));
   return <div className="stack" style={{ gap: 4 }}><span className="meter" style={{ width: '100%', height: 10 }}><i style={{ width: `${pct}%` }} /></span><span className="small muted">{pct}% · {t.left(left)}</span></div>;
+}
+
+// Chi #46: a lesson made from the child's marked work says so on every step: who it is for, from which
+// work, and the mistakes it opens with (the opening slide and the first practice items are made from them).
+function MadeFor({ l, parent }: { l: Lesson; parent: boolean }) {
+  const lang = useLang(), w = l.setup.work!, d = `${w.date.slice(8, 10)}/${w.date.slice(5, 7)}`, L = lang === 'en' ? 'en' : 'vi';
+  const who = w.child ? (L === 'en' ? `Made for ${w.child} · from the work of ${d}` : `Soạn riêng cho ${w.child} · từ bài làm ngày ${d}`)
+    : L === 'en' ? `Made from ${parent ? "your child's" : "a pupil's"} work of ${d}` : `Soạn riêng từ bài ${parent ? 'con' : 'em'} làm ngày ${d}`;
+  const counts = L === 'en' ? `${w.total} questions · ${w.right} right · ${w.wrong} wrong` : `${w.total} câu · đúng ${w.right} · sai ${w.wrong}`;
+  return <div className="banner warn row" style={{ maxWidth: 980, margin: '0 auto 10px' }}><b className="grow">{who}</b><span className="small">{counts}{w.types.length ? ` · ${w.types.map((x) => `${x.label[L]} ×${x.count}`).join(' · ')}` : ''}</span></div>;
 }

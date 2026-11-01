@@ -4,7 +4,12 @@ export interface Teacher { id: string; kind: 'demo' | 'account'; name: string; e
 // daily allowance (Vietnam days), used first.
 export interface Credits { balance: number; subscriber: boolean; planUntil: string | null; daily: { perDay: number; used: number; left: number } | null; left: number }
 export type Level = 'basic' | 'good' | 'advanced';
-export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string; level?: 'mixed' | 'basic' | 'advanced'; make?: { video: boolean; cards: boolean } }
+// A child's marked work, read from photos and typed by code on the server (Chi #46)
+export interface Words { vi: string; en: string }
+export interface WorkQ { q: string; child: string; mark: 'right' | 'wrong' | 'none'; right: string; ok: boolean; kind: string; label: Words; slip?: Words; unsure?: boolean; typeName?: string; calc?: unknown }
+export interface Work { recordId?: string; pupilId?: string; child?: string; date: string; subject: 'math' | 'english'; topic: string; questions: WorkQ[]; total: number; right: number; wrong: number; types: { kind: string; label: Words; count: number }[]; base?: string }
+export interface Learner { id: string; name: string; class_id: string; class_name: string; kind: 'class' | 'child' }
+export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string; level?: 'mixed' | 'basic' | 'advanced'; make?: { video: boolean; cards: boolean }; work?: Work; forParent?: boolean }
 export type UsageKind = 'lessons' | 'pictures' | 'books' | 'photos' | 'voice' | 'advice' | 'requests';
 export interface Usage {
   credits: Credits; promised: number; days: number; storage?: { on: boolean; used: number; quota: number }; total: { credits: number; calls: number }; period: { credits: number; calls: number };
@@ -12,20 +17,21 @@ export interface Usage {
   items: { kind: 'lesson' | 'book'; id: string; title: string; at: string; credits: number; calls: number; parts: Partial<Record<UsageKind, number>> }[];
   log: { at: string; reason: 'signup' | 'promo' | 'admin' | 'hold' | 'refund'; credits: number; days: number; ref: string; title: string }[];
 }
-export interface SectionSource { section: { id: string; title: string; pageFrom: number; pageTo: number }; book: { id: string; title: string; source: string }; pages: { page: number; text: string }[]; original: { kind: 'pdf'; url: string } | { kind: 'pages'; pages: Record<number, string> } | null }
-export interface KnowledgeMap { area: { id: string; name: string }; books: { id: string; title: string; pages: number }[]; sections: { id: string; title: string; pageFrom: number; pageTo: number; bookId: string }[];
+// page/pageFrom/pageTo: the place in the file; printed*: the number printed in the book, when known (Chi #45)
+export interface SectionSource { section: { id: string; title: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null }; book: { id: string; title: string; source: string }; pages: { page: number; text: string; printed?: number | null }[]; printed?: Record<number, number>; original: { kind: 'pdf'; url: string } | { kind: 'pages'; pages: Record<number, string> } | null }
+export interface KnowledgeMap { area: { id: string; name: string }; books: { id: string; title: string; pages: number }[]; sections: { id: string; title: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null; bookId: string }[];
   lessons: { id: string; title: string; section: string; status: string; classes: number; skills: string[] }[]; skills: { id: string; name: string; kind: string; lessons: string[] }[] }
 export interface Skill { tag: string; name: string; kind: string }
-export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number }
-export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; redone?: string[]; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
+export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number; fromWork?: boolean }
+export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; redone?: string[]; fromWork?: boolean; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
 export interface Lesson { queue?: { place: number } | null; id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
 export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
-export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number; source?: 'pdf' | 'text' | 'scan'; used?: number | null; returned?: number | null }
+export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number; source?: 'pdf' | 'text' | 'scan'; used?: number | null; returned?: number | null; page_one?: number | null; printed?: boolean }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
-export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number }
-export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
+export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number; printed_from?: number | null; printed_to?: number | null; printed?: (number | null)[] }
+export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
 export interface ClassRow { id: string; name: string; code: string; kind?: 'class' | 'child'; grade?: number | null; pupils: number; joined: number; assignments: number }
 export interface PupilRow { id: string; name: string; link: string; url: string; joined_at: string | null; seen_at: string | null }
 export interface AssignedRow { id: string; lesson_id: string; title: string; due: string | null; created_at: string; items: number; done: number; started: number; seen?: number }
@@ -105,10 +111,18 @@ export const api = {
   unassign: (id: string) => call<{ ok: true }>('DELETE', `/t/assignments/${id}`),
   lessonAssignments: (lessonId: string) => call<{ assignments: LessonAssignment[] }>('GET', `/t/lessons/${lessonId}/assignments`),
   setRole: (r: { role: 'teacher' | 'parent'; name: string; subject?: string; classes?: string[]; children?: { name: string; grade: number }[] }) => call<{ teacher: Teacher }>('POST', '/t/role', r),
-  work: (images: { data: string; type: string }[]) => call<{ request: string; focus: string }>('POST', '/t/notes/work', { images }),
+  work: (images: { data: string; type: string }[]) => call<{ request: string; focus: string; work: Work }>('POST', '/t/notes/work', { images }),
+  workCheck: (work: Work) => call<{ work: Work }>('POST', '/t/notes/work/check', { work }),
+  learners: () => call<{ learners: Learner[] }>('GET', '/t/learners'),
+  pupilWork: (pupilId: string) => call<{ pupil: { id: string; name: string }; records: Work[] }>('GET', `/t/pupils/${pupilId}/work`),
+  saveWork: (pupilId: string, work: Work) => call<{ record: Work }>('POST', `/t/pupils/${pupilId}/work`, { work }),
+  updateWork: (id: string, work: Work) => call<{ record: Work }>('PUT', `/t/work/${id}`, { work }),
+  workRecord: (id: string) => call<{ record: Work }>('GET', `/t/work/${id}`),
+  deleteWork: (id: string) => call<{ ok: boolean }>('DELETE', `/t/work/${id}`),
   renameSection: (id: string, title: string) => call<{ ok: boolean }>('PUT', `/t/sections/${id}`, { title }),
   splitSection: (id: string, page: number, title: string) => call<{ id: string }>('POST', `/t/sections/${id}/split`, { page, title }),
   mergeSection: (id: string) => call<{ ok: boolean }>('POST', `/t/sections/${id}/merge`),
+  setPageOne: (bookId: string, pageOne: number | null) => call<{ ok: boolean; pageOne: number | null }>('PUT', `/t/books/${bookId}/page-one`, { pageOne }),
   rewriteSlide: (id: string, sid: string, how: 'rewrite' | 'simpler') => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/rewrite`, { how }),
   addSlide: (id: string, after: string, topic: string) => call<{ slide: Slide; slides: Slide[] }>('POST', `/t/lessons/${id}/slides`, { after, topic }),
   editItem: (id: string, itemId: string, f: Record<string, unknown>) => call<{ item: Item }>('PUT', `/t/lessons/${id}/items/${itemId}`, f),
@@ -135,7 +149,8 @@ export const api = {
   photos: (images: { data: string; type: string }[]) => call<{ text: string }>('POST', '/t/notes/photos', { images }),
   voice: (audio: Blob) => call<{ text: string }>('POST', '/t/notes/voice', undefined, audio),
   areas: () => call<{ areas: AreaRow[] }>('GET', '/t/areas'),
-  createArea: (a: { name: string; subject: string; grade: number }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
+  createArea: (a: { name: string; subject: string; grade: number; fingerprint?: string }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
+  sameArea: (fingerprint: string) => call<{ same: { id: string; name: string; created_at: string } | null }>('POST', '/t/areas/same', { fingerprint }),
   sampleArea: (book: 'toan2' | 'english3' | 'maths2') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
   area: (id: string) => call<{ area: AreaRow; books: BookRow[]; sections: SectionRow[] }>('GET', `/t/areas/${id}`),
   bookText: (areaId: string, title: string, pages: { page: number; text: string }[]) => call<{ book: { id: string } }>('POST', `/t/areas/${areaId}/books/text`, { title, pages }),

@@ -18,10 +18,13 @@ import { spoken as spokenText } from './video.ts';
 import { areaOf, sectionOf } from '../knowledge/routes.ts';
 import { citation, sourceOf } from '../knowledge/search.ts';
 import type { Setup } from './types.ts';
-import { cleanSetup, intake, NotLesson, readPhotos, readWork } from './writer.ts';
+import { cleanSetup, intake, NotLesson, readPhotos, readWork, WorkUnread } from './writer.ts';
+import { forPrompt, titled, typeWork, type Work } from './work.ts';
 
 const MAX_NOTES = 20000, MAX_PHOTOS = 5, MAX_PHOTO = 4e6, MAX_AUDIO = 10e6;
 const AUDIO = /^audio\/(webm|ogg|mp4|mpeg|wav|x-m4a|aac)(;.*)?$/;
+// Chi #46: a sheet that cannot be read is said so plainly, never made into an ordinary lesson
+const UNREAD = { code: 'workUnread', error: 'Máy chưa đọc được bài của con: ảnh mờ, bị cắt, hoặc chưa có dấu chấm đúng/sai. Cô chụp lại thẳng, đủ sáng, cả trang, sau khi đã chấm bài nhé.', errorEn: "The work could not be read: the photo is blurry or cut off, or nothing is marked right or wrong yet. Take it again straight on, in good light, the whole page, after marking it." };
 const lessonsPerDay = (kind: string) => (kind === 'demo' ? config.guard.lessonsDemoDay : config.guard.lessonsDay);
 
 export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs }) {
@@ -65,7 +68,15 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
       images.push({ data, mime });
     }
     const g = await gate(c); if (g) return g;
-    try { return c.json(await d.as(c.get('teacher').id, () => readWork(d.ai, images))); } catch (e) { return aiError(c, e); }
+    try { return c.json(await d.as(c.get('teacher').id, () => readWork(d.ai, images))); }
+    catch (e) { if (e instanceof WorkUnread) return c.json(UNREAD, 422); return aiError(c, e); }
+  });
+  // The table as the assigner corrected it, typed again by code (no AI, nothing spent): the right answers,
+  // right or wrong, the kinds of mistake (Chi #46: handwriting is misread now and then, she fixes it first).
+  app.post('/api/t/notes/work/check', async (c) => {
+    const b = await c.req.json<{ work?: unknown }>().catch(() => ({} as { work?: unknown }));
+    const w = (b.work && typeof b.work === 'object' ? b.work : {}) as Partial<Work>;
+    return c.json({ work: typeWork(b.work, { date: w.date, topic: w.topic, subject: w.subject }) });
   });
 
   // The recording comes as the raw request body (audio/webm from the browser's recorder).
@@ -102,7 +113,17 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (!setup0) return fail(c, 'setup');
     // her request steers the lesson inside the section (Chi: only what the material points to); the section stays the only source
     const ask = request && request.toLowerCase() !== m.section.title.toLowerCase() && request.length > m.section.title.length + 10 ? request.slice(0, 200) : '';
-    const setup = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(t.role === 'parent' ? { forParent: true } : {}), ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
+    const setup1 = { ...setup0, subject: a.subject, grade: a.grade as Setup['grade'], ...(t.role === 'parent' ? { forParent: true } : {}), ...(ask && !(setup0.note || '').includes(ask) ? { note: [setup0.note, `${setup0.lang === 'en' ? 'Focus' : 'Tập trung'}: ${ask}`].filter(Boolean).join('; ').slice(0, 400) } : {}) };
+    // Chi #46: made from the child's work: typed again by code, her name taken from her own record (never the
+    // browser's word), and the title says who it is for. Prompts get forPrompt(setup): no name, no "Made for".
+    const rawWork = (b.setup && typeof b.setup === 'object' ? (b.setup as { work?: Partial<Work> }).work : undefined);
+    let setup: Setup = setup1;
+    if (rawWork && typeof rawWork === 'object') {
+      const kid = rawWork.pupilId ? await d.sql.one<{ id: string; name: string }>('select p.id, p.name from pupils p join classes k on k.id = p.class_id where p.id = $1 and k.teacher_id = $2', [String(rawWork.pupilId), t.id]) : null;
+      const rec = kid && rawWork.recordId ? await d.sql.one<{ id: string }>('select id from work_records where id = $1 and pupil_id = $2', [String(rawWork.recordId), kid.id]) : null;
+      const w = typeWork(rawWork, { date: rawWork.date, topic: rawWork.topic, subject: rawWork.subject, ...(kid ? { pupilId: kid.id, child: kid.name } : {}), ...(rec ? { recordId: rec.id } : {}) });
+      if (w.total) setup = { ...setup1, title: titled(setup1.title, w, setup1.lang, t.role === 'parent'), work: { ...w, base: setup1.title } };
+    }
     if (await lessons.madeToday(t.id) >= lessonsPerDay(t.kind)) return fail(c, 'lessonLimit', 429);
     const g = await gate(c); if (g) return g;
     const cr = await spare(d.sql, t.id);
@@ -110,7 +131,8 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (cr.left < config.guard.lessonCredits) return fail(c, cr.promised && cr.left + cr.promised >= config.guard.lessonCredits ? 'creditsHeld' : 'credits', 429);
     const source = sourceOf(m);
     // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
-    try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, setup.title, ...setup.objectives, setup.note || ''].join('\n\n'))); } catch (e) { return aiError(c, e); }
+    const ai = forPrompt(setup);
+    try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, ai.title, ...ai.objectives, ai.note || '', ...(ai.work?.questions || []).map((q) => `${q.q} ${q.child}`)].join('\n\n'))); } catch (e) { return aiError(c, e); }
     const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
     // a lesson holds its credits up front, pictures included (Son, 30 Oct); what it does not use comes back
@@ -124,7 +146,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
         const b = await d.budget.check(t.id);
         if (b && b !== 'credits') { await lessons.step(id, 'Ứng dụng đang tạm dừng soạn bài. Cô thử lại sau nhé; lượt đã giữ được trả lại.', 'Making lessons is paused for now. Please try again later; the held credits came back.'); await lessons.fail(id); await settle(); return; }
         await new Promise<void>((ready) => {
-          void d.held(t.id, hold, () => runLesson(d.ai, lessons, id, setup, source, { files: d.files, budget: d.budget, teacherId: t.id, held: true, passages: m.passages, sql: d.sql, onReady: ready }), undefined, id).finally(settle);
+          void d.held(t.id, hold, () => runLesson(d.ai, lessons, id, ai, source, { files: d.files, budget: d.budget, teacherId: t.id, held: true, passages: m.passages, sql: d.sql, onReady: ready }), undefined, id).finally(settle);
         });
       },
       async () => { await d.sql.query(`delete from lessons where id = $1 and teacher_id = $2 and status = 'working'`, [id, t.id]); await settle(); }, need);

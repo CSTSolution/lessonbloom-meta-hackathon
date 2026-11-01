@@ -10,31 +10,34 @@ const COLOURS: Record<string, string> = { red: '🔴', blue: '🔵', green: '�
 export function isEnglish(notes: string) { const head = notes.slice(0, 300); return !/[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệịỉĩọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(head) && /\b(the|and|is|lesson|unit|english|colou?r|add|subtract)\b/i.test(head); }
 
 function plan(setup: F, count: number) {
-  const sub = /trừ|subtract/i.test(String(setup.title)), plain = /không nhớ|without regrouping/i.test(String(setup.title)), en = setup.lang === 'en';
+  const sub = /trừ|subtract/i.test(String(setup.title)), plain = /không nhớ|without regrouping/i.test(String(setup.title)), en = setup.lang === 'en', n = /1[ .,]?000(?!\d)/.test(String(setup.title)) ? 1000 : 100;
   const skills = setup.subject === 'english'
     ? [{ tag: 'colour_words', name: 'Colour words', kind: 'vocabulary' }, { tag: 'what_colour', name: "Asking 'What colour is it?'", kind: 'sentence_pattern' }]
-    : sub ? [{ tag: plain ? 'tru_khong_nho' : 'tru_co_nho', name: en ? (plain ? 'Subtracting without regrouping' : 'Subtracting with regrouping within 100') : plain ? 'Trừ không nhớ' : 'Trừ có nhớ trong phạm vi 100', kind: plain ? 'sub_no_borrow' : 'sub_borrow' }, { tag: 'dat_tinh', name: en ? 'Column subtraction' : 'Đặt tính rồi tính', kind: 'column' }]
-      : [{ tag: 'cong_co_nho', name: en ? 'Adding with regrouping within 100' : 'Cộng có nhớ trong phạm vi 100', kind: 'add_carry' }, { tag: 'toan_loi_van', name: en ? 'Word problems' : 'Bài toán có lời văn', kind: 'word_problem' }];
+    : sub ? [{ tag: plain ? 'tru_khong_nho' : 'tru_co_nho', name: en ? (plain ? 'Subtracting without regrouping' : `Subtracting with regrouping within ${n}`) : plain ? 'Trừ không nhớ' : `Trừ có nhớ trong phạm vi ${n}`, kind: plain ? 'sub_no_borrow' : 'sub_borrow' }, { tag: 'dat_tinh', name: en ? 'Column subtraction' : 'Đặt tính rồi tính', kind: 'column' }]
+      : [{ tag: 'cong_co_nho', name: en ? `Adding with regrouping within ${n}` : `Cộng có nhớ trong phạm vi ${n}`, kind: 'add_carry' }, { tag: 'toan_loi_van', name: en ? 'Word problems' : 'Bài toán có lời văn', kind: 'word_problem' }];
   const kinds = ['title', 'warmup', ...Array(Math.max(0, count - 4)).fill(0).map((_, i) => (i % 2 ? 'example' : 'teach')), 'practice', 'summary'];
   return { skills, outline: kinds.map((kind, i) => ({ kind, heading: `${kind === 'title' ? setup.title : `${en ? 'Part' : 'Phần'} ${i}`}`, objective: setup.objectives?.[i % Math.max(1, setup.objectives?.length || 1)] || '' })) };
 }
 
 function mathItems(f: F) {
   const { skill, template, level, count, round } = f, k = skill.kind as string, out: F[] = [], en = f.setup.lang === 'en';
+  // a section within 1000 gets its 3-digit numbers (Chi #47); a column skill mixes with and without regrouping
+  const big = /(?:phạm vi|within)\s+1[ .,]?000(?!\d)/i.test(`${f.source}\n${f.setup.title}`), plainCol = (i: number) => big && k === 'column' && i % 2 === 1;
   if (/^sub_|column/.test(k) && /trừ|subtract/i.test(String(f.setup.title))) {        // subtraction sections: 52 − 28 and friends
     return { items: Array.from({ length: count }, (_, i) => {
-      const a = 52 + i * 10 + (level === 'advanced' ? 20 : 0) - (k === 'sub_no_borrow' ? -6 : 0), b = k === 'sub_no_borrow' ? 23 : 28, r = a - b;
-      return template === 'fill' ? { a, op: '-', b, blank: 'result', explain: `${a} − ${b} = ${r}.` }
+      const plain = k === 'sub_no_borrow' || plainCol(i);
+      const a = big ? (plain ? 658 : 652) + i * 10 + (level === 'advanced' ? 200 : 0) : 52 + i * 10 + (level === 'advanced' ? 20 : 0) - (plain ? -6 : 0), b = big ? (plain ? 234 : 287) : plain ? 23 : 28, r = a - b;
+      return template === 'fill' || template === 'column' ? { a, op: '-', b, blank: 'result', explain: `${a} − ${b} = ${r}.` }
         : template === 'truefalse' ? { a, op: '-', b, shown: i % 2 ? r : r + 10, explain: `${a} − ${b} = ${r}.` }
         : { a, op: '-', b, distractors: [r + 10, r - 1], explain: en ? `Take 1 ten: ${a} − ${b} = ${r}.` : `Mượn 1 chục: ${a} − ${b} = ${r}.` };
     }) };
   }
   for (let i = 0; i < count; i++) {
-    const a = 36 + i + (level === 'advanced' ? 10 : 0), b = 27, r = a + b;
-    if (k === 'add_carry' && template === 'mcq' && level === 'basic' && round === 0 && i === 0) { out.push({ a: 31, op: '+', b: 22, distractors: [43, 63], explain: '1 + 2 = 3; 3 + 2 = 5.' }); continue; }   // no carrying: rejected (Q)
+    const a = big ? (plainCol(i) ? 432 : 436) + i * 10 + (level === 'advanced' ? 100 : 0) : 36 + i + (level === 'advanced' ? 10 : 0), b = big ? (plainCol(i) ? 215 : 278) : 27, r = a + b;
+    if (k === 'add_carry' && template === 'mcq' && level === 'basic' && round === 0 && i === 0) { out.push(big ? { a: 312, op: '+', b: 221, distractors: [433, 633], explain: '2 + 1 = 3; 1 + 2 = 3; 3 + 2 = 5.' } : { a: 31, op: '+', b: 22, distractors: [43, 63], explain: '1 + 2 = 3; 3 + 2 = 5.' }); continue; }   // no carrying: rejected (Q)
     if ((template === 'word' || k === 'word_problem') && en) out.push({ a, op: '+', b, story: `Mia has ${a} apples. Her mum gives her ${b} more apples. How many apples does Mia have in all?`, unit: 'apples', explain: `${a} + ${b} = ${r} (apples).` });
     else if (template === 'word' || k === 'word_problem') out.push({ a, op: '+', b, story: `Lan có ${a} quả xoài, mẹ cho thêm ${b} quả xoài. Hỏi Lan có tất cả bao nhiêu quả xoài?`, unit: 'quả xoài', explain: `${a} + ${b} = ${r} (quả xoài).` });
-    else if (template === 'fill') out.push({ a, op: '+', b, blank: 'result', explain: en ? `${a % 10} + 7 = ${(a % 10) + 7}: write ${((a % 10) + 7) % 10}, carry 1.` : `${a % 10} + 7 = ${(a % 10) + 7}, viết ${((a % 10) + 7) % 10} nhớ 1.` });
+    else if (template === 'fill' || template === 'column') out.push({ a, op: '+', b, blank: 'result', explain: en ? `${a % 10} + ${b % 10} = ${(a % 10) + (b % 10)}: write ${((a % 10) + (b % 10)) % 10}, carry 1.` : `${a % 10} + ${b % 10} = ${(a % 10) + (b % 10)}, viết ${((a % 10) + (b % 10)) % 10} nhớ 1.` });
     else if (template === 'truefalse') out.push({ a, op: '+', b, shown: i % 2 ? r : r - 10, explain: `${a} + ${b} = ${r}.` });
     else out.push({ a, op: '+', b, distractors: [r - 10, r + 1], explain: en ? `Add the ones, carry 1 to the tens: ${a} + ${b} = ${r}.` : `Cộng hàng đơn vị, nhớ 1 sang hàng chục: ${a} + ${b} = ${r}.` });
   }
@@ -78,7 +81,10 @@ export const lessonAnswers: [string, (r: JsonRequest) => unknown][] = [
     return { usable: notes.replace(/[^\p{L}]/gu, '').length > 20, subject: english ? 'english' : 'math', grade, title: (notes.split('\n')[0] || 'Bài học').split(/[–:]/).pop()!.replace(/[.]$/, '').trim().slice(0, 60),
       objectives: english ? (/\d\s*[+−-]\s*\d/.test(notes) ? ['Add two-digit numbers, carrying 1 to the tens.', 'Solve a one-step word problem.'] : ['Name six colours.', 'Ask and answer "What colour is it?".']) : ['Cộng có nhớ hai số có hai chữ số.', 'Giải bài toán có lời văn một bước.'], minutes: 25, lang: english ? 'en' : 'vi' };
   }],
-  ['work', () => ({ usable: true, topic: 'Phép cộng có nhớ trong phạm vi 100', kind: 'add_carry', mistakes: ['Quên nhớ 1 sang hàng chục (36 + 27 = 53)'] })],
+  // a marked review sheet like Chi's (#46), within 100 like the sample book: 16 questions, 4 crossed wrong
+  ['work', () => ({ usable: true, topic: 'Ôn tập phép cộng có nhớ, phép trừ có nhớ trong phạm vi 100', kind: 'sub_borrow', mistakes: ['Quên nhớ 1 sang hàng chục (36 + 27 = 53)'],
+    questions: [['52 - 28', '34', 'wrong'], ['45 + 37 ... 81', '<', 'wrong'], ['36 + 27', '53', 'wrong'], ['71 - 46', '35', 'wrong'], ['48 + 25', '73'], ['19 + 36', '55'], ['57 + 28', '85'], ['64 + 18', '82'],
+      ['43 - 17', '26'], ['60 - 24', '36'], ['35 + 42', '77'], ['86 - 53', '33'], ['27 + 15', '42'], ['90 - 45', '45'], ['38 + 44 ... 80', '>'], ['73 - 38', '35']].map(([q, child, mark = 'right']) => ({ q, child, mark })) })],
   // one page of a scanned book or a photo of a page (fixture.page), or the photos of a lesson (fixture.photos)
   ['ocr', (r) => (r.fixture as { page?: number }).page ? { usable: true, text: `Lesson ${(r.fixture as { page: number }).page}: Adding within 100\nMia has 36 apples and gets 27 more. 36 + 27 = 63.\nPractice: 48 + 25; 19 + 36.` } : ({ usable: true, text: Array.from({ length: (r.fixture as F).photos }, (_, i) => `Trang ${i + 1}: Phép cộng có nhớ trong phạm vi 100. Ví dụ: 36 + 27 = 63. Luyện tập: 48 + 25; 19 + 36.`).join('\n') })],
   ['plan', (r) => plan((r.fixture as F).setup, (r.fixture as F).count)],

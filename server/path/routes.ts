@@ -14,6 +14,7 @@ import { guardedJson, type Budget, wrapUser } from '../guard/guard.ts';
 import { fail } from '../http.ts';
 import type { Item, Lesson, Skill } from '../lesson/types.ts';
 import { writeItems } from '../lesson/writer.ts';
+import { typeWork } from '../lesson/work.ts';
 import { addDays, type Answer, classLabel, clock, cleanCriteria, type Criteria, daysBetween, labelOf, type Label, mondayOf, schoolDay, vnToday } from './labels.ts';
 
 const J = (x: unknown) => JSON.stringify(x);
@@ -210,7 +211,24 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     const pupils = await sql.query<{ id: string; name: string }>('select id, name from pupils where class_id = $1 order by created_at, name', [classId]);
     const answers = await sql.query<Answer & { pupil_id: string }>(`select w.pupil_id, w.item_id, w.skill, w.correct, w.answer, w.at, to_char(w.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day
       from answers w where w.assignment_id = any($1) order by w.at`, [assignments.map((a) => a.id)]);
-    return { assignments, items, skills, pupils, answers, lang: (assignments[0]?.content.lang || 'vi') as 'vi' | 'en' };
+    const lang = (assignments[0]?.content.lang || 'vi') as 'vi' | 'en';
+    // the child's marked work (Chi #46) counts like practice done in the app: each question one answer, under
+    // the lesson skill of the same kind (or its own), with the kind of mistake code found. Not in one lesson's view.
+    if (!assignmentId) {
+      const kinds = new Map<string, string>();
+      for (const a of assignments) for (const s of a.skills) if (!kinds.has(s.kind)) kinds.set(s.kind, s.tag);
+      const recs = await sql.query<{ id: string; pupil_id: string; at: string; day: string; topic: string; items: unknown[] }>(`select r.id, r.pupil_id, r.made_at as at, to_char(r.made_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, r.topic, r.items
+        from work_records r join pupils p on p.id = r.pupil_id where p.class_id = $1 order by r.made_at`, [classId]);
+      for (const r of recs) typeWork({ questions: r.items }, { topic: r.topic }).questions.forEach((q, n) => {
+        const tag = kinds.get(q.kind) ?? `bai_lam_${q.kind}`, id = `wr:${r.id}:${n}`, x = q.calc;
+        if (!skills.has(tag)) skills.set(tag, q.label[lang]);
+        if (x && !x.cmp && x.op && x.b !== undefined) items.set(id, { id, subject: 'math', template: 'fill', skill: tag, level: 'basic', prompt: q.q, explain: '', a: x.a, op: x.op, b: x.b, blank: x.blank, answer: q.right });
+        const coded = q.slip?.[lang] ?? (lang === 'en' ? `${q.label.en}: not right yet` : `${q.label.vi} chưa đúng`);
+        answers.push({ pupil_id: r.pupil_id, item_id: id, skill: tag, correct: q.ok, answer: q.child, at: r.at, day: r.day, mistake: q.ok ? null : coded });
+      });
+      answers.sort((p, q) => Date.parse(p.at) - Date.parse(q.at));
+    }
+    return { assignments, items, skills, pupils, answers, lang };
   };
   const labelsFor = (data: Awaited<ReturnType<typeof classData>>, cr: Criteria) => {
     const bySkill = new Map<string, Map<string, ReturnType<typeof labelOf>>>();

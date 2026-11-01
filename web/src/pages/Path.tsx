@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type AreaRow, type ClassRow, type PathStep, type PathView } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
+import { pagesOf } from './Sources.tsx';
 
 const T = {
   vi: {
@@ -52,6 +53,9 @@ export function Path({ parent }: { parent: boolean }) {
   }, []);
   const load = () => { const g = gen.current; if (k && a) api.path(k, a).then((p) => { if (g !== gen.current) return; setV(p); setWeeks(Object.fromEntries(p.steps.map((s) => [s.sectionId, s.weeks]))); setStart(p.path.start); setOpen((o) => o || p.steps.find((s) => s.status === 'current')?.topic || p.steps[0]?.topic || ''); }).catch(() => setV(null)); };
   useEffect(() => { flush.current?.(); gen.current++; setSaving(''); setMsg(''); setOpen(''); setV(null); load(); }, [k, a]);
+  // each lesson's pages as printed in the paper book, when known (Chi #45); the path itself sends file pages
+  const [printed, setPrinted] = useState<Record<string, string>>({});
+  useEffect(() => { setPrinted({}); if (a) api.area(a).then((r) => setPrinted(Object.fromEntries(r.sections.filter((x) => x.printed_from != null && x.printed_to != null).map((x) => [x.id, pagesOf(x.page_from, x.page_to, x.printed_from, x.printed_to)])))).catch(() => {}); }, [a]);
   if (!classes) return null;
   if (!classes.length || !areas.length) return <div className="page narrow"><h1>{t.title}</h1><div className="card" style={{ marginTop: 12 }}><p className="muted">{!classes.length ? (parent ? t.noChild : t.noClass) : t.noSrc}</p></div></div>;
   const save = async (w = weeks, st = start, my = gen.current) => {
@@ -94,7 +98,7 @@ export function Path({ parent }: { parent: boolean }) {
                   <div className="row">
                     <span className={`num ${s.status === 'done' ? 'done' : cur ? 'cur' : ''}`}>{n}</span>
                     <span className="grow"><b className="small">{s.title}</b> <span className={`tag ${s.status}`}>{t.st[s.status]}</span>
-                      <span className="small muted" style={{ display: 'block' }}>{t.page} {s.pages} · {s.status === 'done' ? t.ended(dm(s.end)) : cur ? `${dm(s.start)} – ${dm(s.end)}` : t.starts(dm(s.start))}</span></span>
+                      <span className="small muted" style={{ display: 'block' }}>{t.page} {printed[s.sectionId] ?? s.pages} · {s.status === 'done' ? t.ended(dm(s.end)) : cur ? `${dm(s.start)} – ${dm(s.end)}` : t.starts(dm(s.start))}</span></span>
                     {s.status !== 'done' && <div className="weeks">{[1, 2, 3].map((w) => <button key={w} className={s.weeks === w ? 'on' : ''} onClick={() => { if (w !== s.weeks) change({ ...weeks, [s.sectionId]: w }, start); }}>{t.wk(w)}</button>)}</div>}
                   </div>
                   {cur && <div className="stack" style={{ gap: 4, background: 'var(--paper)', borderRadius: 8, padding: 8 }}>

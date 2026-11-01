@@ -16,8 +16,14 @@ export interface CheckContext { subject: Subject; grade: number; lang: Lang; ski
 
 // Chi's scope rule: the lesson stays inside its section of the book. "phạm vi 100" caps every number;
 // only the operations the section teaches are allowed (a section on addition gets no subtraction).
-export function scopeOf(source: string): Scope {
-  const t = source.toLowerCase(), title = t.split('\n')[0], caps = [...t.matchAll(/(?:phạm vi|within|up to)\s+(\d{1,5})/g)].map((m) => Number(m[1]));
+// hint: the lesson's title and the assigner's note (which carries the child's work when the lesson
+// comes from a photo of it), read for the number range only when the section itself does not give one.
+export function scopeOf(source: string, hint = ''): Scope {
+  const t = source.toLowerCase(), title = t.split('\n')[0], [hintTitle = '', ...note] = hint.toLowerCase().split('\n');
+  // Chi #47: the range follows "phạm vi 1000" / "within 1000" (the part's title, then the lesson's, then the
+  // part's text), then the numbers its calculations use, then the child's work in the note. A grade-2 book
+  // reaches 1000 in its second volume, so the grade alone is not the range.
+  const max = rangeIn(title) ?? rangeIn(hintTitle) ?? rangeIn(t) ?? calcRange(t) ?? rangeIn(note.join('\n')) ?? calcRange(note.join('\n'));
   // whole words, Unicode-aware (\b does not know "ừ" is a letter)
   const word = (w: string) => new RegExp(`(?<!\\p{L})(${w})(?!\\p{L})`, 'u');
   const named = (x: string) => [word('cộng|addition|adding|add').test(x) && '+', word('trừ|subtraction|subtracting|subtract|take away').test(x) && '-', word('nhân|multiplication|multiplying|multiply|times tables?').test(x) && '×', word('chia|division|dividing|divide').test(x) && ':'].filter(Boolean) as Op[];
@@ -31,17 +37,56 @@ export function scopeOf(source: string): Scope {
     if (/\d\s*[:÷]\s*\d/.test(t)) seen.add(':');
     ops = [...seen];
   }
-  return { ...(caps.length ? { max: Math.max(...caps) } : {}), ...(ops.length ? { ops } : {}) };
+  return { ...(max !== undefined ? { max } : {}), ...(ops.length ? { ops } : {}) };
+}
+
+// "phạm vi 1000", "phạm vi 10 000", "within 1,000": the largest range named in the text
+function rangeIn(t: string): number | undefined {
+  const caps = [...t.matchAll(/(?:phạm vi|within|up to)\s+(\d{1,3}(?:[ .,]\d{3})+|\d{1,7})(?!\d)/g)].map((m) => Number(m[1].replace(/[ .,]/g, '')));
+  return caps.length ? Math.max(...caps) : undefined;
+}
+// No range named: the numbers the text calculates with ("456 + 278 = 734"), page references left out.
+// Only numbers above 100 set a range this way (1000, 10 000…); smaller ones leave the grade's own range.
+const RANGES = [1000, 10000, 100000, 1000000];
+function calcRange(t: string): number | undefined {
+  const x = t.replace(/\[?\b(?:tr|trang|pp?|pages?)\.?\s*\d+(?:\s*[–-]\s*\d+)?\]?/gi, ' ');
+  const ns = [...x.matchAll(/(\d+)\s*[+−–×x*:÷=-]\s*(\d+)/g)].flatMap((m) => [Number(m[1]), Number(m[2])]);
+  const top = Math.max(0, ...ns);
+  return top > 100 ? RANGES.find((r) => top <= r) : undefined;
+}
+
+// The numbers a lesson works with: the section's range when it gives one, else the grade's. In a section
+// within 1000 (100, 10 000…) a sum or difference using only numbers up to a tenth of it belongs to an earlier
+// chapter: "within 1000" practises 3-digit numbers, so 48 + 37 or 100 − 28 is too small (Chi #47). The
+// grade's own range sets no floor (a grade-3 lesson on 2-digit numbers is fine).
+const TENS = [100, 1000, 10000, 100000, 1000000];
+export function rangeOf(ctx: Pick<CheckContext, 'grade' | 'scope'>): { max: number; floor?: number } {
+  const own = ctx.scope?.max, max = own ?? GRADE_MAX[ctx.grade] ?? Infinity;
+  return { max, ...(own !== undefined && TENS.includes(own) ? { floor: own / 10 } : {}) };
+}
+
+// Carrying (+) or borrowing (−) in any column, not only the ones: 254 + 172 carries in the tens (Chi #47).
+// first: the place value of the lowest column that regroups (1 = ones, 10 = tens…), 0 when none does.
+export function regroups(a: number, op: Op, b: number): { any: boolean; first: number } {
+  if ((op !== '+' && op !== '-') || a < 0 || b < 0) return { any: false, first: 0 };
+  let c = 0, place = 1, x = a, y = b;
+  while (x > 0 || y > 0) {
+    const d = op === '+' ? (x % 10) + (y % 10) + c : (x % 10) - (y % 10) - c;
+    c = op === '+' ? (d >= 10 ? 1 : 0) : (d < 0 ? 1 : 0);
+    if (c) return { any: true, first: place };
+    x = Math.floor(x / 10); y = Math.floor(y / 10); place *= 10;
+  }
+  return { any: false, first: 0 };
 }
 
 // Numbers a grade works with (Chi: grade 1 to 20, grade 2 to 100, grade 3 to 1000); grades 4-5: never negative only.
 export const GRADE_MAX: Record<number, number> = { 1: 20, 2: 100, 3: 1000 };
 
 const INSTRUCTION = {
-  vi: { mcq: 'Chọn kết quả đúng', fill: 'Điền số thích hợp vào ô trống', truefalse: 'Đúng hay sai?' },
-  en: { mcq: 'Choose the right answer', fill: 'Write the missing number', truefalse: 'True or false?' },
+  vi: { mcq: 'Chọn kết quả đúng', fill: 'Điền số thích hợp vào ô trống', truefalse: 'Đúng hay sai?', column: 'Đặt tính rồi tính' },
+  en: { mcq: 'Choose the right answer', fill: 'Write the missing number', truefalse: 'True or false?', column: 'Write in columns, then work it out' },
 };
-const SIGN: Record<Op, string> = { '+': '+', '-': '−', '×': '×', ':': ':' };
+export const SIGN: Record<Op, string> = { '+': '+', '-': '−', '×': '×', ':': ':' };
 
 export function compute(a: number, op: Op, b: number): number {
   return op === '+' ? a + b : op === '-' ? a - b : op === '×' ? a * b : b === 0 ? NaN : a / b;
@@ -67,7 +112,8 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
     case 'mcq': {
       let distractors = (r.distractors || []).map((d) => Math.trunc(Number(d))).filter(Number.isFinite).slice(0, 3);
       // Chi: wrong options are mistakes children really make. With carrying or borrowing, the forgotten 1 is always one of them
-      const slip = op === '+' && (a % 10) + (b % 10) >= 10 ? result - 10 : op === '-' && a % 10 < b % 10 ? result + 10 : null;
+      // (in the lowest column that regroups: 254 + 172 forgets the 1 in the tens, 326)
+      const g = regroups(a, op, b), slip = !g.any ? null : op === '+' ? result - g.first * 10 : result + g.first * 10;
       if (slip !== null && slip >= 0 && slip !== result && !distractors.includes(slip)) distractors = [slip, ...distractors.filter((d) => d !== result)].slice(0, 3);
       return { ...base, distractors, prompt: `${INSTRUCTION[lang].mcq}: ${calc} = ?`, options: shuffle([result, ...distractors].map(String), id + calc), answer: String(result) };
     }
@@ -80,6 +126,9 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
       const shown = Number.isFinite(Number(r.shown)) ? Math.trunc(Number(r.shown)) : result;
       return { ...base, shown, prompt: `${INSTRUCTION[lang].truefalse} ${calc} = ${shown}`, answer: shown === result ? 'true' : 'false' };
     }
+    // Chi #47: "đặt tính rồi tính", the two numbers set out in columns; the pupil writes the result
+    case 'column':
+      return { ...base, template: 'column', prompt: `${INSTRUCTION[lang].column}: ${calc}`, answer: String(result) };
     case 'word':
     default:
       return { ...base, template: 'word', story: String(r.story || '').trim(), unit: String(r.unit || '').trim(), prompt: String(r.story || '').trim(), answer: String(result) };
@@ -117,12 +166,15 @@ export function askedThing(story: string): string[] | null {
 }
 
 function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
-  const max = GRADE_MAX[ctx.grade] ?? Infinity, result = compute(e.a, e.op, e.b);
+  // the section's range when it names one (a grade-2 book goes to 1000 in its second volume), else the grade's
+  const { max, floor } = rangeOf(ctx), result = compute(e.a, e.op, e.b);
   const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind;
   if (!Number.isFinite(result) || !Number.isInteger(result)) out.push({ code: 'range', msg: 'the result is not a whole number' });
   if (ctx.scope?.max !== undefined && [e.a, e.b, result].some((n) => n > ctx.scope!.max!)) out.push({ code: 'scope', msg: `numbers above ${ctx.scope.max}, outside this section of the book` });
+  // Chi #47: too small is outside the section too: "within 1000" means 3-digit numbers, not 48 + 37 or 100 − 28
+  if (floor && (e.op === '+' || e.op === '-') && [e.a, e.b, result].every((n) => n <= floor)) out.push({ code: 'scope', msg: `${e.a} ${SIGN[e.op]} ${e.b} only uses numbers up to ${floor}; this section works within ${max}, so use its bigger numbers` });
   if (ctx.scope?.ops && !ctx.scope.ops.includes(e.op)) out.push({ code: 'scope', msg: `"${SIGN[e.op]}" is not taught in this section of the book` });
-  if ([e.a, e.b, result].some((n) => n < 0 || n > max)) out.push({ code: 'range', msg: `numbers outside grade ${ctx.grade} (0–${max}) or negative` });
+  if ([e.a, e.b, result].some((n) => n < 0 || n > max)) out.push({ code: 'range', msg: ctx.scope?.max !== undefined ? `numbers outside 0–${max} or negative` : `numbers outside grade ${ctx.grade} (0–${max}) or negative` });
   if (e.template === 'mcq') {
     if ((e.distractors || []).length < 2) out.push({ code: 'shape', msg: 'needs at least 2 wrong options' });
     if (new Set(e.options).size !== (e.options || []).length) out.push({ code: 'dup', msg: 'repeated options' });
@@ -130,13 +182,17 @@ function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
   }
   if (e.template === 'truefalse' && e.shown !== undefined && (e.shown < 0 || e.shown > max * 2)) out.push({ code: 'range', msg: 'the claimed result is out of range' });
   // Q: the skill fits the calculation
-  const units = (x: number) => x % 10;
-  const carries = e.op === '+' ? units(e.a) + units(e.b) >= 10 : e.op === '-' ? units(e.a) < units(e.b) : false;
+  const carries = regroups(e.a, e.op, e.b).any;
   if ((kind === 'add_carry' || kind === 'add_no_carry') && e.op !== '+') out.push({ code: 'Q', msg: `an addition skill on ${e.op}` });
   if ((kind === 'sub_borrow' || kind === 'sub_no_borrow') && e.op !== '-') out.push({ code: 'Q', msg: `a subtraction skill on ${e.op}` });
   if ((kind === 'add_carry' || kind === 'sub_borrow') && !carries) out.push({ code: 'Q', msg: `${e.a} ${SIGN[e.op]} ${e.b} has no ${e.op === '+' ? 'carrying' : 'borrowing'}, but the skill is "${e.skill}"` });
   if ((kind === 'add_no_carry' || kind === 'sub_no_borrow') && carries) out.push({ code: 'Q', msg: `${e.a} ${SIGN[e.op]} ${e.b} needs ${e.op === '+' ? 'carrying' : 'borrowing'}, but the skill is "${e.skill}"` });
   if (kind === 'column' && e.template === 'fill' && e.blank !== 'result') out.push({ code: 'Q', msg: 'finding a missing number is not column calculation' });
+  if (e.template === 'column') {
+    if (e.op === ':') out.push({ code: 'shape', msg: 'division is not set out in columns here; use +, − or ×' });
+    else if (e.op === '×' && e.b >= 10) out.push({ code: 'shape', msg: 'column multiplication is by a one-digit number' });
+    if (Math.max(e.a, e.b) < 10) out.push({ code: 'shape', msg: 'one-digit numbers need no columns' });
+  }
   if (kind === 'find_missing' && !(e.template === 'fill' && e.blank !== 'result')) out.push({ code: 'Q', msg: 'a find-the-missing-number skill needs the blank on a number' });
   if (kind === 'multiply' && e.op !== '×') out.push({ code: 'Q', msg: 'a multiplication skill without ×' });
   if (kind === 'divide' && e.op !== ':') out.push({ code: 'Q', msg: 'a division skill without :' });
@@ -256,4 +312,5 @@ export function checkItem(e: Item, ctx: CheckContext): Issue[] {
   return out.filter((x, i) => out.findIndex((y) => y.code === x.code && y.msg === x.msg) === i);
 }
 
-export const contextOf = (setup: Setup, skills: Skill[], source: string): CheckContext => ({ subject: setup.subject, grade: setup.grade, lang: setup.lang, skills, source, scope: setup.subject === 'math' ? scopeOf(source) : undefined });
+// the title and note help with the range only (Chi #47), and so do the sums on the child's work (Chi #46)
+export const contextOf = (setup: Setup, skills: Skill[], source: string): CheckContext => ({ subject: setup.subject, grade: setup.grade, lang: setup.lang, skills, source, scope: setup.subject === 'math' ? scopeOf(source, `${setup.work?.base || setup.title}\n${setup.note || ''}\n${(setup.work?.questions || []).map((q) => q.q).join('\n')}`) : undefined });

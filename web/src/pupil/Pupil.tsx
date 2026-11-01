@@ -15,7 +15,7 @@ const PAIRS = 4;  // pairs in the game (Chi's design: "Tìm 4 cặp", 8 cards fi
 const S = {
   vi: {
     hiKid: 'Chào con!', joinSub: 'Nhập mã lớp cô đưa, rồi chọn tên con nhé.', codeLabel: 'Mã lớp', next: 'Tiếp', who: 'Con là ai?', notMe: 'Đổi lớp', noName: 'Không thấy tên con? Hỏi cô giáo nhé.',
-    hello: (n: string, k: string) => (k && k !== n ? `Chào ${n} · ${k}` : `Chào ${n}`), todayIs: (t: string) => `Bài hôm nay: ${t}`, nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!', leave: 'Thoát', remind: 'Nhớ nhé!',
+    hello: (n: string, k: string) => (k && k !== n ? `Chào ${n} · ${k}` : `Chào ${n}`), todayIs: (t: string) => `Bài hôm nay: ${t}`, fromWork: 'Luyện lại từ bài con làm', nothing: 'Hôm nay chưa có bài. Con quay lại sau nhé!', leave: 'Thoát', remind: 'Nhớ nhé!',
     video: 'Xem video', slides: 'Xem bài', seen: 'đã xem', cards: 'Thẻ nhớ', nCards: (n: number) => `${n} thẻ`, doneMark: 'đã xong', practise: 'Làm bài tập', nItems: (n: number) => `${n} câu`, pairs: 'Lật thẻ', nPairs: (n: number) => `Tìm ${n} cặp`,
     gotSoFar: 'Con đã đi được', back: 'Quay lại', done: 'Xong', subject: { math: 'Toán', english: 'Tiếng Anh' } as Record<string, string>,
     qOf: (k: number, n: number) => `Câu ${k}/${n}`, pick: 'Con chọn câu trả lời đúng nhé', listenQ: 'Nghe câu hỏi', almost: 'Gần đúng rồi! Thử lại nhé', notThis: 'Chưa đúng rồi. Mình sang câu khác nhé', right: 'Đúng rồi, giỏi quá!',
@@ -28,7 +28,7 @@ const S = {
   },
   en: {
     hiKid: 'Hi there!', joinSub: 'Type the class code from your teacher, then tap your name.', codeLabel: 'Class code', next: 'Next', who: 'Who are you?', notMe: 'Change class', noName: "Can't see your name? Ask your teacher.",
-    hello: (n: string, k: string) => (k && k !== n ? `Hi ${n} · ${k}` : `Hi ${n}`), todayIs: (t: string) => `Today: ${t}`, nothing: 'Nothing for today yet. Come back later!', leave: 'Leave', remind: 'Remember!',
+    hello: (n: string, k: string) => (k && k !== n ? `Hi ${n} · ${k}` : `Hi ${n}`), todayIs: (t: string) => `Today: ${t}`, fromWork: 'Practice again from your work', nothing: 'Nothing for today yet. Come back later!', leave: 'Leave', remind: 'Remember!',
     video: 'Watch the video', slides: 'Look at the lesson', seen: 'watched', cards: 'Flashcards', nCards: (n: number) => `${n} cards`, doneMark: 'done', practise: 'Practise', nItems: (n: number) => `${n} questions`, pairs: 'Find the pairs', nPairs: (n: number) => `Find ${n} pairs`,
     gotSoFar: "How far you've got", back: 'Back', done: 'Done', subject: { math: 'Maths', english: 'English' } as Record<string, string>,
     qOf: (k: number, n: number) => `Question ${k}/${n}`, pick: 'Pick the right answer', listenQ: 'Listen to the question', almost: 'Almost! Try again', notThis: "Not this time. Let's go on", right: "That's right, well done!",
@@ -48,9 +48,9 @@ async function p<R>(method: string, path: string, body?: unknown): Promise<R> {
   if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi', j.errorEn || 'Error', r.status);
   return j as R;
 }
-interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; done: boolean; answered: number }
+interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; done: boolean; answered: number; greet?: { vi: string; en: string } | null }
 interface Today { pupil: { name: string }; class: { name: string }; lessons: TodayRow[]; reminder?: { vi: string; en: string } | null }
-interface PItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean }
+interface PItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean; fromWork?: boolean; stack?: { a: number; op: string; b: number } }
 interface PLesson { id: string; title: string; lang: L; retry: boolean; hints: boolean; video: string | null; slides: { id: string; heading: string; bullets: string[]; example?: string; image?: string }[]; items: PItem[]; cards: { id: string; front: string; back: string; emoji?: string }[]; tried: Record<string, boolean> }
 
 // Small line icons instead of emoji (the design's tiles).
@@ -106,6 +106,8 @@ export function Pupil() {
           <section key={l.id} className="p-lesson">
             <span className="p-chip">{t.subject[l.subject] || l.subject}</span>
             <h1>{t.todayIs(l.title)}</h1>
+            {/* made from her own marked work (Chi #46): what she found tricky last time */}
+            {l.greet && <p className="p-soft">{lang === 'en' ? l.greet.en : l.greet.vi}</p>}
             <div className="p-acts">
               {l.video ? <Act tone="blue" icon="play" title={t.video} sub={l.video_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/video`)} />
                 : l.slides > 0 && <Act tone="blue" icon="book" title={t.slides} sub={l.slides_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/slides`)} />}
@@ -253,14 +255,17 @@ function Practice({ l, t, onHome, to }: { l: PLesson; t: T; onHome: () => void; 
     <>
       <div className="p-seg blue" aria-label={t.qOf(i - roundStart + 1, inRound)}>{Array.from({ length: inRound }, (_, k) => <i key={k} className={roundStart + k < i || (roundStart + k === i && answered) ? 'on' : roundStart + k === i ? 'now' : ''} />)}</div>
       <div className="p-card q center">
+        {it.fromWork && <span className="p-chip">{t.fromWork}</span>}
         <span className="p-soft small">{split ? split[1] : t.pick} · {t.qOf(i - roundStart + 1, inRound)}</span>
-        <p className={split ? 'p-sum' : 'p-q'}>{split ? split[2] : it.prompt}</p>
+        {/* "đặt tính rồi tính": the numbers one above the other, ones under ones (Chi #47) */}
+        {it.stack ? <div className="p-col" role="img" aria-label={split ? split[2] : it.prompt}><span /><span>{it.stack.a}</span><span>{it.stack.op}</span><span>{it.stack.b}</span><i /></div>
+          : <p className={split ? 'p-sum' : 'p-q'}>{split ? split[2] : it.prompt}</p>}
         {it.sentence && <p className="p-q">{it.sentence}</p>}
         <button className="p-pill" onClick={say}><Icon name="sound" size={16} /> {t.listenQ}</button>
       </div>
       {it.options && <div className="p-opts">{it.options.map((o) => <button key={o} className={optClass(o)} disabled={!!answered} onClick={() => choose(o)}>{o}</button>)}</div>}
       {it.template === 'truefalse' && <div className="p-opts">{(['true', 'false'] as const).map((o) => <button key={o} className={optClass(o)} disabled={!!answered} onClick={() => choose(o)}>{o === 'true' ? t.tr : t.fa}</button>)}</div>}
-      {(it.template === 'fill' || it.template === 'word') && !it.options && (
+      {(it.template === 'fill' || it.template === 'word' || it.template === 'column') && !it.options && (
         <form className="p-stack" style={{ padding: 0 }} onSubmit={(e) => { e.preventDefault(); if (given.trim()) void send(given.trim()); }}>
           <div className="row center"><input className="p-input p-num" inputMode="numeric" autoFocus placeholder={t.type} value={given} disabled={!!answered} onChange={(e) => setGiven(e.target.value.replace(/[^\d]/g, '').slice(0, 7))} />{it.unit && <span className="p-q">{it.unit}</span>}</div>
           {!answered && <button className="p-btn main" disabled={!given.trim() || busy}>{t.check}</button>}

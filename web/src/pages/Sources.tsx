@@ -9,20 +9,23 @@ import { go } from '../router.ts';
 
 const T = {
   vi: {
-    original: 'Trang gốc', text: 'Chữ đã đọc', page: (n: number) => `Trang ${n}`, close: 'Đóng', loading: 'Đang mở…',
+    original: 'Trang gốc', text: 'Chữ đã đọc', page: (n: number) => `Trang ${n}`, inFile: (n: number) => `(trang ${n} trong file)`, close: 'Đóng', loading: 'Đang mở…',
     noOriginal: 'Sách này được đọc trên trình duyệt nên máy chủ chỉ giữ chữ. Sắp tới tệp gốc sẽ được lưu riêng tư để xem lại tại đây.', noText: 'Trang này không có chữ.',
     lead: 'Bài giảng chỉ dùng đúng phần chữ này, kèm số trang.',
     map: 'Bản đồ kiến thức', mapLead: 'Sách → phạm vi kiến thức → bài đã soạn → kỹ năng. Bấm vào một ô để mở.', parts: 'Phạm vi', lessons: 'Bài giảng', skills: 'Kỹ năng',
     assigned: (n: number) => `đã giao ${n} lớp`, notAssigned: 'chưa giao', working: 'đang soạn', noLessons: 'Chưa có bài nào từ sách này. Bấm "Tạo bài" ở một phạm vi.', inLessons: (n: number) => `trong ${n} bài`,
   },
   en: {
-    original: 'Original page', text: 'Text read', page: (n: number) => `Page ${n}`, close: 'Close', loading: 'Opening…',
+    original: 'Original page', text: 'Text read', page: (n: number) => `Page ${n}`, inFile: (n: number) => `(page ${n} in the file)`, close: 'Close', loading: 'Opening…',
     noOriginal: 'This book was read in your browser, so the server kept only its text. Soon the original file will be kept privately so you can see it here.', noText: 'No text on this page.',
     lead: 'Lessons use exactly this text, with its page numbers.',
     map: 'Knowledge map', mapLead: 'Book → parts → lessons made → skills. Click a box to open it.', parts: 'Parts', lessons: 'Lessons', skills: 'Skills',
     assigned: (n: number) => `assigned to ${pl(n, 'class', 'classes')}`, notAssigned: 'not assigned', working: 'being made', noLessons: 'No lessons from this book yet. Press "Make lesson" on a part.', inLessons: (n: number) => `in ${pl(n, 'lesson')}`,
   },
 };
+
+// A part's pages as printed in the book when both ends are known (Chi #45), else as in the file.
+export const pagesOf = (from: number, to: number, pf?: number | null, pt?: number | null) => { const [a, b] = pf != null && pt != null ? [pf, pt] : [from, to]; return b > a ? `${a}–${b}` : `${a}`; };
 
 // One part: the original page (drawn from her PDF in the browser) beside the text read from it.
 export function SourceView({ sectionId, onClose }: { sectionId: string; onClose: () => void }) {
@@ -43,6 +46,8 @@ export function SourceView({ sectionId, onClose }: { sectionId: string; onClose:
     return () => { alive = false; };
   }, [src]);
   const pages = src ? Array.from({ length: src.section.pageTo - src.section.pageFrom + 1 }, (_, k) => src.section.pageFrom + k).slice(0, 12) : [];
+  // the page as printed in her paper book, and where it is in the file when that differs (Chi #45)
+  const label = (n: number) => { const p = src?.printed?.[n] ?? src?.pages.find((x) => x.page === n)?.printed; return p != null && p !== n ? `${t.page(p)} ${t.inFile(n)}` : t.page(n); };
   return (
     <div className="card stack source-view" style={{ gap: 10 }}>
       <div className="row"><div className="grow"><b>{src?.section.title || t.loading}</b>{src && <span className="small muted" style={{ display: 'block' }}>{src.book.title} · {t.lead}</span>}</div><button className="btn small" onClick={onClose}>{t.close}</button></div>
@@ -52,8 +57,8 @@ export function SourceView({ sectionId, onClose }: { sectionId: string; onClose:
         const text = src.pages.find((p) => p.page === n)?.text;
         return (
           <div key={n} className={`source-page ${src.original ? 'two' : ''}`}>
-            {src.original && <figure><figcaption className="small muted">{t.original} · {t.page(n)}</figcaption>{imgs[n] ? <img src={imgs[n]} alt={t.page(n)} /> : <div className="small muted">{t.loading}</div>}</figure>}
-            <div><span className="small muted">{t.text} · {t.page(n)}</span><pre className="source-text">{text || t.noText}</pre></div>
+            {src.original && <figure><figcaption className="small muted">{t.original} · {label(n)}</figcaption>{imgs[n] ? <img src={imgs[n]} alt={label(n)} /> : <div className="small muted">{t.loading}</div>}</figure>}
+            <div><span className="small muted">{t.text} · {label(n)}</span><pre className="source-text">{text || t.noText}</pre></div>
           </div>
         );
       })}
@@ -93,7 +98,7 @@ export function KnowledgeMapView({ areaId, onSource }: { areaId: string; onSourc
               <title>{s.title}</title>
               <rect x={colX[0]} y={cy - 18} width={colW[0]} height={36} rx={8} fill="var(--leaf-2)" stroke="var(--leaf)" strokeWidth={hover === s.id ? 2 : 1} />
               <text x={colX[0] + 10} y={cy - 2} fontSize="12" fontWeight="600" fill="var(--ink)">{clip(s.title, chars)}</text>
-              <text x={colX[0] + 10} y={cy + 12} fontSize="11" fill="var(--ink-2)">{lang === 'vi' ? 'Trang' : s.pageFrom === s.pageTo ? 'Page' : 'Pages'} {s.pageFrom === s.pageTo ? s.pageFrom : `${s.pageFrom}–${s.pageTo}`}</text>
+              <text x={colX[0] + 10} y={cy + 12} fontSize="11" fill="var(--ink-2)">{lang === 'vi' ? 'Trang' : s.pageFrom === s.pageTo ? 'Page' : 'Pages'} {pagesOf(s.pageFrom, s.pageTo, s.printedFrom, s.printedTo)}</text>
             </g>); })}
           {lessons.map((l) => { const cy = yl(l.id); return (
             <g key={l.id} className="map-node" onClick={() => go(`/lesson/${l.id}`)} onMouseEnter={() => setHover(l.id)} onMouseLeave={() => setHover('')}>

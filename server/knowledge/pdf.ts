@@ -1,7 +1,8 @@
 // Text out of a PDF, page by page (pdf.js, no system tools). Text PDFs only for now: a page with
 // almost no text is reported as scanned, so the assigner knows rather than getting an empty book.
 // pdf.js runs without a worker and without fonts or scripting: we only want the text layer.
-export interface PdfPage { page: number; text: string }
+// page: its place in the file; printed: the number printed on it, when a scan read one (Chi #45)
+export interface PdfPage { page: number; text: string; printed?: number | null }
 
 export async function readPdf(data: Buffer, maxPages = 400): Promise<{ pages: PdfPage[]; scanned: number; title: string }> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');

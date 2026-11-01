@@ -62,11 +62,17 @@ function shuffle<T>(xs: T[], seed: string): T[] {
   return out;
 }
 
-export interface PupilItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean }
+// stack: a column item's two numbers, set out one above the other ("đặt tính rồi tính", Chi #47)
+export interface PupilItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean; fromWork?: boolean; stack?: { a: number; op: string; b: number } }
 export function forPupil(it: Item): PupilItem {
   const out: PupilItem = { id: it.id, template: it.template, prompt: it.prompt };
   if (it.options?.length) out.options = it.options;
-  if (it.subject === 'math') { if (it.template === 'word' && it.unit) out.unit = it.unit; return out; }
+  if (it.fromWork) out.fromWork = true;   // "Luyện lại từ bài con làm" (Chi #46)
+  if (it.subject === 'math') {
+    if (it.template === 'word' && it.unit) out.unit = it.unit;
+    if (it.template === 'column') out.stack = { a: it.a, op: it.op === '-' ? '−' : it.op, b: it.b };
+    return out;
+  }
   if (it.sentence) out.sentence = it.sentence;
   if (it.template === 'order' && it.words) out.words = it.words;
   if (it.template === 'match' && it.pairs) { out.left = shuffle(it.pairs.map((p) => p.word), it.id + 'l'); out.right = shuffle(it.pairs.map((p) => p.emoji), it.id + 'r'); }

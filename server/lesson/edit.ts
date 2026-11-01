@@ -35,7 +35,7 @@ export function explainMath(a: number, op: string, b: number, lang: 'vi' | 'en')
   return `${a} ${op} ${b}`;
 }
 const clip = (s: unknown, n: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
-const MATH_T = ['mcq', 'fill', 'truefalse', 'word'], ENG_T = ['match', 'fill', 'listen', 'order'];
+const MATH_T = ['mcq', 'fill', 'truefalse', 'word', 'column'], ENG_T = ['match', 'fill', 'listen', 'order'];
 
 export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; files: Files; as: <T>(teacherId: string, fn: () => T, lessonId?: string) => T }) {
   const { sql } = d;

@@ -9,11 +9,12 @@
 //   - when the agent stops early or fails, code completes whatever is missing, so a lesson always ends
 import type { AI, ChatMsg, ToolCall, ToolSpec } from '../ai/types.ts';
 import { Blocked, checkOutput, guardedJson, newCanary, scopedSystem, wrapUser } from '../guard/guard.ts';
-import { checkItem, contextOf } from './items.ts';
+import { checkItem, contextOf, rangeOf, regroups } from './items.ts';
 import { checkSlide, issueWords, type SlideIssue } from './slide-check.ts';
 import { fill, langName, maxWords, slideCount, SLIDES_SCHEMA } from './prompts.ts';
-import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
+import { ENG_KINDS, MATH_KINDS, type AgentNote, type Card, type Item, type Level, type Op, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
 import { cleanSkills, planLesson, reviewItems, writeCards, writeItems, writeSlides } from './writer.ts';
+import { applyWork, forPrompt } from './work.ts';
 
 const LEVEL_WORDS: Record<Level, { vi: string; en: string }> = { basic: { vi: 'cơ bản', en: 'basic' }, good: { vi: 'khá', en: 'good' }, advanced: { vi: 'nâng cao', en: 'advanced' } };
 // why the checker turned items down, in words a teacher reads (Chi #36): the issue codes of items.ts, grouped
@@ -38,13 +39,13 @@ const AGENT_SYSTEM = `You are LessonBloom's lesson agent. You turn ONE section o
 Work in this order:
 1. save_plan: 2-4 skills the notes really teach (each with the closest kind) and an outline of {{count}} slides (title, warmup, teach/example, practice, summary), each slide serving one of her objectives.
 2. write_slides.
-3. write_items for every skill: basic and good levels for each skill, advanced for at least one; 2-4 items per call. Templates — maths: mcq, fill, truefalse, word; English: match, fill, listen, order. Code builds and checks every item; read what it rejected and ask again differently if a skill is still short.
+3. write_items for every skill: basic and good levels for each skill, advanced for at least one; 2-4 items per call. Templates — maths: mcq, fill, truefalse, word, column ("đặt tính rồi tính": the two numbers set out in columns); English: match, fill, listen, order. A section on adding or subtracting 3-digit numbers needs column items with and without carrying or borrowing. Code builds and checks every item; read what it rejected and ask again differently if a skill is still short.
 4. write_cards.
 5. review, then fix only real problems: simplify_slide for text too hard for the grade, drop_item for an item that should not be there.
 6. finish: a note to the teacher in {{lang}} (2-3 sentences: what you made, what you checked and changed, anything she should look at herself), and one line per change.
-If SETUP has "level": "basic", give most practice at basic level (still some good); if "advanced", lean to good and advanced. If SETUP.note has a focus, aim the practice at it. Never add content that is not in the book section; harder items extend only within it. Practice is "bài luyện tập", never a test; no scores. You have at most {{turns}} turns.`;
+If SETUP has "level": "basic", give most practice at basic level (still some good); if "advanced", lean to good and advanced. If SETUP.note has a focus, aim the practice at it. If SETUP.work is there (the child's own marked work), the app itself adds an opening slide and practice made from the child's wrong sums: write the rest from the book as usual, aiming at the kinds in SETUP.work.types. Never add content that is not in the book section; harder items extend only within it. Practice is "bài luyện tập", never a test; no scores. You have at most {{turns}} turns.`;
 
-const MATHT = ['mcq', 'fill', 'truefalse', 'word'], ENGT = ['match', 'fill', 'listen', 'order'];
+const MATHT = ['mcq', 'fill', 'truefalse', 'word', 'column'], ENGT = ['match', 'fill', 'listen', 'order'];
 const TOOLS = (subject: Setup['subject']): ToolSpec[] => [
   { name: 'save_plan', description: 'Save the lesson plan: the skills and the slide outline.', parameters: { type: 'object', properties: {
     skills: { type: 'array', items: { type: 'object', properties: { tag: { type: 'string' }, name: { type: 'string' }, kind: { type: 'string', enum: subject === 'math' ? [...MATH_KINDS] : [...ENG_KINDS] } }, required: ['tag', 'name', 'kind'] } },
@@ -67,6 +68,23 @@ export function grounded(quote: string, notes: string): boolean {
   return q.filter((w) => all.has(w)).length / q.length >= 0.8;
 }
 
+// Chi #47: a section adding or subtracting within 1000 (or 10 000…) is mostly "đặt tính rồi tính" with its
+// own big numbers, with and without carrying or borrowing. What such a lesson still lacks, in words the agent
+// reads; empty for every other lesson.
+export function columnGaps(setup: Setup, source: string, skills: Skill[], items: Item[]): string[] {
+  if (setup.subject !== 'math') return [];
+  const ctx = contextOf(setup, skills, source), { floor } = rangeOf(ctx);
+  if (!floor || floor < 100) return [];
+  const gaps: string[] = [];
+  for (const op of (ctx.scope?.ops ?? []).filter((o): o is Op => o === '+' || o === '-')) {
+    const col = items.filter((i) => i.subject === 'math' && i.template === 'column' && i.op === op);
+    const word = op === '+' ? 'carrying' : 'borrowing';
+    if (!col.some((i) => i.subject === 'math' && regroups(i.a, i.op, i.b).any)) gaps.push(`no column items ("đặt tính rồi tính") for ${op} with ${word}`);
+    if (!col.some((i) => i.subject === 'math' && !regroups(i.a, i.op, i.b).any)) gaps.push(`no column items ("đặt tính rồi tính") for ${op} without ${word}`);
+  }
+  return gaps;
+}
+
 // The lesson as code sees it: what is missing or too hard. Used by the review tool and the fallback.
 export function reviewLesson(setup: Setup, source: string, b: { skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[] }) {
   const issues: string[] = [];
@@ -81,6 +99,7 @@ export function reviewLesson(setup: Setup, source: string, b: { skills: Skill[];
   if (!b.items.some((i) => i.level === 'advanced')) issues.push('no advanced items');
   if (b.items.length < LIMITS.minItems) issues.push(`only ${b.items.length} items (at least ${LIMITS.minItems})`);
   if (!b.cards.length) issues.push('no flashcards yet');
+  issues.push(...columnGaps(setup, source, b.skills, b.items));
   const said = words([...b.slides.map((s) => `${s.heading} ${s.bullets.join(' ')}`)].join(' '));
   for (const o of setup.objectives) { const ow = words(o).filter((w) => w.length > 2); if (ow.length && ow.filter((w) => said.includes(w)).length / ow.length < 0.4) issues.push(`objective "${o}" is not clearly taught on a slide`); }
   return issues;
@@ -217,7 +236,7 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   try {
     const messages: ChatMsg[] = [
       { role: 'system', content: scopedSystem(fill(AGENT_SYSTEM, { grade: setup.grade, subject: setup.subject === 'math' ? 'Maths' : 'English', lang: langName(setup.lang), count: slideCount(setup.minutes), turns: LIMITS.maxTurns }), canary) },
-      { role: 'user', content: wrapUser(JSON.stringify({ SETUP: setup, BOOK_SECTION: source })) },
+      { role: 'user', content: wrapUser(JSON.stringify({ SETUP: forPrompt(setup), BOOK_SECTION: source })) },
     ];
     const tools = TOOLS(setup.subject);
     let nudged = false;
@@ -251,9 +270,29 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
     skills = skills.length ? skills : p.skills; outline = outline.length ? outline : p.outline;
   }
   if (!slides.length) { slides = await writeSlides(ai, setup, source, outline); await say(`Đã viết ${slides.length} slide.`, `Wrote ${slides.length} slides.`); slides = await checkSlides(slides); }
+  // Chi #47: column practice with the section's 3-digit numbers, both with and without carrying, is always
+  // there (its own skill if the plan had none); it stays when the lesson is over its cap, others give way.
+  if (columnGaps(setup, source, skills, items).length) {
+    let col = skills.find((k) => k.kind === 'column');
+    if (!col) { col = { tag: skills.some((k) => k.tag === 'dat_tinh') ? 'dat_tinh_cot' : 'dat_tinh', name: setup.lang === 'en' ? 'Column addition and subtraction' : 'Đặt tính rồi tính', kind: 'column' }; skills = [...skills, col]; }
+    for (const level of ['basic', 'good', 'advanced'] as Level[]) {
+      if (!columnGaps(setup, source, skills, items).length) break;
+      const r = await writeItems(ai, setup, source, skills, { skill: col.tag, template: 'column', level, count: 3 }, nextId, items);
+      items.push(...r.kept); rejected.push(...r.rejected);
+    }
+    while (items.length > LIMITS.maxItems) {
+      const count = new Map<string, number>();
+      for (const i of items) if (i.template !== 'column') count.set(i.template, (count.get(i.template) || 0) + 1);
+      const most = [...count.entries()].sort((x, y) => y[1] - x[1])[0]?.[0];
+      if (!most) break;
+      items.splice(items.map((i) => i.template).lastIndexOf(most as Item['template']), 1);
+    }
+  }
   for (const k of skills) for (const level of ['basic', 'good'] as Level[]) {
     if (items.length >= LIMITS.maxItems || items.some((i) => i.skill === k.tag && i.level === level)) continue;
-    const r = await writeItems(ai, setup, source, skills, { skill: k.tag, template: setup.subject === 'math' ? (level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill'), level, count: 3 }, nextId, items);
+    // a column skill is practised in columns (Chi #47)
+    const template = setup.subject === 'math' ? (k.kind === 'column' ? 'column' : level === 'basic' ? 'mcq' : 'word') : (level === 'basic' ? 'match' : 'fill');
+    const r = await writeItems(ai, setup, source, skills, { skill: k.tag, template, level, count: 3 }, nextId, items);
     items.push(...r.kept); rejected.push(...r.rejected);
   }
   if (!cards.length) cards = await writeCards(ai, setup, source);
@@ -263,10 +302,27 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   const rv = await reviewItems(ai, setup, source, skills, items, LIMITS.minItems);
   if (rv.rejected.length) { items = rv.kept; rejected.push(...rv.rejected); changes.push(setup.lang === 'en' ? `The AI review removed ${rv.rejected.length} item${rv.rejected.length === 1 ? '' : 's'}.` : `Bước AI rà soát bỏ ${rv.rejected.length} câu.`); }
   await say(`AI rà soát lần hai: giữ ${items.length} câu.`, `AI second review: kept ${items.length} items.`);
+  // Chi #46: from the child's own work, by code: the opening slide on her mistakes and practice from her sums
+  let fromWork = '';
+  if (setup.work?.wrong) {
+    const w = applyWork(setup, source, { skills, slides, items }), L = setup.lang === 'en' ? 'en' : 'vi';
+    skills = w.skills; slides = w.slides; items = w.items;
+    const kinds = w.inPart.map((x) => x[L].toLowerCase()).join(', '), out = w.outPart.map((x) => x[L].toLowerCase()).join(', ');
+    if (w.inPart.length) {
+      await say(`Từ bài con làm: thêm slide mở đầu và ${w.made} câu luyện lại (${w.inPart.map((x) => x.vi.toLowerCase()).join(', ')}).`, `From the child's work: an opening slide and ${w.made} practice items (${w.inPart.map((x) => x.en.toLowerCase()).join(', ')}).`);
+      changes.unshift(L === 'en' ? `Opening slide and ${w.made} items from the child's own mistakes (${kinds})` : `Slide mở đầu và ${w.made} câu từ chính lỗi của bài con làm (${kinds})`);
+      fromWork = L === 'en' ? ` The lesson opens with the child's own mistakes (${kinds}) and the practice starts with ${w.made} items made from them.` : ` Bài mở đầu bằng chính các lỗi trong bài con làm (${kinds}); phần luyện tập bắt đầu bằng ${w.made} câu làm từ các lỗi đó.`;
+    }
+    if (w.outPart.length) {
+      await say(`${w.outPart.map((x) => x.vi).join(', ')}: không có trong phần sách đã chọn, chưa luyện ở bài này.`, `${w.outPart.map((x) => x.en).join(', ')}: not in the chosen part of the book, so not practised here.`);
+      fromWork += L === 'en' ? ` Not practised here because the chosen part of the book does not teach it: ${out}. Choose a part that does for a lesson on it.` : ` Chưa luyện ở bài này vì phần sách đã chọn không dạy: ${out}. ${setup.forParent ? 'Bạn' : 'Cô'} chọn phần sách có dạng này để soạn bài riêng.`;
+    }
+  }
 
   if (!note) note = setup.lang === 'en'
     ? `I made ${slides.length} slides, ${items.length} practice items and ${cards.length} flashcards from the section of your book. Every item passed the code checks.`
     : `Trợ lý đã soạn ${slides.length} slide, ${items.length} câu luyện tập và ${cards.length} thẻ nhớ từ phần bài trong sách của cô. Mọi câu đều đã qua bộ kiểm tra.`;
+  note += fromWork;
   // what the teacher reads names each skill, never its internal tag ("add_carry_100")
   const named = (x: string) => skills.reduce((t, k) => t.split(k.tag).join(`"${k.name}"`), x);
   note = named(note); changes.splice(0, changes.length, ...changes.map(named));

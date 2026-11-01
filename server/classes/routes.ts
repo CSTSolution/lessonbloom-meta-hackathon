@@ -18,6 +18,7 @@ import type { Card, Item, Lesson, Slide } from '../lesson/types.ts';
 import type { Files } from '../files.ts';
 import { makeVideo } from '../lesson/video.ts';
 import { forPupil, hintOf, isRight } from './check.ts';
+import { greetOf, typeWork } from '../lesson/work.ts';
 
 const PCOOKIE = 'lbm_p';
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -30,10 +31,12 @@ export const pupilUrl = (link: string) => `${config.publicUrl}/p/${link}`;
 const MAX_CLASSES = 30, MAX_PUPILS = 60;
 
 // What an assignment keeps of the lesson: what pupils see, frozen at the moment it was assigned.
-interface Content { title: string; subject: string; lang: 'vi' | 'en'; ref: string; slides: Slide[]; items: Item[]; cards: Card[] }
+interface Content { title: string; subject: string; lang: 'vi' | 'en'; ref: string; slides: Slide[]; items: Item[]; cards: Card[]; greet?: { vi: string; en: string } | null }
 const snapshot = (l: Lesson): Content => ({
   title: l.setup.title, subject: l.setup.subject, lang: l.setup.lang, ref: (l.refs?.[0] as { vi?: string } | undefined)?.vi ?? '',
   slides: l.slides, items: l.items, cards: l.cards,
+  // made from the child's work (Chi #46): the child's page greets her with what she found tricky
+  ...(l.setup.work ? { greet: greetOf(l.setup.work) } : {}),
 });
 
 // A teacher's class, named as she typed it.
@@ -59,6 +62,53 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   const mine = (c: Context<Env>, id: string) => sql.one<{ id: string; name: string; code: string }>('select id, name, code from classes where id = $1 and teacher_id = $2', [id, c.get('teacher').id]);
 
   // ---- the assigner ----
+  // ---- the child's work (Chi #46): "Con của tôi → <con> → Bài làm", one dated record per upload ----
+  // Her profile, not Knowledge: what she wrote on a marked sheet, typed by code; the summary counts it.
+  app.get('/api/t/learners', async (c) => c.json({ learners: await sql.query(`select p.id, p.name, k.id as class_id, k.name as class_name, k.kind
+      from pupils p join classes k on k.id = p.class_id where k.teacher_id = $1 order by k.created_at, p.created_at, p.name limit 500`, [c.get('teacher').id]) }));
+  const pupilOfMine = (c: Context<Env>, id: string) => sql.one<{ id: string; name: string }>('select p.id, p.name from pupils p join classes k on k.id = p.class_id where p.id = $1 and k.teacher_id = $2', [id, c.get('teacher').id]);
+  type Rec = { id: string; pupil_id: string; made_at: string; day: string; subject: string; topic: string; items: unknown[] };
+  const asWork = (r: Rec, name: string) => typeWork({ questions: r.items }, { recordId: r.id, pupilId: r.pupil_id, child: name, date: r.day, subject: r.subject as 'math', topic: r.topic });
+  const REC = `select id, pupil_id, made_at, to_char(made_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, subject, topic, items from work_records`;
+  // only what the table needs is kept: the question, what she wrote, the mark (and, for what code cannot read, the model's answer and type)
+  const rows = (w: ReturnType<typeof typeWork>) => J(w.questions.map((q) => ({ q: q.q, child: q.child, mark: q.mark === 'none' ? (q.ok ? 'right' : 'wrong') : q.mark, ...(q.calc ? {} : { right: q.right, kind: q.kind, ...(q.typeName ? { typeName: q.typeName } : {}) }) })));
+  app.get('/api/t/pupils/:id/work', async (c) => {
+    const p = await pupilOfMine(c, c.req.param('id'));
+    if (!p) return fail(c, 'notFound', 404);
+    const list = await sql.query<Rec>(`${REC} where pupil_id = $1 order by made_at desc limit 50`, [p.id]);
+    return c.json({ pupil: p, records: list.map((r) => asWork(r, p.name)) });
+  });
+  app.post('/api/t/pupils/:id/work', async (c) => {
+    const p = await pupilOfMine(c, c.req.param('id'));
+    if (!p) return fail(c, 'notFound', 404);
+    const b = await c.req.json<{ work?: { topic?: string; subject?: string; date?: string } }>().catch(() => ({} as { work?: undefined }));
+    const w = typeWork(b.work, { topic: b.work?.topic, subject: b.work?.subject === 'english' ? 'english' : 'math' });
+    if (!w.total) return fail(c, 'bad');
+    if (Number((await sql.one<{ n: string }>('select count(*) as n from work_records where pupil_id = $1', [p.id]))?.n) >= 200) return fail(c, 'tooMany', 429);
+    const id = newId(10);
+    await sql.query('insert into work_records (id, pupil_id, teacher_id, subject, topic, items) values ($1, $2, $3, $4, $5, $6::jsonb)', [id, p.id, c.get('teacher').id, w.subject, w.topic, rows(w)]);
+    const r = await sql.one<Rec>(`${REC} where id = $1`, [id]);
+    return c.json({ record: asWork(r!, p.name) });
+  });
+  const recordOf = (c: Context<Env>) => sql.one<Rec & { name: string }>(`select r.id, r.pupil_id, r.made_at, to_char(r.made_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, r.subject, r.topic, r.items, p.name
+      from work_records r join pupils p on p.id = r.pupil_id where r.id = $1 and r.teacher_id = $2`, [c.req.param('id'), c.get('teacher').id]);
+  app.get('/api/t/work/:id', async (c) => { const r = await recordOf(c); return r ? c.json({ record: asWork(r, r.name) }) : fail(c, 'notFound', 404); });
+  app.put('/api/t/work/:id', async (c) => {
+    const r = await recordOf(c);
+    if (!r) return fail(c, 'notFound', 404);
+    const b = await c.req.json<{ work?: { topic?: string } }>().catch(() => ({} as { work?: undefined }));
+    const w = typeWork(b.work, { topic: b.work?.topic ?? r.topic, subject: r.subject as 'math' });
+    if (!w.total) return fail(c, 'bad');
+    await sql.query('update work_records set items = $2::jsonb, topic = $3 where id = $1', [r.id, rows(w), w.topic]);
+    return c.json({ record: asWork({ ...r, items: JSON.parse(rows(w)), topic: w.topic }, r.name) });
+  });
+  app.delete('/api/t/work/:id', async (c) => {
+    const r = await recordOf(c);
+    if (!r) return fail(c, 'notFound', 404);
+    await sql.query('delete from work_records where id = $1', [r.id]);
+    return c.json({ ok: true });
+  });
+
   app.get('/api/t/classes', async (c) => c.json({ classes: await sql.query(`select c.id, c.name, c.code, c.kind, c.grade, c.created_at,
       (select count(*) from pupils p where p.class_id = c.id)::int as pupils,
       (select count(*) from pupils p where p.class_id = c.id and p.joined_at is not null)::int as joined,
@@ -230,7 +280,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     const p = await pupilOf(c);
     if (!p) return fail(c, 'signIn', 401);
     await sql.query(`update pupils set seen_at = now() where id = $1 and (seen_at is null or seen_at < now() - interval '5 minutes')`, [p.id]);
-    const rows = await sql.query(`select a.id, a.content->>'title' as title, a.content->>'subject' as subject, a.content->>'lang' as lang, a.due,
+    const rows = await sql.query(`select a.id, a.content->>'title' as title, a.content->>'subject' as subject, a.content->>'lang' as lang, a.due, a.content->'greet' as greet,
         jsonb_array_length(a.content->'slides')::int as slides, jsonb_array_length(a.content->'items')::int as items, jsonb_array_length(a.content->'cards')::int as cards,
         (select l.video_status = 'ready' from lessons l where l.id = a.lesson_id) as video,
         g.slides_at is not null as slides_seen, g.video_at is not null as video_seen, g.cards_at is not null as cards_seen, g.done_at is not null as done,

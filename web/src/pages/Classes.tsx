@@ -6,6 +6,7 @@ import { api, ApiError, type ClassRow, type ClassView } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { ask } from '../ask.tsx';
 import { go } from '../router.ts';
+import { WorkPanel } from './WorkCard.tsx';
 
 const T = {
   vi: {
@@ -77,6 +78,7 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
   const lang = useLang();
   const [v, setV] = useState<ClassView | null>(null), [names, setNames] = useState<string | null>(null), [copied, setCopied] = useState(''), [showAll, setShowAll] = useState(false);
   const [mist, setMist] = useState<{ what: string; skill: string }[]>([]);
+  const [workOf, setWorkOf] = useState<string | null>(null);   // a pupil whose marked work is open (Chi #46)
   const load = () => api.classView(id).then(setV).catch(() => {});
   useEffect(() => { api.summary({ classId: id }).then((r) => setMist(r.classes.find((x) => x.id === id)?.mistakes ?? [])).catch(() => {}); }, [id]);
   useEffect(() => { void load(); }, [id]);
@@ -88,6 +90,8 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
     <div className="stack" style={{ gap: 14, paddingTop: 8 }}>
       {parent && me && <div className="row small"><b>{t.link}:</b><span className="grow muted ellipsis">{me.url.replace(/^https?:\/\//, '')}</span><button className="btn ghost small" onClick={() => copy(me.url, 'me')}>{copied === 'me' ? t.copied : t.copy}</button><button className="link small" onClick={() => go(`/learner/${me.id}`)}>{lang === 'en' ? 'See details' : 'Xem chi tiết'}</button></div>}
       {mist.length > 0 && <div className="banner warn row"><span className="grow"><b>{lang === 'en' ? 'Mistake that keeps coming back' : 'Dạng đang lặp lỗi'}:</b> {[...new Set(mist.map((m) => m.what))].join(' · ')}</span><button className="link small" onClick={() => go(`/insight?class=${id}`)}>{lang === 'en' ? 'See the summary ›' : 'Xem tóm tắt ›'}</button></div>}
+      {/* the child's profile: her marked work, one dated record per upload (Chi #46), never Knowledge */}
+      {parent && me && <div className="card"><WorkPanel pupilId={me.id} name={me.name} parent /></div>}
       <div className="row"><h3 className="grow">{t.assigned}</h3><AssignMore classId={id} /></div>
       {v.assignments.length ? (
         <table className="tbl stack-sm"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th>{lang === 'en' ? 'Status' : 'Trạng thái'}</th><th /></tr></thead><tbody>
@@ -111,10 +115,12 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
           <button className="link" style={{ color: 'inherit', fontWeight: 700 }} onClick={() => go(`/learner/${p.id}`)}>{p.name}</button><span className={`small ${p.joined_at ? 'ok-text' : 'muted'}`}>{p.joined_at ? t.joined : t.waiting}</span>
           <div className="row small" style={{ gap: 6 }}>
             <button className="link small" title={t.parentLink} onClick={() => copy(p.url, p.id)}>{copied === p.id ? t.copied : t.parentLink}</button>
+            <button className="link small" onClick={() => setWorkOf(workOf === p.id ? null : p.id)}>{lang === 'en' ? 'Work' : 'Bài làm'}</button>
             <button className="link small muted" onClick={async () => { await api.removePupil(id, p.id); await load(); onChange(); }}>{t.remove}</button>
           </div>
         </div>
       ))}</div>
+      {workOf && v.pupils.some((p) => p.id === workOf) && <div className="card"><WorkPanel pupilId={workOf} name={v.pupils.find((p) => p.id === workOf)!.name} parent={false} /></div>}
       {v.pupils.length > 12 && !showAll && <button className="link small" onClick={() => setShowAll(true)}>{lang === 'en' ? `See all ${v.pupils.length}` : `Xem cả ${v.pupils.length} em`}</button>}</>}
       <div className="row small" style={{ justifyContent: 'flex-end' }}>
         <button className="link small" onClick={async () => { const n = prompt(t.rename, v.class.name); if (n?.trim()) { await api.renameClass(id, n); await load(); onChange(); } }}>{t.rename}</button>

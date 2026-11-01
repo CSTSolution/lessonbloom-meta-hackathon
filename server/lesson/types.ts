@@ -1,4 +1,5 @@
 // The lesson's shapes. The models return data; code turns maths data into the questions pupils see.
+import type { Work } from './work.ts';
 
 export type Subject = 'math' | 'english';
 export type Lang = 'vi' | 'en';
@@ -16,6 +17,7 @@ export interface Setup {
   level?: 'mixed' | 'basic' | 'advanced';   // the class's level (Chi's step 2): how the practice leans
   make?: { video: boolean; cards: boolean }; // what to make besides slides and practice (Chi's step 2)
   forParent?: boolean;            // made by a parent for their own child at home (Chi #24): no "class", no "teacher"
+  work?: Work;                    // made from a photo of the child's finished work (Chi #46): the focus, never the content
 }
 
 // A skill ("dạng bài") with a kind from a fixed list, so code can check items against it (Chi's rule Q).
@@ -39,15 +41,16 @@ export interface Slide {
   // the code check of its numbers, units and title (Chi, 31 Oct): written again automatically (fixed),
   // or still wrong after one rewrite (fixed false). Shown on the slide until the assigner changes it.
   flag?: { fixed: boolean; vi: string; en: string };
+  fromWork?: boolean;             // the opening slide on the child's own mistakes (Chi #46), made by code
 }
 
 export type Op = '+' | '-' | '×' | ':';
-interface ItemBase { id: string; skill: string; level: Level; prompt: string; explain: string; page?: number; redone?: string[] }   // redone: why the checker had it written again   // page: the book page it comes from
+interface ItemBase { id: string; skill: string; level: Level; prompt: string; explain: string; page?: number; redone?: string[]; fromWork?: boolean }   // fromWork: "Luyện lại từ bài con làm" (Chi #46)   // redone: why the checker had it written again   // page: the book page it comes from
 
 // Maths: the model gives a, op, b (and distractors, a story); code writes prompt, options and answer.
 export interface MathItem extends ItemBase {
   subject: 'math';
-  template: 'mcq' | 'fill' | 'truefalse' | 'word';
+  template: 'mcq' | 'fill' | 'truefalse' | 'word' | 'column';   // column: "đặt tính rồi tính" (Chi #47)
   a: number; op: Op; b: number;
   blank?: 'a' | 'b' | 'result';   // fill: which number is hidden
   shown?: number;                 // truefalse: the result the statement claims

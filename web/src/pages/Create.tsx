@@ -6,10 +6,11 @@
 //   2 Câu hỏi: the setup the AI pre-filled, each question folded, only the open one shows.
 // Steps 3-6 are the lesson page.
 import { useEffect, useRef, useState } from 'react';
-import { api, ApiError, type AreaRow, type Match, type SectionRow, type Setup } from '../api.ts';
+import { api, ApiError, type AreaRow, type Learner, type Match, type SectionRow, type Setup, type Work } from '../api.ts';
 import { useLang, useT } from '../i18n.ts';
 import { shrink } from '../photo.ts';
 import { go } from '../router.ts';
+import { WorkTable } from './WorkCard.tsx';
 
 export const STEPS = { vi: ['Tài liệu', 'Câu hỏi', 'Slide', 'Video', 'Bài tập', 'Giao bài'], en: ['Material', 'Questions', 'Slides', 'Video', 'Practice', 'Assign'] };
 // Chi's role table: Questions (2) is the teacher's step; a parent's run 1, 3, 4, 5, 6, shown as 1-5. The
@@ -35,6 +36,7 @@ const T = {
     q: { goal: 'Mục tiêu', title: 'Tên bài', minutes: 'Thời lượng', level: 'Mức của lớp', make: 'Cần tạo', lang: 'Ngôn ngữ', note: 'Ghi chú cho AI' },
     min: (n: number) => `${n} phút`, lv: { mixed: 'Nhiều mức (3 mức bài tập)', basic: 'Phần lớn cơ bản', advanced: 'Phần lớn nâng cao' }, mk: { slides: 'Slide bài giảng', items: 'Bài tập theo mẫu', video: 'Video có giọng đọc', cards: 'Thẻ nhớ' }, always: 'luôn có', vi: 'Tiếng Việt', en: 'Tiếng Anh', none: 'Chưa có', notePh: 'Ví dụ: dùng tình huống ở chợ',
     back: 'Quay lại', create: 'Tạo bài giảng', thinking: 'Đang đọc phạm vi…', page: 'tr.',
+    whose: 'Bài này của em nào?', whoseP: 'Bài này của con nào?', whoseLeadP: 'Bài làm được lưu vào hồ sơ của con (không vào Kho kiến thức), và bài giảng được soạn riêng cho con.', noOne: 'Không chọn', whoseLead: 'Bài làm được lưu vào hồ sơ của em (không vào Kho kiến thức), và bài giảng được soạn riêng cho em.', fromRec: (d: string) => `Từ bài làm ngày ${d} trong hồ sơ.`, saving: 'Đang lưu bài làm…',
   },
   en: {
     save: 'Save draft and leave', short: (left: number, need: number) => `You have ${left} credits; a lesson needs ${need}. Enter a code for more, then carry on right here.`, shortDemo: 'Sign in with your email to use a promo code.', promoPh: 'Promo code', apply: 'Apply', promoOk: (n: number) => `${n} credits added. Carry on.`, usage: 'See usage', restored: 'Your unfinished lesson was opened again.', discard: 'Discard draft', h1: 'Choose the source and the material', lead: 'The lesson is made only from the source you choose.', src: 'Source', srcLead: 'With “Find it for me”, LessonBloom finds the right pages.', source: 'Source', part: 'Part', auto: 'Find it from the material', openKnowledge: 'Open Knowledge',
@@ -49,6 +51,7 @@ const T = {
     q: { goal: 'Objectives', title: 'Title', minutes: 'Length', level: 'Class level', make: 'To make', lang: 'Language', note: 'Note for the AI' },
     min: (n: number) => `${n} min`, lv: { mixed: 'Mixed (3 practice levels)', basic: 'Mostly basic', advanced: 'Mostly advanced' }, mk: { slides: 'Slides', items: 'Practice from templates', video: 'Narrated video', cards: 'Flashcards' }, always: 'always made', vi: 'Vietnamese', en: 'English', none: 'None', notePh: 'e.g. use market examples',
     back: 'Back', create: 'Make the lesson', thinking: 'Reading the part…', page: 'p.',
+    whose: 'Whose work is this?', whoseP: 'Which child did this work?', whoseLeadP: "The work is kept in your child's profile (never in Knowledge), and the lesson is made for them.", noOne: 'Nobody chosen', whoseLead: "The work is kept in the pupil's profile (never in Knowledge), and the lesson is made for them.", fromRec: (d: string) => `From the work of ${d} in the profile.`, saving: 'Saving the work…',
   },
 };
 type Kind = 'one' | 'lesson' | 'work' | 'paste';
@@ -56,7 +59,7 @@ type Kind = 'one' | 'lesson' | 'work' | 'paste';
 // Step 1 is kept in this browser as she works (Chi #30): leaving to enter a code and coming back finds
 // it, and a part already found is not looked for (and paid for) again. Gone once the lesson is made.
 const DRAFT = 'lbm-draft';
-export interface Draft { areaId: string; sectionId: string; part?: string; kind: Kind; text: string; focus: string; match: Match | null; at: number }
+export interface Draft { areaId: string; sectionId: string; part?: string; kind: Kind; text: string; focus: string; match: Match | null; at: number; work?: Work | null; pupilId?: string }
 export const readDraft = (): Draft | null => {
   try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null') as Draft | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; }
 };
@@ -74,6 +77,8 @@ export function Create({ parent }: { parent: boolean }) {
   const q = new URLSearchParams(location.search), d0 = useRef(q.get('area') ? null : readDraft()).current;
   const [areas, setAreas] = useState<AreaRow[] | null>(null), [areaId, setAreaId] = useState(q.get('area') || d0?.areaId || ''), [sections, setSections] = useState<SectionRow[]>([]), [sectionId, setSectionId] = useState(q.get('section') || d0?.sectionId || '');
   const [kind, setKind] = useState<Kind>(d0?.kind || 'one'), [text, setText] = useState(d0?.text || ''), [focus, setFocus] = useState(d0?.focus || '');
+  // the child's marked work (Chi #46): the table read from the photos, and whose it is
+  const [work, setWork] = useState<Work | null>(d0?.work || null), [pupilId, setPupilId] = useState(d0?.pupilId || ''), [learners, setLearners] = useState<Learner[]>([]);
   const [match, setMatch] = useState<Match | null>(d0?.match || null), [missing, setMissing] = useState(false), [setup, setSetup] = useState<Setup | null>(null), [open, setOpen] = useState('goal');
   // her credits, checked before any step that costs some (Chi #30): too few, and a code is entered here
   const [cr, setCr] = useState<{ left: number; need: number; account: boolean } | null>(null), [code, setCode] = useState(''), [pmsg, setPmsg] = useState('');
@@ -81,7 +86,10 @@ export function Create({ parent }: { parent: boolean }) {
   useEffect(() => { loadCr(); window.addEventListener('lbm-credits', loadCr); return () => window.removeEventListener('lbm-credits', loadCr); }, []);
   const short = !!cr && cr.left < cr.need, firstArea = useRef(true);
   // a draft with nothing in it yet (no part chosen, no sentence) is not kept (Chi #43)
-  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, part: sections.find((s) => s.id === sectionId)?.title, kind, text, focus, match, at: Date.now() }); }, [areaId, sectionId, kind, text, focus, match, sections]);
+  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, part: sections.find((s) => s.id === sectionId)?.title, kind, text, focus, match, at: Date.now(), work, pupilId }); }, [areaId, sectionId, kind, text, focus, match, sections, work, pupilId]);
+  useEffect(() => { api.learners().then((r) => { const ls = r.learners.filter((x) => !parent || x.kind === 'child'); setLearners(ls); if (parent && ls.length === 1) setPupilId((p) => p || ls[0].id); }).catch(() => {}); }, []);
+  // "Make a lesson from these mistakes" on the child's page: /create?work=<record>
+  useEffect(() => { const rid = q.get('work'); if (rid) api.workRecord(rid).then((r) => { setKind('work'); setMoreMat(true); setWork(r.record); setPupilId(r.record.pupilId || ''); setText(r.record.topic || r.record.questions[0]?.q || ''); setFocus(focusOf(r.record, lang)); }).catch(() => {}); }, []);
   const [busy, setBusy] = useState(''), [err, setErr] = useState(''), [rec, setRec] = useState<MediaRecorder | null>(null);
   // no book yet (Chi #39): the sample books are offered here; a book still being read is said so
   const [reading, setReading] = useState(false), [pickSample, setPickSample] = useState(false);
@@ -101,7 +109,7 @@ export function Create({ parent }: { parent: boolean }) {
   };
   const photos = (fs: File[], what: 'lesson' | 'work') => run('photo', async () => {
     const imgs = await Promise.all(fs.slice(0, 5).map((f) => shrink(f)));
-    if (what === 'work') { const r = await api.work(imgs); setText(r.request); setFocus(r.focus); } else setText((await api.photos(imgs)).text.slice(0, 2000));
+    if (what === 'work') { const r = await api.work(imgs); setText(r.request); setWork(r.work); setFocus(focusOf(r.work, lang)); } else setText((await api.photos(imgs)).text.slice(0, 2000));
   });
   const find = () => run('find', async () => {
     setMissing(false);
@@ -110,7 +118,11 @@ export function Create({ parent }: { parent: boolean }) {
   const chosen = sections.find((s) => s.id === sectionId), a = areas?.find((x) => x.id === areaId);
   const scopeText = chosen ? `${a?.name} · ${t.page} ${chosen.page_from}${chosen.page_to > chosen.page_from ? `–${chosen.page_to}` : ''}` : match ? `${match.book} · ${t.page} ${match.pageFrom}${match.pageTo > match.pageFrom ? `–${match.pageTo}` : ''}` : '';
   const toStep2 = () => run('intake', async () => {
-    const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note };
+    // the work is saved to the child's profile first (Chi #46), as she corrected it; the lesson carries a copy
+    let w = kind === 'work' ? work : null;
+    if (w && pupilId) w = { ...(w.recordId && w.pupilId === pupilId ? (await api.updateWork(w.recordId, w)).record : (await api.saveWork(pupilId, w)).record) };
+    if (w) setWork(w);
+    const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note, ...(w ? { work: w } : {}) };
     // a parent has no Questions step: the lesson is made straight from the setup the book gave
     if (parent) { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || chosen?.title || '', setup: s }); writeDraft(null); go(`/lesson/${id}`); return; }
     setSetup(s);
@@ -178,7 +190,10 @@ export function Create({ parent }: { parent: boolean }) {
           <label className="field">{t.what}<textarea rows={kind === 'paste' ? 7 : 3} maxLength={kind === 'paste' ? 6000 : 2000} value={text} placeholder={kind === 'paste' ? t.pastePh : t.whatPh} onChange={(e) => { setText(e.target.value); setMatch(null); setMissing(false); }} /></label>
           {kind === 'one' && (rec ? <button className="btn coral small" style={{ alignSelf: 'start' }} onClick={() => { rec.stop(); setRec(null); }}>{t.stop}</button>
             : <button className="btn small" style={{ alignSelf: 'start' }} disabled={!!busy} onClick={() => void record().catch((e) => setErr(String(e.message || e)))}>{busy === 'voice' ? t.hearing : t.say}</button>)}
-          {focus && <p className="banner warn small"><b>{t.mistakes}:</b> {focus}</p>}
+          {kind === 'work' && <label className="field">{parent ? t.whoseP : t.whose}<select value={pupilId} onChange={(e) => setPupilId(e.target.value)}><option value="">{t.noOne}</option>{learners.map((x) => <option key={x.id} value={x.id}>{parent ? x.name : `${x.name} · ${x.class_name}`}</option>)}</select><span className="small muted">{parent ? t.whoseLeadP : t.whoseLead}</span></label>}
+          {kind === 'work' && work && <>{work.recordId && <span className="small muted">{t.fromRec(`${work.date.slice(8, 10)}/${work.date.slice(5, 7)}`)}</span>}
+            <WorkTable work={{ ...work, child: learners.find((x) => x.id === pupilId)?.name }} parent={parent} busy={!!busy} onChange={(nw) => { setWork(nw); setFocus(focusOf(nw, lang)); }} /></>}
+          {focus && !(kind === 'work' && work) && <p className="banner warn small"><b>{t.mistakes}:</b> {focus}</p>}
           {!chosen && <div className="row"><span className="grow" /><button className="btn" disabled={!!busy || short || !areaId || text.trim().length < 3} onClick={find}>{busy === 'find' ? t.finding : t.find}</button></div>}
         </div>}
         {match && !chosen && <div className="banner"><b>✓ {t.found(scopeText)}</b><details className="small"><summary>{match.title} · {t.quotes}</summary>{match.cited.map((c) => <blockquote key={c.id}>“{c.quote}” <span className="muted">· {t.page} {c.page}</span></blockquote>)}</details></div>}
@@ -221,4 +236,9 @@ export function Create({ parent }: { parent: boolean }) {
       </div>
     </div>
   );
+}
+
+// the mistakes, for the agent's note (no name): "Phép trừ có nhớ: 655 - 367 (viết 322, đúng là 288)"
+function focusOf(w: Work, lang: 'vi' | 'en'): string {
+  return w.types.slice(0, 4).map((t) => { const q = w.questions.find((x) => !x.ok && x.label.en === t.label.en); return q ? (lang === 'en' ? `${t.label.en}: ${q.q} (wrote ${q.child || '…'}, right ${q.right || '?'})` : `${t.label.vi}: ${q.q} (viết ${q.child || '…'}, đúng là ${q.right || '?'})`) : t.label[lang]; }).join('; ').slice(0, 260);
 }

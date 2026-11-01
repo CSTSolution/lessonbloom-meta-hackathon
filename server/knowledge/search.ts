@@ -13,7 +13,8 @@ import { guardedJson, wrapUser } from '../guard/guard.ts';
 export interface Candidate { id: string; book_id: string; book: string; section_id: string; section: string; page: number; text: string; score: number }
 export interface Match {
   areaId: string;
-  section: { id: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number };
+  // pageFrom/pageTo: places in the file (what lessons and search use); printedFrom/To: as printed in the book (Chi #45)
+  section: { id: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null };
   cited: { id: string; page: number; quote: string }[];        // the passages Muse Spark used, verified
   passages: { id: string; page: number; text: string }[];       // the whole matched section, in order: the lesson's source
 }
@@ -76,7 +77,8 @@ export async function findSection(sql: Sql, ai: AI, areaId: string, request: str
     `select s.id, s.title, b.title as book, b.id as book_id, s.page_from, s.page_to from sections s join books b on b.id = s.book_id where s.id = $1 and b.area_id = $2`, [sectionId, areaId]);
   if (!s) throw new NoMatch();
   const passages = await sql.query<{ id: string; page: number; text: string }>('select id, page, text from passages where section_id = $1 order by ord', [s.id]);
-  return { areaId, section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to }, cited, passages };
+  const printed = printedRange(await shownPages(sql, s.book_id), s.page_from, s.page_to);
+  return { areaId, section: { id: s.id, title: s.title, book: s.book, bookId: s.book_id, pageFrom: s.page_from, pageTo: s.page_to, ...printed }, cited, passages };
 }
 
 // The lesson's source: the matched section, each passage marked with its page, within a size budget.
@@ -85,5 +87,23 @@ export function sourceOf(m: Pick<Match, 'section' | 'passages'>, max = 12000) {
   for (const p of m.passages) { const add = `[tr. ${p.page}] ${p.text}\n`; if (out.length + add.length > max) break; out += add; }
   return out.trim();
 }
+// The page she finds in the paper book (Chi #45): the number printed on it when it was read, else from
+// where she said the book's page 1 is in the file; null when neither is known (the file's page is shown).
+export type Shown = (page: number) => number | null;
+export async function shownPages(sql: Sql, bookId: string): Promise<Shown> {
+  const rows = await sql.query<{ page: number; printed: number }>('select page, min(printed) as printed from passages where book_id = $1 and printed is not null group by page', [bookId]);
+  const one = Number((await sql.one<{ page_one: number | null }>('select page_one from books where id = $1', [bookId]))?.page_one) || 0;
+  const m = new Map(rows.map((r) => [Number(r.page), Number(r.printed)]));
+  return (page) => m.get(page) ?? (one && page - one + 1 >= 1 ? page - one + 1 : null);
+}
+// a range is shown as printed only when both ends are known, so it never mixes the two numberings
+export const printedRange = (shown: Shown, from: number, to: number) => {
+  const a = shown(from), b = shown(to);
+  return a != null && b != null ? { printedFrom: a, printedTo: b } : { printedFrom: null, printedTo: null };
+};
+export const pagesLabel = (s: { pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null }) => {
+  const [a, b] = s.printedFrom != null && s.printedTo != null ? [s.printedFrom, s.printedTo] : [s.pageFrom, s.pageTo];
+  return b > a ? `${a}–${b}` : `${a}`;
+};
 export const citation = (m: Pick<Match, 'section'>, lang: 'vi' | 'en') =>
-  `${lang === 'en' ? 'From' : 'Theo'}: ${m.section.book}, ${m.section.title}, ${lang === 'en' ? 'p.' : 'tr.'} ${m.section.pageFrom}${m.section.pageTo > m.section.pageFrom ? `–${m.section.pageTo}` : ''}`;
+  `${lang === 'en' ? 'From' : 'Theo'}: ${m.section.book}, ${m.section.title}, ${lang === 'en' ? 'p.' : 'tr.'} ${pagesLabel(m.section)}`;

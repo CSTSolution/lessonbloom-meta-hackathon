@@ -3,12 +3,13 @@
 // create endpoints call intake and readPhotos directly.
 import type { AI } from '../ai/types.ts';
 import { guardedJson, wrapUser } from '../guard/guard.ts';
-import { buildEnglish, buildMath, checkItem, contextOf, questionOf, type RawEnglish, type RawMath } from './items.ts';
+import { buildEnglish, buildMath, checkItem, contextOf, questionOf, rangeOf, type CheckContext, type RawEnglish, type RawMath } from './items.ts';
 import {
   CARDS_SCHEMA, CARDS_SYSTEM, ENG_ITEMS_SCHEMA, ENG_ITEMS_SYSTEM, fill, INTAKE_SCHEMA, INTAKE_SYSTEM, langName, MATH_ITEMS_SCHEMA, MATH_ITEMS_SYSTEM,
   audienceLine, maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
 } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
+import { forPrompt, typeWork, type Work } from './work.ts';
 
 export class NotLesson extends Error {}
 const clip = (s: unknown, n: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -28,7 +29,8 @@ export function cleanSetup(x: unknown): Setup | null {
   return { subject: s.subject, grade: Math.min(5, Math.max(1, Math.round(Number(s.grade)) || 2)) as Setup['grade'], title, objectives, minutes, lang: s.lang === 'en' ? 'en' : 'vi', ...(note ? { note } : {}), ...(level && level !== 'mixed' ? { level } : {}), make };
 }
 
-const material = (setup: Setup, source: string) => wrapUser(`SETUP: ${JSON.stringify(setup)}\n\nBOOK SECTION (the only source):\n${source}`);
+// forPrompt: the child's work without her name (Chi #46); the title without "Made for …"
+const material = (setup: Setup, source: string) => wrapUser(`SETUP: ${JSON.stringify(forPrompt(setup))}\n\nBOOK SECTION (the only source):\n${source}`);
 
 // The language a section is written in, by code: Vietnamese letters, or not.
 const VI_LETTERS = /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệịỉĩọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/gi;
@@ -48,12 +50,22 @@ export async function readPhotos(ai: AI, images: { data: Buffer; mime: string }[
   return r.text.trim().slice(0, 20000);
 }
 
-// A child's finished exercise: the request to find the section with, and the mistakes to aim at.
-export async function readWork(ai: AI, images: { data: Buffer; mime: string }[]): Promise<{ request: string; focus: string }> {
-  const r = await guardedJson<{ usable: boolean; topic: string; mistakes: string[] }>(ai, { endpoint: 'work', system: WORK_SYSTEM, prompt: `Look at the ${images.length} photo(s) of the child's exercise.`, images, schema: WORK_SCHEMA, fixture: { photos: images.length } });
+// A child's finished exercise (Chi #46): the request to find the section with, the mistakes to aim at, and
+// the table of every question, typed by code (work.ts). A sheet that cannot be read, or where nothing can
+// be judged (no marks and no sums code can check), is said so: never an ordinary lesson in its place.
+export class WorkUnread extends Error {}
+export async function readWork(ai: AI, images: { data: Buffer; mime: string }[]): Promise<{ request: string; focus: string; work: Work }> {
+  const r = await guardedJson<{ usable: boolean; topic: string; mistakes: string[]; questions?: unknown[] }>(ai, { endpoint: 'work', system: WORK_SYSTEM, prompt: `Look at the ${images.length} photo(s) of the child's exercise.`, images, schema: WORK_SCHEMA, fixture: { photos: images.length } });
   const topic = clip(r.topic, 200), mistakes = (Array.isArray(r.mistakes) ? r.mistakes : []).map((m) => clip(m, 160)).filter(Boolean).slice(0, 4);
-  if (!r.usable || !topic) throw new NotLesson();
-  return { request: topic, focus: mistakes.join('; ') };
+  if (!r.usable) throw new WorkUnread();
+  const read = typeWork({ questions: r.questions }, { topic }), english = !read.questions.some((q) => q.calc) && (ENG_KINDS as readonly string[]).includes(String((r as { kind?: string }).kind));
+  const work: Work = { ...read, subject: english ? 'english' : 'math' };
+  if (!work.total || !work.questions.some((q) => q.mark !== 'none' || q.calc)) throw new WorkUnread();
+  return { request: topic || work.questions[0].q, focus: focusOf(work) || mistakes.join('; '), work };
+}
+// "Phép trừ có nhớ: 655 − 367 (con viết 322, đúng là 288); …", for the agent's note (no name in it)
+export function focusOf(w: Work): string {
+  return w.types.slice(0, 4).map((t) => { const q = w.questions.find((x) => !x.ok && x.kind === t.kind && x.label.en === t.label.en)!; return `${t.label.vi}: ${q.q} (viết ${q.child || '…'}, đúng là ${q.right || '?'}${q.slip ? `, ${q.slip.vi.toLowerCase()}` : ''})`; }).join('; ').slice(0, 280);
 }
 
 // Skills keep only a known kind, a unique snake_case tag and a short name.
@@ -87,7 +99,16 @@ export async function writeSlides(ai: AI, setup: Setup, source: string, outline:
 
 export interface ItemRequest { skill: string; template: string; level: Level; count: number }
 export interface ItemResult { kept: Item[]; rejected: Rejected[] }
-const MATH_T = ['mcq', 'fill', 'truefalse', 'word'], ENG_T = ['match', 'fill', 'listen', 'order'];
+const MATH_T = ['mcq', 'fill', 'truefalse', 'word', 'column'], ENG_T = ['match', 'fill', 'listen', 'order'];
+
+// The number range the maths items must use, in the prompt's words (Chi #47: the section's range, not the
+// grade's; a "within 1000" section gets 3-digit numbers). The checker holds every item to the same range.
+export function rangeLine(ctx: Pick<CheckContext, 'grade' | 'scope'>): string {
+  const { max, floor } = rangeOf(ctx);
+  if (!Number.isFinite(max)) return `Grade ${ctx.grade}: any size the book section uses; never a negative result.`;
+  if (ctx.scope?.max === undefined) return `Grade ${ctx.grade} uses numbers up to ${max}; never a negative result.`;
+  return `This book section works within ${max}: every number and every result is at most ${max}${floor ? `, and every + or − calculation uses at least one number above ${floor} (the section's ${String(floor * 10).length - 1}-digit numbers; numbers only up to ${floor} belong to an earlier chapter)` : ''}; never a negative result.`;
+}
 
 // One batch of items for one skill, template and level. Every item is built and checked by code;
 // a failing item is asked for again (up to 2 more times, told what was wrong), then dropped and logged.
@@ -102,7 +123,7 @@ export async function writeItems(ai: AI, setup: Setup, source: string, skills: S
   const prompt = material(setup, source) + (taken.length ? `\n\nALREADY IN THE LESSON AT BASIC LEVEL (write different ones):\n${wrapUser(JSON.stringify(taken))}` : '');
   let want = Math.min(6, Math.max(1, Math.round(req.count) || 3)), avoid: string[] = [], before: string[] = [];
   for (let round = 0; round < 3 && want > 0; round++) {
-    const sys = fill(math ? MATH_ITEMS_SYSTEM : ENG_ITEMS_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), skill: `${skill.tag} "${skill.name}"`, kind: skill.kind, template, level: req.level, count: want,
+    const sys = fill(math ? MATH_ITEMS_SYSTEM : ENG_ITEMS_SYSTEM, { grade: setup.grade, lang: langName(setup.lang), skill: `${skill.tag} "${skill.name}"`, kind: skill.kind, template, level: req.level, count: want, range: rangeLine(ctx),
       avoid: avoid.length ? `\nThe last ones were refused by the checker; avoid: ${avoid.slice(0, 6).join('; ')}` : '' });
     const r = await guardedJson<{ items: (RawMath | RawEnglish)[] }>(ai, { endpoint: 'items', creative: true, system: sys, prompt, schema: math ? MATH_ITEMS_SCHEMA : ENG_ITEMS_SCHEMA, fixture: { setup, source, skill, template, level: req.level, count: want, round } });
     before = avoid; avoid = [];

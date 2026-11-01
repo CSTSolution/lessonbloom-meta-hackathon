@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { MockProvider } from '../server/ai/mock.ts';
 import type { ChatMsg, ChatTurn, Endpoint, ToolSpec } from '../server/ai/types.ts';
-import { buildLesson, LIMITS, reviewLesson } from '../server/lesson/agent.ts';
-import { checkItem, contextOf } from '../server/lesson/items.ts';
+import { buildLesson, columnGaps, LIMITS, reviewLesson } from '../server/lesson/agent.ts';
+import { checkItem, contextOf, regroups } from '../server/lesson/items.ts';
 import { intake } from '../server/lesson/writer.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
@@ -25,6 +25,27 @@ test('the agent builds a whole lesson; the checker\'s rejection is logged and ev
     if (setup.subject === 'math') assert.deepEqual(b.rejected[0].codes, ['Q']);
     assert.match(b.agent.note, /\S/);
   }
+});
+
+// Chi #47: "Cộng, trừ trong phạm vi 1000" got practice only up to 100. A lesson within 1000 works with its
+// 3-digit numbers and always has "đặt tính rồi tính", with and without carrying.
+test('a lesson within 1000 practises 3-digit numbers and has column items with and without carrying', async () => {
+  const notes = 'Toán lớp 2 – Bài 59: Phép cộng (có nhớ) trong phạm vi 1000.\nVí dụ: 456 + 278. Cộng hàng đơn vị: 6 cộng 8 bằng 14, viết 4 nhớ 1. Vậy 456 + 278 = 734.\nĐặt tính rồi tính: 254 + 172; 432 + 215.\nBài toán: Trường có 425 học sinh nam và 387 học sinh nữ. Hỏi trường có tất cả bao nhiêu học sinh?';
+  const ai = new MockProvider(), setup = await intake(ai, notes, 'vi');
+  const b = await buildLesson(ai, setup, notes);
+  const ctx = contextOf(setup, b.skills, notes);
+  assert.equal(ctx.scope?.max, 1000);
+  for (const i of b.items) assert.deepEqual(checkItem(i, ctx), [], i.id);
+  assert.ok(b.items.every((i) => i.subject === 'math' && Math.max(i.a, i.b) > 100 && i.a + i.b <= 1000), 'every item uses the section\'s 3-digit numbers');
+  const col = b.items.filter((i) => i.template === 'column');
+  assert.ok(col.some((i) => i.subject === 'math' && regroups(i.a, i.op, i.b).any) && col.some((i) => i.subject === 'math' && !regroups(i.a, i.op, i.b).any), 'column items with and without carrying');
+  assert.ok(b.skills.some((k) => k.kind === 'column'), 'their own skill when the plan had none');
+  assert.deepEqual(columnGaps(setup, notes, b.skills, b.items), []);
+  assert.ok(b.items.length <= LIMITS.maxItems);
+  // a lesson within 100 is not made to add column items
+  const small = await intake(ai, MATH, 'vi');
+  assert.deepEqual(columnGaps(small, MATH, [], []), []);
+  assert.ok(reviewLesson(setup, notes, { ...b, items: b.items.filter((i) => i.template !== 'column') }).some((x) => /no column items .*\+ with carrying/.test(x)), 'the agent\'s review names what is missing');
 });
 
 // A model that plays the given turns, then nothing.

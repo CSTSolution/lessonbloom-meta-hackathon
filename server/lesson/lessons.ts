@@ -84,7 +84,8 @@ export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Set
     if (pics?.passages) for (const s of b.slides) { const p = pageOf(s.source, pics.passages); if (p) s.page = p; }
     if (pics?.passages) for (const it of b.items) it.page = itemPage(it, pics.passages);
     // a teaching slide whose words are not in the book section is left out, while enough slides remain
-    const loose = b.slides.filter((s) => !['title', 'summary'].includes(s.kind) && !grounded(s.source, source));
+    // (the opening slide on the child's own mistakes comes from her work, not the book: it stays, Chi #46)
+    const loose = b.slides.filter((s) => !['title', 'summary'].includes(s.kind) && !s.fromWork && !grounded(s.source, source));
     if (loose.length && b.slides.length - loose.length >= 5) {
       b.slides = b.slides.filter((s) => !loose.includes(s));
       b.agent.changes.push(...loose.map((s) => `${s.id}: left out, its words are not in the book section`));
