@@ -17,7 +17,7 @@ import type { Jobs } from '../jobs.ts';
 import { illustrate } from './pictures.ts';
 import { spoken as spokenText } from './video.ts';
 import { areaOf, sectionOf } from '../knowledge/routes.ts';
-import { citation, sourceOf, shownPages } from '../knowledge/search.ts';
+import { citation, pagesLabel, printedRange, sourceOf, shownPages } from '../knowledge/search.ts';
 import type { Setup } from './types.ts';
 import { cleanSetup, intake, NotLesson, readPhotos, readWork, WorkUnread } from './writer.ts';
 import { forPrompt, titled, typeWork, type Work } from './work.ts';
@@ -216,7 +216,10 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     // each slide's and item's page as printed in the paper book, like Knowledge and the citation (Chi #53: "tr. 11"
     // on a slide for a part shown as pages 10–14); stored as the place in the file, which View source uses
     const bookId = (l.refs?.[0] as { bookId?: string } | undefined)?.bookId, shown = bookId ? await shownPages(d.sql, bookId) : null;
-    if (shown) { rest.slides = l.slides.map((s) => (s.page ? { ...s, page: shown(s.page) ?? s.page } : s)); rest.items = l.items.map((it) => (it.page ? { ...it, page: shown(it.page) ?? it.page } : it)); }
+    if (shown) { rest.slides = l.slides.map((s) => (s.page ? { ...s, page: shown(s.page) ?? s.page } : s)); rest.items = l.items.map((it) => (it.page ? { ...it, page: shown(it.page) ?? it.page } : it));
+      // the citation too, written when the lesson was made: "p. 3" stayed while slides showed 2 (live test, 1 Nov)
+      rest.refs = (l.refs ?? []).map((r) => { const pr = printedRange(shown, r.pageFrom, r.pageTo); if (pr.printedFrom == null) return r; const pg = pagesLabel({ pageFrom: r.pageFrom, pageTo: r.pageTo, ...pr }); return { ...r, vi: r.vi.replace(/(tr\.|p\.)\s*[\d–-]+$/, `$1 ${pg}`), en: r.en.replace(/(tr\.|p\.)\s*[\d–-]+$/, `$1 ${pg}`) }; });
+    }
     return c.json({ lesson: { ...rest, credits: credits(Number(u?.usd)), voiced: speaks(l.setup.lang), queue: queue && queue.status === 'queued' ? { place: queue.place } : null } });
   });
 }

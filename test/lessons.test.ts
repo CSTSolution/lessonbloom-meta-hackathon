@@ -151,6 +151,7 @@ test('a lesson shows its slides\' and items\' pages as printed in the book, like
   assert.equal((await call('PUT', `/api/t/books/${bookId}/page-one`, { pageOne: 2 })).status, 200);
   const l = (await call('GET', `/api/t/lessons/${a.id}`)).json.lesson;
   assert.deepEqual(l.slides.map((x: any) => x.page).filter(Boolean), filePages.map((p: number) => p - 1));
+  assert.match(l.refs[0].vi, new RegExp(`tr\\. ${a.lesson.refs[0].pageFrom - 1}`), 'the citation shows the printed page too');
   const sec = (await call('GET', `/api/t/areas/${areaId}`)).json.sections.find((x: any) => x.id === a.match.sectionId);
   assert.equal(sec.printed_from, sec.page_from - 1, 'Knowledge shows the same numbering');
 });
