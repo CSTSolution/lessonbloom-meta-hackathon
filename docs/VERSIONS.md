@@ -3,6 +3,14 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.2123 (1 Nov, evening)
+
+- **One photo button (Chi #57, option B)**: "Take / add photos" replaces the two photo buttons. The photos are
+  read as marked work first, and as a book page when they are not; "What is this?" then shows both answers with
+  the app's guess chosen, and choosing the other reads them again that way. Whose work is asked right under the
+  answer. Tried live with the real model: a book page and a marked sheet were each guessed right.
+- The "?" guide explains one button and two kinds of photo.
+
 ## v1.0.20261101.1949 (1 Nov, evening)
 
 Chi's review of 1555 (#55–#58):
