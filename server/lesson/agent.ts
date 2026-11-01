@@ -323,7 +323,11 @@ export async function buildLesson(ai: AI, setup: Setup, source: string, say: Say
   if (setup.work?.wrong) {
     const w = applyWork(setup, source, { skills, slides, items }), L = setup.lang === 'en' ? 'en' : 'vi';
     // within the lesson's size (Chi #61): the child's own items come first, the book's tail goes
-    skills = w.skills; slides = w.slides.slice(0, sizeOf(setup).slides + 1); items = w.items.slice(0, maxItems);
+    skills = w.skills; slides = w.slides.slice(0, sizeOf(setup).slides + 1);
+    // a book item asking the very question of the child's own is left out (live test 1 Nov: "___ colour is it?" twice)
+    // the whole question: a match's or an order's instruction is the same for all, its words and numbers are not
+    const q = (i: Item) => { const x = i as Item & { sentence?: string; pairs?: unknown; words?: unknown; a?: number; b?: number; op?: string }; return JSON.stringify([String(x.sentence || x.prompt).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(), x.pairs, x.words, x.a, x.op, x.b]); };
+    items = w.items.filter((it, k, all) => all.findIndex((x) => q(x) === q(it)) === k).slice(0, maxItems);
     const kinds = w.inPart.map((x) => x[L].toLowerCase()).join(', '), out = w.outPart.map((x) => x[L].toLowerCase()).join(', ');
     if (w.inPart.length) {
       await say(`Từ bài con làm: thêm slide mở đầu và ${w.made} câu luyện lại (${w.inPart.map((x) => x.vi.toLowerCase()).join(', ')}).`, `From the child's work: an opening slide and ${w.made} practice items (${w.inPart.map((x) => x.en.toLowerCase()).join(', ')}).`);

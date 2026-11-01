@@ -211,6 +211,8 @@ const joinW = (xs: string[], and: string) => (xs.length <= 1 ? xs.join('') : `${
 export function greetOf(w: Pick<Work, 'types'>): Words | null {
   const t = w.types.slice(0, 2);
   if (!t.length) return null;
+  // a kind named after the exercise reads oddly to a child ("con còn vướng fill in the missing word", live test 1 Nov)
+  if (t.some((x) => INSTRUCTION.test(x.label.en))) return { vi: 'Hôm trước con còn nhầm vài câu, hôm nay mình luyện lại đúng những câu đó nhé.', en: 'Last time a few questions were tricky; today we practise those again.' };
   return { vi: `Hôm trước con còn vướng ${joinW(t.map((x) => lower(x.label.vi)), 'và')}, hôm nay mình luyện lại nhé.`,
     en: `Last time you still found ${joinW(t.map((x) => lower(x.label.en)), 'and')} tricky; today we practise it again.` };
 }

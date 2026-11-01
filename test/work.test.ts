@@ -238,3 +238,9 @@ test('an English sheet is looked for by its unit and its mistakes, not by its in
   const v = typeWork({ questions: [{ q: '___ colour is it?', child: 'Where', mark: 'wrong', right: 'What', typeName: 'Fill in the missing word' }] }, { topic: 'Unit 6: Colours - Fill in the missing word', subject: 'english' });
   assert.equal(findOf(v), 'Unit 6: Colours – What colour is it?');
 });
+
+test('the child\'s greeting does not repeat a kind named after the exercise (live test, 1 Nov)', () => {
+  const w = typeWork({ questions: [{ q: '___ colour is it?', child: 'Where', mark: 'wrong', right: 'What', typeName: 'Fill in the missing word' }] }, { subject: 'english' });
+  assert.equal(greetOf(w)?.vi, 'Hôm trước con còn nhầm vài câu, hôm nay mình luyện lại đúng những câu đó nhé.');
+  assert.match(greetOf(typeWork({ questions: [{ q: '52 - 28', child: '36', mark: 'wrong' }] }))!.vi, /phép trừ có nhớ/);
+});
