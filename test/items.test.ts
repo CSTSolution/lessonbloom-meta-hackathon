@@ -307,3 +307,9 @@ test('Chi #52 (d): "Which is 321 in words?" with word options, checked as text',
   assert.deepEqual(checkItem(v, { ...cam, lang: 'vi' }), []);
   assert.ok(hintOf(v, 'ba trăm mười hai', 'vi').startsWith('“ba trăm mười hai” là số 312, không phải 321.'));
 });
+
+test('a reason that calls the wrong option "the answer" is dropped (live test, 1 Nov)', async () => {
+  const { buildEnglish } = await import('../server/lesson/items.ts');
+  const it = buildEnglish({ template: 'fill', skill: 'q', level: 'basic', prompt: 'Choose the missing word.', sentence: 'What colour is ___?', options: ['it', 'red', 'blue'], answer: 'it', explain: 'We ask about the thing with it.', why: [{ option: 'blue', why: "'Blue' is the answer, not the question word." }, { option: 'red', why: 'Red is a colour, not the thing we ask about.' }] }, 'x1', 'en') as any;
+  assert.deepEqual(it.why, { red: 'Red is a colour, not the thing we ask about.' });
+});

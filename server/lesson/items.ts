@@ -230,6 +230,8 @@ function whyOf(raw: RawEnglish['why'], options: string[], answer: string): Recor
     const o = options.find((x) => x.toLowerCase() === clean(k).toLowerCase()), why = clean(v), ww: string[] = [...words(why)];
     if (!o || o.toLowerCase() === answer.toLowerCase() || out.some(([x]) => x === o) || !why || why.length > 140) continue;
     if (!aw.length || ` ${ww.join(' ')} `.includes(phrase) || content.some((w) => ww.includes(w))) continue;
+    // never calls the wrong option right (live test 1 Nov: "'Blue' is the answer, not the question word.")
+    if (/\b(is|are) (the|a) (right |correct )?answer\b|\bis (right|correct)\b|là đáp án|là (câu|từ) đúng|\bđúng rồi\b/iu.test(why)) continue;
     out.push([o, why]);
   }
   return out.length ? Object.fromEntries(out) : undefined;
