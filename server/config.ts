@@ -29,6 +29,7 @@ export const config = {
   mail: {
     host: env('SMTP_SERVER'), port: num('SMTP_PORT', 587), user: env('SMTP_USER'), key: env('SMTP_KEY'),
     from: env('MAIL_FROM', 'no-reply@cstsolution.com'), fromName: env('LB_MAIL_FROM_NAME', 'LessonBloom'),
+    feedbackTo: env('LB_FEEDBACK_TO'),   // each new feedback is emailed here (Chi #62); unset: no email
   },
 
   // guard layer 1: limits and money

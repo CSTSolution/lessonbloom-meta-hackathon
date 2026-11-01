@@ -42,7 +42,7 @@
 </style>
 </head>
 <body>
-<header><b>LessonBloom Meta · Admin</b><a href="#/">Overview</a><a href="#/t">Testers</a><span class="grow"></span><span id="when" class="muted small"></span><button class="ghost" id="out" hidden>Forget key</button></header>
+<header><b>LessonBloom Meta · Admin</b><a href="#/">Overview</a><a href="#/t">Testers</a><a href="#/f">Feedback</a><span class="grow"></span><span id="when" class="muted small"></span><button class="ghost" id="out" hidden>Forget key</button></header>
 <main id="view"></main>
 <script>
 const KEY = 'lbm-admin-key';
@@ -231,13 +231,40 @@ async function testers(code) {
     ${d.testers.length ? `<p class="muted small">In all: ${n(d.testers.length)} testers · ${n(sum('lessons'))} lessons · ${n(sum('assignments'))} assigned · ${n(sum('rejected'))} items rejected by the checks · ${n(sum('hand_items'))} changed by hand · ${n(sum('credits'))} credits.</p>` : ''}`;
 }
 
+// Chi #62: what assigners sent (read only). The screenshot is fetched with the key and opened as a blob.
+const FB = { bug: 'Bug', hard: 'Hard to use', content: 'Lesson content wrong', idea: 'Idea', lesson: 'Lesson rating', item: 'Item report' };
+const REASON = { wrong: 'wrong answer', unclear: 'hard to understand', notInLesson: 'not in the lesson' };
+async function feedback() {
+  const d = await get('/feedback');
+  view.innerHTML = `
+    <h1>Feedback</h1>
+    <p class="muted">From the "Feedback" button, "Is this lesson useful?" and "Report" on practice items. Newest first.</p>
+    ${table([
+      { h: 'When', f: (r) => when(r.created_at) },
+      { h: 'Who', f: (r) => `<a href="#/u/${esc(r.teacher_id)}">${esc(r.email || r.name || r.teacher_id)}</a><div class="small muted">${esc(r.name && r.email ? r.name : '')} ${esc(r.account)}</div>` },
+      { h: 'Kind', f: (r) => chip(FB[r.kind] || r.kind, r.kind === 'bug' || r.rating === -1 ? 'bad' : r.kind === 'idea' || r.rating === 1 ? 'ready' : '') + (r.reason ? `<div class="small muted">${esc(REASON[r.reason] || r.reason)}</div>` : '') },
+      { h: 'Rating', f: (r) => r.rating === 1 ? '👍' : r.rating === -1 ? '👎' : '' },
+      { h: 'Text', wide: 1, f: (r) => `<span class="note">${esc(r.text)}</span>` },
+      { h: 'Lesson / item', f: (r) => r.lesson_id ? `<a href="#/l/${esc(r.lesson_id)}">${esc(r.lesson_title || r.lesson_id)}</a>${r.item_id ? `<div class="small muted">item ${esc(r.item_id)}</div>` : ''}` : '' },
+      { h: 'Page', f: (r) => `<span class="small">${esc(r.page)}</span>` }, { h: 'Version', f: (r) => `<span class="small muted">${esc(r.version)}</span>` },
+      { h: 'Screenshot', f: (r) => r.has_image ? `<button class="ghost" data-img="${esc(r.id)}">View</button>` : '' },
+    ], d.feedback || [])}`;
+  view.querySelectorAll('button[data-img]').forEach((b) => { b.onclick = async () => {
+    const w = window.open('', '_blank');
+    const r = await fetch(API + '/feedback/' + encodeURIComponent(b.dataset.img) + '/image', { headers: { authorization: 'Bearer ' + key } });
+    if (!r.ok) { w?.close(); return alert('The picture could not be loaded.'); }
+    const url = URL.createObjectURL(await r.blob());
+    if (w) w.location.href = url; else location.href = url;
+  }; });
+}
+
 async function route() {
   if (!key) return askKey();
   document.getElementById('out').hidden = false;
   document.getElementById('when').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', tz) + ' (Hanoi)';
   const h = location.hash.slice(1) || '/', [, kind, id] = h.split('/');
   view.innerHTML = '<p class="muted">Loading…</p>';
-  try { kind === 'u' ? await user(decodeURIComponent(id)) : kind === 'l' ? await lesson(decodeURIComponent(id)) : kind === 't' ? await testers(decodeURIComponent(id || '')) : await overview(); }
+  try { kind === 'u' ? await user(decodeURIComponent(id)) : kind === 'l' ? await lesson(decodeURIComponent(id)) : kind === 't' ? await testers(decodeURIComponent(id || '')) : kind === 'f' ? await feedback() : await overview(); }
   catch (e) { if (e.message !== 'key') view.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 view.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-go]'); if (tr && !e.target.closest('a')) location.hash = tr.dataset.go; });

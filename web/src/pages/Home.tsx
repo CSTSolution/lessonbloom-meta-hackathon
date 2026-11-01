@@ -22,13 +22,14 @@ import { Reminders } from './Reminders.tsx';
 import { SignupRole } from './SignupRole.tsx';
 import { Usage } from './Usage.tsx';
 import { VERSION } from '../version.ts';
+import { FeedbackButton } from '../feedback.tsx';
 
 const T = {
   vi: {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
     teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string, step: string) => `Tiếp tục: ${what} · ${step}`, draftGo: 'Tiếp tục', allClasses: 'Tất cả các lớp', all: 'Tất cả',
-    groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
+    groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, none: 'Chưa có bài', n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, example: 'Ví dụ', carryOn: 'Soạn tiếp', empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Lượt dùng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
@@ -39,7 +40,7 @@ const T = {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
     teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string, step: string) => `Continue: ${what} · ${step}`, draftGo: 'Continue', allClasses: 'All classes', all: 'All',
-    groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
+    groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, none: 'No lessons yet', n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, example: 'Example', carryOn: 'Carry on', empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
@@ -69,6 +70,8 @@ export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onCha
       </header>
       <ChromeBanner />
       <Toast />
+      {/* Chi #62: on every assigner page (the pupils' /hoc and /p/ pages are another app) */}
+      <FeedbackButton />
       {path === '/new' ? <Create parent={parent} />
         : lessonId ? <LessonPage id={lessonId} parent={parent} />
         : path.startsWith('/knowledge') ? <Knowledge />
@@ -136,14 +139,15 @@ function Me({ teacher, t, onSignOut }: { teacher: Teacher; t: Dict; onSignOut: (
   );
 }
 
-// "Bài giảng": lessons grouped by Đang giao / Bản nháp / Đã xong, only one group open; a filter by
+// "Bài giảng": lessons grouped by Đang giao / Bản nháp / Đã xong, each opened and closed by itself; a filter by
 // class (a parent: by child); this week's repeated mistakes on the right.
 function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
   const lang = useLang(), parent = teacher.role === 'parent';
   const [rows, setRows] = useState<LessonRow[] | null>(null), [classes, setClasses] = useState<{ id: string; name: string; grade?: number | null }[]>([]), [pick, setPick] = useState('');
-  const [open, setOpen] = useState<'open' | 'draft' | 'done'>('open'), [week, setWeek] = useState<{ what: string; where: string }[]>([]), draft = readDraft();
+  // Chi #59: each heading toggles on its own (it was an accordion that could not close the open one)
+  const [open, setOpen] = useState<Record<'open' | 'draft' | 'done', boolean>>({ open: true, draft: false, done: false }), [week, setWeek] = useState<{ what: string; where: string }[]>([]), draft = readDraft();
   useEffect(() => {
-    api.lessons().then((r) => { setRows(r.lessons); if (r.lessons.some((l) => !l.given) || !r.lessons.some((l) => l.open)) setOpen('draft'); }).catch(() => setRows([]));
+    api.lessons().then((r) => { setRows(r.lessons); if (r.lessons.some((l) => !l.given) || !r.lessons.some((l) => l.open)) setOpen({ open: false, draft: true, done: false }); }).catch(() => setRows([]));
     api.classes().then((r) => setClasses(r.classes)).catch(() => {});
     api.summary({ lang }).then((s) => setWeek(s.classes.flatMap((k) => [...new Set(k.mistakes.map((m) => m.what))].map((what) => ({ what, where: k.name }))))).catch(() => {});
   }, []);
@@ -173,12 +177,13 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
           {!rows.length && <div className="card"><p className="muted">{t.empty}</p></div>}
           {/* drafts first, open when there are any: a lesson just made is found there, not thought lost (Chi, 30 Oct) */}
           {rows.length > 0 && (['draft', 'open', 'done'] as const).map((g) => (
-            <div key={g} className={`group card ${open === g ? 'on' : ''}`}>
-              <button className="group-head" onClick={() => setOpen(g)} aria-expanded={open === g}>
-                <span className="caret">{open === g ? '▾' : '▸'}</span><span className="grow"><b>{t.groups[g]}</b><span className="small muted" style={{ display: 'block' }}>{t.n(groups[g].length)}</span></span>
+            <div key={g} className={`group card ${open[g] ? 'on' : ''}`}>
+              <button className="group-head" onClick={() => setOpen((o) => ({ ...o, [g]: !o[g] }))} aria-expanded={open[g]}>
+                <span className="caret">{open[g] ? '▾' : '▸'}</span><span className="grow"><b>{t.groups[g]}</b><span className="small muted" style={{ display: 'block' }}>{t.n(groups[g].length)}</span></span>
                 <span className={`count ${g === 'draft' ? 'grey' : g === 'done' ? 'green' : ''}`}>{groups[g].length}</span>
               </button>
-              {open === g && groups[g].length > 0 && <div className="lessons" style={{ paddingTop: 10 }}>{groups[g].map((r, i) => (
+              {open[g] && !groups[g].length && <p className="small muted" style={{ paddingTop: 8 }}>{t.none}</p>}
+              {open[g] && groups[g].length > 0 && <div className="lessons" style={{ paddingTop: 10 }}>{groups[g].map((r, i) => (
                 <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
                   <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example ? <><span className="thumb-tag">{t.example}</span><span>{r.example}</span></> : r.setup.title.trim().charAt(0).toUpperCase()}</div>
                   {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}

@@ -7,6 +7,7 @@ import { api, ApiError, type Item, type Lesson, type Slide } from '../api.ts';
 import { pl, useLang, useT } from '../i18n.ts';
 import { shrink } from '../photo.ts';
 import { ask } from '../ask.tsx';
+import { LessonRating, ReportItem } from '../feedback.tsx';
 import { go } from '../router.ts';
 import { Assign } from './Assign.tsx';
 import { keepStep, lessonStep, Stepper } from './Create.tsx';
@@ -80,6 +81,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} parent={parent} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
       {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} items={l.items.length} /></div>}
+      {l.status === 'ready' && <LessonRating lessonId={l.id} />}{/* Chi #62: once per lesson */}
     </div>
   );
 }
@@ -243,7 +245,8 @@ function Practice({ l, t, refText, onChange, onNext, parent = false }: { l: Less
                 <div className="row small"><details className="grow"><summary className="link">{t.details}</summary><p><b>{t.explain}:</b> {it.explain}</p>{!!it.redone?.length && <p className="muted">↻ <b>{t.redoneWhy}:</b> {it.redone.join('; ')}</p>}{refText && <p className="muted">{t.page}: {ref(refText, it.page)}</p>}</details>
                   <button className="btn small noprint" onClick={() => setEditing(editing === it.id ? '' : it.id)}>{t.edit}</button>
                   <button className="btn small noprint" disabled={!!busy} onClick={() => run(it.id, async () => onChange((await api.similarItem(l.id, it.id)).items))}>{busy === it.id ? t.working2 : t.similar}</button>
-                  <button className="btn small danger noprint" onClick={async () => { if (await ask(t.removeAsk, { danger: true })) { await api.deleteItem(l.id, it.id); onChange(l.items.filter((x) => x.id !== it.id)); } }}>{t.remove}</button></div>
+                  <button className="btn small danger noprint" onClick={async () => { if (await ask(t.removeAsk, { danger: true })) { await api.deleteItem(l.id, it.id); onChange(l.items.filter((x) => x.id !== it.id)); } }}>{t.remove}</button>
+                  <ReportItem lessonId={l.id} itemId={it.id} /></div>{/* Chi #62 */}
                 {editing === it.id && <ItemEdit it={it} t={t} onSave={async (f) => run('edit', async () => { const r = await api.editItem(l.id, it.id, f); onChange(l.items.map((x) => (x.id === it.id ? r.item : x))); setEditing(''); })} onCancel={() => setEditing('')} />}
               </div>
             ))}

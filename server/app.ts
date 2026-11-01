@@ -18,6 +18,7 @@ import { Jobs } from './jobs.ts';
 import { addChild, addClass, classRoutes } from './classes/routes.ts';
 import { knowledgeRoutes } from './knowledge/routes.ts';
 import { editRoutes } from './lesson/edit.ts';
+import { feedbackRoutes } from './feedback.ts';
 import { lessonRoutes } from './lesson/routes.ts';
 import { pathRoutes } from './path/routes.ts';
 import type { Mailer } from './mail.ts';
@@ -162,6 +163,7 @@ export function createApp(deps: { sql: Sql; ai: AI; mail: Mailer; files?: Files;
   editRoutes(app, { sql, ai, budget, files, as });
   const path = pathRoutes(app, { sql, ai, budget, as });
   classRoutes(app, { sql, ai, files, reminder: path.pupilReminder });
+  feedbackRoutes(app, { sql, mail });   // Chi #62: "Góp ý", 👍 👎 on a lesson, "Báo câu này"; no model
   // her line of jobs (reading a book, making a lesson) and taking one out
   app.get('/api/t/jobs', async (c) => c.json({ jobs: await jobs.list(c.get('teacher').id) }));
   app.post('/api/t/jobs/:id/cancel', async (c) => {

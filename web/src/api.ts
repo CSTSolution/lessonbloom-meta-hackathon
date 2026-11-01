@@ -31,7 +31,7 @@ export interface LessonRow { id: string; status: Lesson['status']; setup: Setup;
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number; source?: 'pdf' | 'text' | 'scan'; used?: number | null; returned?: number | null; page_one?: number | null; printed?: boolean }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
 export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number; printed_from?: number | null; printed_to?: number | null; printed?: (number | null)[] }
-export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
+export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null; narrow?: { pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null } | null; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
 export interface ClassRow { id: string; name: string; code: string; kind?: 'class' | 'child'; grade?: number | null; pupils: number; joined: number; assignments: number }
 export interface PupilRow { id: string; name: string; link: string; url: string; joined_at: string | null; seen_at: string | null }
 export interface AssignedRow { id: string; lesson_id: string; title: string; due: string | null; created_at: string; items: number; done: number; started: number; seen?: number }
@@ -171,10 +171,14 @@ export const api = {
   cancelJob: (id: string) => call<{ ok: boolean; result: string }>('POST', `/t/jobs/${id}/cancel`),
   uploadBook: (areaId: string, file: File, title: string, onProgress?: (share: number) => void) => upload<{ book: BookRow }>(`/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, file, onProgress),
   match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),
-  intake: (areaId: string, sectionId: string) => call<{ setup: Setup; citation: string }>('POST', '/t/intake', { areaId, sectionId }),
-  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup }) => call<{ id: string }>('POST', '/t/lessons', b).then((r) => { window.dispatchEvent(new Event('lbm-jobs')); return r; }),
+  intake: (areaId: string, sectionId: string, pages?: { from: number; to: number }) => call<{ setup: Setup; citation: string }>('POST', '/t/intake', { areaId, sectionId, ...(pages ? { pages } : {}) }),
+  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup; pages?: { from: number; to: number } }) => call<{ id: string }>('POST', '/t/lessons', b).then((r) => { window.dispatchEvent(new Event('lbm-jobs')); return r; }),
   lessons: () => call<{ lessons: LessonRow[] }>('GET', '/t/lessons'),
   newPicture: (id: string, sid: string) => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/picture`),
   cutout: (id: string, sid: string, photo: string, name: string) => call<{ slide: Slide; matches: number }>('POST', `/t/lessons/${id}/slides/${sid}/cutout`, { photo, name }),
   lesson: (id: string) => call<{ lesson: Lesson }>('GET', `/t/lessons/${encodeURIComponent(id)}`),
+  // Chi #62: "Góp ý", 👍 👎 on a lesson, "Báo câu này" (image: a JPEG as base64, at most 1.5 MB)
+  feedback: (f: FeedbackIn) => call<{ ok: true; id: string }>('POST', '/t/feedback', f),
 };
+export type FeedbackKind = 'bug' | 'hard' | 'content' | 'idea' | 'lesson' | 'item';
+export interface FeedbackIn { kind: FeedbackKind; text?: string; page?: string; version?: string; lessonId?: string; itemId?: string; rating?: 1 | -1; reason?: 'wrong' | 'unclear' | 'notInLesson'; image?: string }

@@ -332,3 +332,14 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .help-dot { width: 22px; height: 22px; border-radius: 99px; border: 1px solid var(--line); background: #fff; color: var(--ink-2, #555); font: 600 13px/1 inherit; cursor: pointer; padding: 0; margin-left: -4px; }
 .help-dot:hover { border-color: var(--ink-2, #555); }
 @media (max-width: 560px) { .guide-cols { grid-template-columns: 1fr; } }
+/* Feedback (Chi #62): the "Góp ý" button in the corner of the assigner's pages, its box, the 👍 👎 line under a
+   ready lesson and "Báo câu này" on practice items. Above the page, under dialogs and the toast. */
+.fb-btn { position: fixed; right: 16px; bottom: 16px; z-index: 40; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(23, 32, 51, .15); }
+.fb-btn:hover { border-color: var(--leaf); color: var(--leaf); }
+.fb-box { position: fixed; right: 16px; bottom: 16px; z-index: 45; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 16px; box-shadow: 0 12px 32px rgba(23, 32, 51, .2); }
+.fb-box textarea { font-size: 15px; }
+.fb-rate { max-width: 820px; margin: 18px auto 0; padding: 10px 14px; border-top: 1px solid var(--line); text-align: center; }
+.fb-item { flex-basis: 100%; padding: 12px; background: var(--paper); }
+.fb-report { color: var(--ink-2); }
+.fb-report:hover { color: var(--coral); }
+@media screen { .page { padding-bottom: 72px; } }   /* room at the end of each page, so the button never covers the last row */

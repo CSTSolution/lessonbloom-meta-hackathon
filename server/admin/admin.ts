@@ -9,6 +9,7 @@ import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { cleanCode, CODE, creditState, grant, newCode } from '../credits.ts';
 import { clientIp, credits, Limiter, TODAY } from '../guard/guard.ts';
+import { feedbackImage, feedbackList } from '../feedback.ts';
 
 const PAGE = await readFile(new URL('./page.html', import.meta.url), 'utf8');
 const same = (a: string, b: string) => { const h = (x: string) => createHash('sha256').update(x).digest(); return timingSafeEqual(h(a), h(b)); };
@@ -134,6 +135,13 @@ export function createAdmin(sql: Sql, key = config.adminKey, mode: 'private' | '
     if (!l) return c.json({ error: 'No such lesson.' }, 404);
     const cost = await sql.query(`select endpoint, model, count(*)::int as n, sum(usd) as usd from ai_usage where lesson_id = $1 group by 1, 2 order by sum(usd) desc`, [l.id]);
     return c.json({ lesson: l, publicUrl: config.publicUrl, cost: cost.map((r) => ({ ...r, ...usdOut(r.usd) })) });
+  });
+  // Chi #62: what assigners sent ("Góp ý", 👍 👎 on a lesson, a reported item), newest first; read only.
+  // The screenshot comes on its own (the page fetches it with the key and shows it as a blob).
+  app.get('/api/feedback', async (c) => c.json({ feedback: await feedbackList(sql) }));
+  app.get('/api/feedback/:id/image', async (c) => {
+    const img = await feedbackImage(sql, c.req.param('id'));
+    return img ? c.body(new Uint8Array(img), 200, { 'content-type': 'image/jpeg', 'x-content-type-options': 'nosniff' }) : c.json({ error: 'No picture.' }, 404);
   });
   // ---- writes: promo codes and grants ----
   const body = async (c: { req: { json: <T>() => Promise<T> } }) => (await c.req.json<Record<string, unknown>>().catch(() => ({}))) as Record<string, unknown>;

@@ -42,7 +42,10 @@ test('admin: per-assigner credits, lessons with their cost, books, calls and ref
   assert.equal(d.books[0].title, 'Toán 2 – Sách mẫu');
   assert.ok(d.calls.some((c: any) => c.verdict === 'injection'), 'refusals are listed');
   assert.ok(d.calls.some((c: any) => c.lesson_id === id && c.endpoint === 'critic'), 'background pictures count against the lesson');
-  assert.equal(d.credits.left, config.guard.signupCredits - Math.ceil(d.byEndpoint.reduce((a: number, r: any) => a + r.usd, 0) * 100 - 1e-9), 'the balance is the sign-up credits less what was used');
+  // each held job is charged its own use rounded up, so the balance can be one credit lower per job than the total rounded once
+  await settled(s.sql, id);
+  const used = d.byEndpoint.reduce((a: number, r: any) => a + r.usd, 0) * 100, left = (await get(`/api/users/${me.id}`)).credits.left;
+  assert.ok(left <= config.guard.signupCredits - Math.ceil(used - 1e-9) && left >= config.guard.signupCredits - Math.ceil(used - 1e-9) - 2, `the balance is the sign-up credits less what was used (${left}, used ${used.toFixed(2)})`);
   const l = await get(`/api/lessons/${id}`);
   assert.ok(l.lesson.slides.length && l.cost.length);
   assert.equal((await get('/api/users/nobody')).error, 'No such user.');
