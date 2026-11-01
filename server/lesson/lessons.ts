@@ -1,6 +1,7 @@
 // The lessons table, and the background job that builds one.
 import { newId } from '../auth/accounts.ts';
 import type { AI } from '../ai/types.ts';
+import { speaks } from '../ai/voices.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import type { Files } from '../files.ts';
@@ -96,7 +97,7 @@ export async function runLesson(ai: AI, lessons: Lessons, id: string, setup: Set
     pics?.onReady?.();   // the lesson is there: her next job may start while pictures and the video follow
     if (pics) await drawPictures(ai, lessons, pics.files, pics.budget, id, pics.teacherId, b.slides, pics.held);
     // the video, made after the pictures (local voices, free) unless she asked for none
-    if (pics?.sql && config.autoVideo && setup.make?.video !== false) {
+    if (pics?.sql && config.autoVideo && setup.make?.video !== false && speaks(setup.lang)) {
       const l = await pics.sql.one<Lesson>('select * from lessons where id = $1', [id]);
       if (l && l.status === 'ready') { await pics.sql.query(`update lessons set video_status = 'working:0' where id = $1`, [id]); await makeVideo({ sql: pics.sql, ai, files: pics.files }, l, { subtitles: true, voice: 0 }); }
     }

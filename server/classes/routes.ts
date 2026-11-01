@@ -10,6 +10,7 @@ import QRCode from 'qrcode';
 import type { AI } from '../ai/types.ts';
 import type { Env } from '../app.ts';
 import { newId } from '../auth/accounts.ts';
+import { speaks } from '../ai/voices.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { clientIp, Limiter } from '../guard/guard.ts';
@@ -214,7 +215,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     // made again from this lesson on the next view; one she saved herself is left as it is
     await sql.query(`delete from paths p using lessons l where l.id = $3 and p.class_id = $1 and p.teacher_id = $2 and p.area_id = l.area_id and p.updated_at = p.created_at`, [k.id, t.id, l.id]);
     // a parent has no Video step (Chi): the child's video is made now, in the background (local voices, free)
-    if (t.role === 'parent' && d.files && config.autoVideo && (l as Lesson & { video_status?: string }).video_status === 'none') {
+    if (t.role === 'parent' && d.files && config.autoVideo && speaks(l.setup.lang) && (l as Lesson & { video_status?: string }).video_status === 'none') {
       await sql.query(`update lessons set video_status = 'working:0' where id = $1`, [l.id]);
       void makeVideo({ sql, ai: d.ai, files: d.files }, l, { subtitles: true, voice: 0 });
     }
@@ -361,6 +362,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     const key = hash(`${lang}:${text}`);
     let wav = said.get(key);
     if (!wav) {
+      if (!speaks(lang)) return fail(c, 'voiceOff', 503);   // the page reads it with the phone's own voice
       try { wav = await d.ai.speak({ text, lang }); } catch { return fail(c, 'aiBusy', 503); }
       if (said.size > 500) said.clear();
       said.set(key, wav);

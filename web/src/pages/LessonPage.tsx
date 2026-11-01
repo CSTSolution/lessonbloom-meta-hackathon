@@ -11,6 +11,7 @@ import { go } from '../router.ts';
 import { Assign } from './Assign.tsx';
 import { keepStep, lessonStep, Stepper } from './Create.tsx';
 import { NotFound } from './NotFound.tsx';
+import { browserSay, stopSay } from '../speak.ts';
 // items the AI second review dropped (the rest of `rejected` failed a code check and were written again)
 const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.startsWith('ai:'))).length;
 
@@ -19,7 +20,7 @@ const T = {
     working: 'Trợ lý đang soạn bài…', queued: (n: number) => `Đang chờ (thứ ${n}): bài sẽ được soạn khi xong việc đang làm. Mỗi tài khoản làm một việc một lúc.`, left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', drawing: 'Đang vẽ hình minh hoạ…',
     rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
-    makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', preview: 'Nghe thử từng đoạn',
+    makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', enOnly: 'Hiện chỉ làm video cho bài tiếng Anh. Bài tiếng Việt: bấm ▶ để nghe thử bằng giọng của trình duyệt; bài tập và link của con vẫn đọc câu hỏi.', preview: 'Nghe thử từng đoạn',
     redoneWhy: 'Tạo lại vì', edit: 'Sửa', qText: 'Câu hỏi', save: 'Lưu', cancel: 'Huỷ', similar: 'Tạo câu tương tự', addTpl: '+ Thêm mẫu', tplKind: 'Dạng câu', skill: 'Dạng bài', level: 'Mức', create: 'Tạo 2 câu', working2: 'Đang viết…', story: 'Đề bài', unit: 'Đơn vị', wrongs: 'Đáp án sai (cách nhau bằng dấu phẩy)', shown: 'Kết quả ghi trong câu', opts: 'Lựa chọn (cách nhau bằng dấu phẩy)', ans: 'Đáp án', sentence: 'Câu có chỗ trống ___', sayIt: 'Từ được đọc to', words: 'Các từ (cách nhau bằng dấu phẩy)', codeAns: 'Đáp án do code tính.',
     newPic: 'Đổi hình minh họa', cut: 'Cắt từ ảnh của cô', cutHint: 'Chọn ảnh đồ vật (không có người) và gõ tên đồ vật cần cắt.', cutName: 'Ví dụ: quả táo', cutGo: 'Cắt bằng SAM 3.1', cutDone: (n: number) => `Đã cắt ${n} vật.`, busy: 'Đang làm…',
     video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', parts: 'Các đoạn', subs: 'Phụ đề', toItems: 'Tiếp: bài tập',
@@ -31,7 +32,7 @@ const T = {
     working: 'The agent is making your lesson…', queued: (n: number) => `Waiting (number ${n} in your line): the lesson is made once the job before it is done. Each account runs one job at a time.`, left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', drawing: 'Drawing the picture…',
     rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
-    makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', preview: 'Listen to each part',
+    makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', enOnly: 'Videos are made for English lessons only for now. Vietnamese lessons: press ▶ to hear each part in the browser\'s own voice; practice and the child\'s link still read the questions aloud.', preview: 'Listen to each part',
     redoneWhy: 'Written again because', edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
     newPic: 'New picture', cut: 'Cut out from your photo', cutHint: 'Choose a photo of objects (no people) and type what to cut out.', cutName: 'e.g. apples', cutGo: 'Cut out with SAM 3.1', cutDone: (n: number) => `Cut out ${n}.`, busy: 'Working…',
     video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
@@ -144,16 +145,21 @@ function Video({ l, t, onNext, onStarted }: { l: Lesson; t: Dict; onNext: () => 
   const [subs, setSubs] = useState(l.video?.subtitles ?? true), [voice, setVoice] = useState(0), [speed, setSpeed] = useState(1), [err, setErr] = useState('');
   const status = String(l.video_status || 'none'), working = status.startsWith('working'), v = status === 'ready' ? l.video : null;
   const voices = l.setup.lang === 'en' ? t.voicesEn : t.voices;
+  const lang = useLang(), off = l.voiced === false;   // Vietnamese: no video for now, the browser reads aloud (Chi #49)
+  const run = useRef(0);   // each play or pause starts a new run: a voice that ends after a pause goes no further
+  const stop = () => { run.current++; audio.current?.pause(); stopSay(); setPlaying(false); };
   const play = (j: number) => {
-    audio.current?.pause();
+    audio.current?.pause(); stopSay();
     setI(j); setPlaying(true);
+    const mine = ++run.current, next = () => { if (mine !== run.current) return; if (j + 1 < l.slides.length) play(j + 1); else setPlaying(false); };
+    if (off) { const x = l.slides[j]; browserSay(x.narration || [x.heading, ...x.bullets].join('. '), l.setup.lang, next); return; }
     const a = new Audio(`/api/t/lessons/${l.id}/say/${l.slides[j].id}`);
-    a.onended = () => { if (j + 1 < l.slides.length) play(j + 1); else setPlaying(false); };
+    a.onended = next;
     a.onerror = () => setPlaying(false);
     audio.current = a; void a.play().catch(() => setPlaying(false));
   };
-  useEffect(() => () => audio.current?.pause(), []);
-  const make = async () => { setErr(''); try { await api.makeVideo(l.id, { subtitles: subs, voice, speed }); onStarted(); } catch (e) { setErr(e instanceof ApiError ? e.vi : String(e)); } };
+  useEffect(() => () => { run.current++; audio.current?.pause(); stopSay(); }, []);
+  const make = async () => { setErr(''); try { await api.makeVideo(l.id, { subtitles: subs, voice, speed }); onStarted(); } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } };
   const mmss = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
   return (
     <div className="cols">
@@ -163,7 +169,7 @@ function Video({ l, t, onNext, onStarted }: { l: Lesson; t: Dict; onNext: () => 
           <div className="slide-big" style={{ display: 'grid', placeItems: 'center', textAlign: 'center', minHeight: 300 }}>
             {s.image && <img src={s.image} alt="" style={{ maxHeight: 140, borderRadius: 10 }} />}
             <h2>{s.heading}</h2>{s.example && <div className="ex">{s.example}</div>}
-            {working ? <b className="small">{t.making(status.split(':')[1] || '')}</b> : <button className="btn primary" style={{ borderRadius: 99, width: 56, height: 56 }} onClick={() => (playing ? (audio.current?.pause(), setPlaying(false)) : play(i))} aria-label={t.preview}>{playing ? '❚❚' : '▶'}</button>}
+            {working ? <b className="small">{t.making(status.split(':')[1] || '')}</b> : <button className="btn primary" style={{ borderRadius: 99, width: 56, height: 56 }} onClick={() => (playing ? stop() : play(i))} aria-label={t.preview}>{playing ? '❚❚' : '▶'}</button>}
           </div>
         )}
         {status === 'error' && <p className="note">{t.videoErr}</p>}{err && <p className="note">{err}</p>}
@@ -171,11 +177,12 @@ function Video({ l, t, onNext, onStarted }: { l: Lesson; t: Dict; onNext: () => 
       </div>
       <div className="stack">
         <div className="card stack small" style={{ gap: 6 }}>
-          <b>{t.voice}</b>
+          {!off && <><b>{t.voice}</b>
           <div className="row" style={{ gap: 6 }}><select value={voice} onChange={(e) => setVoice(Number(e.target.value))}>{voices.map((x, j) => <option key={x} value={j}>{x}</option>)}</select>
           <select value={speed} aria-label={t.speed} onChange={(e) => setSpeed(Number(e.target.value))}>{[[0.85, t.slow], [1, t.normal], [1.15, t.fast]].map(([v, n]) => <option key={v} value={v}>{t.speed}: {n}</option>)}</select>
-          <label className="check"><input type="checkbox" checked={subs} onChange={(e) => setSubs(e.target.checked)} /> {t.subsOn}</label></div>
-          <button className="btn small" disabled={working} onClick={make}>{working ? t.making(status.split(':')[1] || '') : v ? t.remake : t.makeVideo}</button>
+          <label className="check"><input type="checkbox" checked={subs} onChange={(e) => setSubs(e.target.checked)} /> {t.subsOn}</label></div></>}
+          {off ? <p className="small muted">{t.enOnly}</p>
+            : <button className="btn small" disabled={working} onClick={make}>{working ? t.making(status.split(':')[1] || '') : v ? t.remake : t.makeVideo}</button>}
         </div>
         <div className="card stack" style={{ gap: 4 }}><b className="small">{v ? t.parts : t.preview}</b>{(v ? v.chapters : l.slides.map((x) => ({ heading: x.heading, start: -1 }))).map((x, j) => (
           <button key={j} className={`list-row small ${j === i ? 'sel' : ''}`} style={{ cursor: 'pointer', padding: '4px 8px' }} onClick={() => { setI(j); if (v && video.current) { video.current.currentTime = x.start; void video.current.play(); } else play(j); }}>

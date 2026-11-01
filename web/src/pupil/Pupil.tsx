@@ -5,6 +5,7 @@
 // flashcards and the pairs game. A VI/EN switch on every screen; kind words only.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../api.ts';
+import { browserSay, readable, stopSay } from '../speak.ts';
 import { langChosen, setLang, useLang } from '../i18n.ts';
 import { LangToggle } from '../pages/LangToggle.tsx';
 import { go, usePath } from '../router.ts';
@@ -42,8 +43,14 @@ const S = {
 };
 type T = (typeof S)['vi'];
 
+// A server that does not answer (Chi #49: the page stood still while it was down): each request gives up
+// after 15 s, and a bar says the connection was lost, with Try again; it goes once a request gets through.
+const net = (up: boolean) => window.dispatchEvent(new Event(up ? 'lbm-online' : 'lbm-offline'));
 async function p<R>(method: string, path: string, body?: unknown): Promise<R> {
-  const r = await fetch(`/api/p${path}`, { method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  let r: Response;
+  try { r = await fetch(`/api/p${path}`, { method, credentials: 'same-origin', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15e3) }); }
+  catch { net(false); throw new ApiError('network', 'Mất kết nối', 'Connection lost', 0); }
+  net(r.status < 500);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi', j.errorEn || 'Error', r.status);
   return j as R;
@@ -82,11 +89,24 @@ function Frame({ tone = '', title, sub, onBack, t, children }: { tone?: string; 
   );
 }
 
-export function Pupil() {
+function Offline() {
+  const lang = useLang() as L, [off, setOff] = useState(false);
+  useEffect(() => {
+    const down = () => setOff(true), up = () => setOff(false);
+    window.addEventListener('lbm-offline', down); window.addEventListener('lbm-online', up);
+    return () => { window.removeEventListener('lbm-offline', down); window.removeEventListener('lbm-online', up); };
+  }, []);
+  if (!off) return null;
+  return <div className="p-offline" role="alert"><span>{lang === 'en' ? 'Connection lost. Your answers so far are saved.' : 'Mất kết nối. Các câu con đã làm vẫn được lưu.'}</span>
+    <button onClick={() => location.reload()}>{lang === 'en' ? 'Try again' : 'Thử lại'}</button></div>;
+}
+
+export function Pupil() { return <><PupilPage /><Offline /></>; }
+function PupilPage() {
   const path = usePath(), lang = useLang() as L, t = S[lang];
   const [today, setToday] = useState<Today | null | undefined>(undefined);
   // a child's phone opens in the language of the lessons given (Chi #24), unless it was switched by hand
-  const load = () => p<Today>('GET', '/today').then((d) => { const l = d?.lessons?.[0]?.lang; if (l && !langChosen() && l !== lang) setLang(l); setToday(d); }).catch(() => setToday(null));
+  const load = () => p<Today>('GET', '/today').then((d) => { const l = d?.lessons?.[0]?.lang; if (l && !langChosen() && l !== lang) setLang(l); setToday(d); }).catch((e) => { if (e instanceof ApiError && e.status >= 400 && e.status < 500) setToday(null); else setToday((x) => x ?? null); });
   useEffect(() => {
     const link = /^\/p\/([\w-]+)$/.exec(path)?.[1];
     if (link) { p('POST', '/link', { link }).then(() => { go('/hoc'); void load(); }).catch(() => { go('/hoc'); setToday(null); }); return; }
@@ -241,13 +261,19 @@ function Practice({ l, t, onHome, to }: { l: PLesson; t: T; onHome: () => void; 
     if (busy) return;
     setBusy(true);
     try { setRes(await p<{ correct: boolean | null; again: boolean; explain: string }>('POST', `/a/${l.id}/answer`, { itemId: it.id, answer })); }
+    catch { setGiven(''); }   // not sent: she can answer again once the connection is back (the bar says so)
     finally { setBusy(false); }
   };
   const nextQ = () => { const n = i + 1; setI(n); if (n >= roundEnd && n < l.items.length) setPause(true); };
   const answered = res && (res.correct || !res.again);
   const choose = (o: string) => { if (!answered) { setGiven(o); void send(o); } };
   const optClass = (o: string) => `p-opt ${given === o && res ? (res.correct ? 'right' : 'wrong') : ''}`;
-  const say = () => { audio.current?.pause(); audio.current = new Audio(`/api/p/a/${l.id}/say/${it.id}`); void audio.current.play().catch(() => {}); };
+  // the server's voice; a Vietnamese question is read by the phone itself while that voice is off (Chi #49)
+  const say = () => {
+    audio.current?.pause(); stopSay();
+    const lg = l.lang === 'en' || it.listen ? 'en' : 'vi', a = new Audio(`/api/p/a/${l.id}/say/${it.id}`);
+    audio.current = a; void a.play().catch(() => { if (!it.listen) browserSay(readable(`${it.prompt}${it.sentence ? ` ${it.sentence}` : ''}`, lg), lg); });
+  };
   // "Choose the right answer: 61 - 37 = ?" → the instruction small, the sum big (the design)
   const split = /^(.{3,80}?):\s*(.*\d.*)$/.exec(it.prompt);
 

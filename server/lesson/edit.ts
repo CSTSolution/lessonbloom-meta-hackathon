@@ -15,6 +15,7 @@ import { buildEnglish, buildMath, checkItem, contextOf, type RawEnglish, type Ra
 import { markSlide } from './slide-check.ts';
 import type { Item, Lesson, Slide } from './types.ts';
 import type { Files } from '../files.ts';
+import { speaks } from '../ai/voices.ts';
 import { makeVideo } from './video.ts';
 import { writeItems, writeSlides } from './writer.ts';
 
@@ -125,6 +126,7 @@ export function editRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   app.post('/api/t/lessons/:id/video', async (c) => {
     const l = await mine(c);
     if (!l) return fail(c, 'notFound', 404);
+    if (!speaks(l.setup.lang)) return fail(c, 'videoEnglish', 409);
     if (String((l as Lesson & { video_status?: string }).video_status || '').startsWith('working')) return c.json({ ok: true });
     const b = await c.req.json<{ subtitles?: boolean; voice?: number; speed?: number }>().catch(() => ({} as { subtitles?: boolean; voice?: number; speed?: number }));
     await sql.query(`update lessons set video_status = 'working:0', updated_at = now() where id = $1`, [l.id]);

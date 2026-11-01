@@ -21,7 +21,10 @@ export const config = {
     transcribe: env('LB_META_TRANSCRIBE', 'muse-voice-transcribe-1.0'),
   },
   voices: { vieneu: env('VIENEU_URL'), kokoro: env('KOKORO_URL') },
-  autoVideo: env('LB_AUTO_VIDEO', '1') === '1',   // make each lesson's video once its pictures are drawn
+  autoVideo: env('LB_AUTO_VIDEO', '1') === '1',
+  // Vietnamese narration (VieNeu) is off until the shared server has room for it: loading its model took
+  // the whole server out of memory twice (Chi #49). Videos and read-aloud are English only meanwhile.
+  viVoice: env('LB_VI_VOICE', '0') === '1',   // make each lesson's video once its pictures are drawn
 
   mail: {
     host: env('SMTP_SERVER'), port: num('SMTP_PORT', 587), user: env('SMTP_USER'), key: env('SMTP_KEY'),

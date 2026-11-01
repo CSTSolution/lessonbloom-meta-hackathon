@@ -34,6 +34,8 @@ export const MSG = {
   promoUsed: { vi: 'Cô đã dùng mã này rồi.', en: 'You have already used this code.' },
   credit: { vi: 'Bản thử nghiệm LessonBloom đã dùng hết hạn mức AI. Cô vẫn xem được các bài đã soạn.', en: 'This LessonBloom trial has used its AI allowance. Your lessons are still here to view.' },
   aiBlocked: { vi: 'LessonBloom chỉ soạn bài giảng và bài luyện tập từ ghi chú bài học. Cô kiểm tra lại nội dung nhé.', en: 'LessonBloom only makes lessons and practice from lesson notes. Please check the text.' },
+  videoEnglish: { vi: 'Hiện LessonBloom chỉ làm video cho bài tiếng Anh. Bài tiếng Việt có slide, bài tập và nghe thử bằng giọng của trình duyệt.', en: 'Videos are made for English lessons only for now. Vietnamese lessons have slides, practice and read-aloud in the browser\'s own voice.' },
+  voiceOff: { vi: 'Giọng đọc tiếng Việt của máy chủ đang tạm tắt.', en: 'The server\'s Vietnamese voice is off for now.' },
   aiBusy: { vi: 'AI đang bận, cô thử lại sau ít phút nhé.', en: 'The AI is busy. Please try again in a few minutes.' },
   cutoutName: { vi: 'Cô gõ tên đồ vật cần cắt, ngắn gọn (ví dụ: quả táo, đồng xu, chậu cây).', en: 'Type the name of the thing to cut out, briefly (for example: apples, coins, plant pot).' },
   cutoutPeople: { vi: 'Không cắt người hoặc khuôn mặt: ảnh của các con không đưa vào bài. Cô chọn đồ vật nhé.', en: 'People and faces are not cut out: children\'s photos never go into lessons. Please choose an object.' },

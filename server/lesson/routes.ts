@@ -4,6 +4,7 @@
 import type { Context, Hono } from 'hono';
 import type { AI } from '../ai/types.ts';
 import type { Env } from '../app.ts';
+import { speaks } from '../ai/voices.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
 import { holdCredits, settleHold, spare } from '../credits.ts';
@@ -201,6 +202,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     if (!l || !text) return fail(c, 'notFound', 404);
     const key = `${l.setup.lang}:${text}`;
     let wav = spoken.get(key);
+    if (!wav && !speaks(l.setup.lang)) return fail(c, 'voiceOff', 503);   // the page reads it with the browser's own voice
     if (!wav) { try { wav = await d.ai.speak({ text, lang: l.setup.lang }); } catch { return fail(c, 'aiBusy', 503); } if (spoken.size > 300) spoken.clear(); spoken.set(key, wav); }
     return c.body(new Uint8Array(wav), 200, { 'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400' });
   });
@@ -211,6 +213,6 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const u = await d.sql.one<{ usd: string }>('select coalesce(sum(usd), 0) as usd from ai_usage where lesson_id = $1', [l.id]);
     // while it waits in her line: its place (1 = running now)
     const queue = l.status === 'working' ? await d.jobs.placeOf(c.get('teacher').id, l.id) : null;
-    return c.json({ lesson: { ...rest, credits: credits(Number(u?.usd)), queue: queue && queue.status === 'queued' ? { place: queue.place } : null } });
+    return c.json({ lesson: { ...rest, credits: credits(Number(u?.usd)), voiced: speaks(l.setup.lang), queue: queue && queue.status === 'queued' ? { place: queue.place } : null } });
   });
 }

@@ -3,7 +3,11 @@
 //   Vietnamese  VieNeu (vieneu), voice "Kim Thanh"; loads on first use, one job at a time
 //   English     Kokoro (kokoro), voice by the teacher's choice
 // Free and local: no key, nothing leaves the server.
+import { config } from '../config.ts';
 import type { SpeechRequest } from './types.ts';
+
+// Whether the server narrates this language now (Chi #49: Vietnamese is off, see config.viVoice)
+export const speaks = (lang: string) => lang === 'en' || config.viVoice;
 
 type Fetch = typeof fetch;
 export interface Voices { vieneu?: string; kokoro?: string; fetch?: Fetch; timeoutMs?: number }

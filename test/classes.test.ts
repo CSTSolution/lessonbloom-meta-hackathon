@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { forPupil, isRight } from '../server/classes/check.ts';
 import { readable } from '../server/classes/routes.ts';
+import { config } from '../server/config.ts';
 import type { Item } from '../server/lesson/types.ts';
 import { areaWithBook, lessonFrom, testServer } from './helpers.ts';
 
@@ -67,7 +68,11 @@ test('assigning needs the confirm box; pupils join by code, practise, and the as
   const svg = await s.app.request(`/api/t/classes/${k.id}/qr.svg`);
   assert.equal(svg.status, 401, 'the QR needs the assigner');
   // "Nghe câu hỏi": any question is read aloud, the symbols as words, never the answer
-  assert.equal((await kid('GET', `/api/p/a/${a.id}/say/${first.id}`)).status, 200);
+  // the server's Vietnamese voice is off for now (Chi #49): the phone reads it; on again, the server does
+  const off = await kid('GET', `/api/p/a/${a.id}/say/${first.id}`);
+  assert.equal(off.status, 503); assert.equal(off.json.code, 'voiceOff');
+  config.viVoice = true;
+  try { assert.equal((await kid('GET', `/api/p/a/${a.id}/say/${first.id}`)).status, 200); } finally { config.viVoice = false; }
   const read = readable(first.prompt, 'vi');
   assert.ok(!/[+=]/.test(read) && !new RegExp(`(?<!\\d)${first.answer}(?!\\d)`).test(read), read);
 });
@@ -131,4 +136,18 @@ test('a repeat assignment warns first; Unassign takes it off the lists and keeps
   // with b still on the list a repeat warns; once b is removed too, assigning is quiet again
   await call('DELETE', `/api/t/assignments/${b.id}`);
   assert.ok((await call('POST', `/api/t/lessons/${lessonId}/assign`, { classId: k.id, confirmed: true })).json.assignment.id);
+});
+
+test('videos are English only for now: a Vietnamese lesson has no video and no server voice (Chi #49)', async () => {
+  const s = await testServer(), call = s.client('198.51.100.150');
+  await call('POST', '/api/auth/demo');
+  const vi = await areaWithBook(call, 'toan2'), en = await areaWithBook(call, 'maths2');
+  const a = await lessonFrom(call, vi.areaId, 'Bài 21'), b = await lessonFrom(call, en.areaId, 'Lesson 21');
+  assert.equal(a.lesson.voiced, false); assert.equal(b.lesson.voiced, true);
+  const v = await call('POST', `/api/t/lessons/${a.id}/video`, {});
+  assert.equal(v.status, 409); assert.equal(v.json.code, 'videoEnglish'); assert.match(v.json.errorEn, /English lessons only/);
+  assert.equal((await call('GET', `/api/t/lessons/${a.id}`)).json.lesson.video_status, 'none', 'nothing started');
+  const say = await call('GET', `/api/t/lessons/${a.id}/say/${a.lesson.slides[0].id}`);
+  assert.equal(say.status, 503); assert.equal(say.json.code, 'voiceOff');
+  assert.notEqual((await call('GET', `/api/t/lessons/${b.id}/say/${b.lesson.slides[0].id}`)).status, 503, 'English is still read by the server');
 });
