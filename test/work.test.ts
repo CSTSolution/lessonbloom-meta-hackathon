@@ -24,9 +24,9 @@ test("Chi's sheet: totals, right answers by code and the kinds of mistake", () =
   assert.deepEqual(w.questions.filter((q) => !q.ok).map((q) => [q.right, q.kind]), [['288', 'sub_borrow'], ['>', 'compare'], ['512', 'add_carry'], ['486', 'sub_borrow']]);
   assert.deepEqual(w.types.map((t) => [t.label.en, t.count]), [['Subtraction with borrowing', 2], ['Comparing after adding', 1], ['Addition with carrying', 1]]);
   assert.deepEqual(w.types.map((t) => t.label.vi), ['Phép trừ có nhớ', 'So sánh sau khi cộng', 'Phép cộng có nhớ']);
-  // the adult's mark comes first; a mark the sum does not agree with is flagged, not overruled
+  // a mark the sum does not agree with is flagged and not counted as a mistake until she sets it (Chi #54)
   const odd = typeWork({ questions: [{ q: '36 + 27', child: '63', mark: 'wrong' }] });
-  assert.equal(odd.questions[0].ok, false); assert.equal(odd.questions[0].unsure, true);
+  assert.equal(odd.questions[0].ok, true); assert.equal(odd.questions[0].unsure, true); assert.deepEqual([odd.wrong, odd.check], [0, 1]);
   // no mark: code decides
   assert.equal(typeWork({ questions: [{ q: '36 + 27', child: '53', mark: 'none' }] }).wrong, 1);
   assert.equal(slipOf(readCalc('36 + 27')!, '53')?.vi, 'Quên nhớ 1 sang hàng chục');
@@ -129,4 +129,40 @@ test('a sheet headed only "Đặt tính rồi tính" finds its part of the book 
     const top = (await candidates(s.sql, areaId, request))[0];
     assert.match(top?.section ?? '', want, `${book}: ${top?.section}`);
   }
+});
+
+test('Chi #54: sums with units and word problems are worked out by code; a mark that disagrees is not a mistake until she sets it', () => {
+  const w = typeWork({ questions: [
+    { q: '329 cm + 183 cm = ?', child: '999', mark: 'wrong' },
+    { q: 'Thư viện có 964 quyển sách, đã cho mượn 478 quyển. Còn lại bao nhiêu quyển?', sum: '964 - 478', child: '486 quyển', mark: 'right' },
+    { q: '842 - 510 ... 232', child: '>', mark: 'wrong' },
+    { q: '655 - 367', child: '322', mark: 'wrong' },
+  ] }, { topic: 'Ôn tập phạm vi 1000' });
+  const [cm, story, marked, sub] = w.questions;
+  assert.deepEqual([cm.right, cm.kind, cm.ok], ['512 cm', 'add_carry', false]);
+  assert.deepEqual([story.right, story.kind, story.ok, story.sum], ['486', 'sub_borrow', true, '964 - 478']);
+  // the adult marked a right answer wrong: flagged, counted neither way, kept off the "still tricky" list
+  assert.deepEqual([marked.right, marked.ok, marked.unsure], ['>', true, true]);
+  assert.deepEqual([w.total, w.right, w.wrong, w.check], [4, 1, 2, 1]);
+  assert.ok(!w.types.some((t) => t.kind === 'compare'), JSON.stringify(w.types));
+  assert.equal(sub.ok, false);
+  // she sets the mark herself: her choice counts
+  const sure = typeWork({ questions: w.questions.map((q) => (q === marked ? { ...q, mark: 'wrong', sure: true } : q)) });
+  assert.deepEqual([sure.questions[2].ok, sure.questions[2].unsure, sure.wrong, sure.check], [false, undefined, 3, undefined]);
+});
+
+test('Chi #54: "Make a lesson from these mistakes" picks the source whose range reaches the sheet, not the first one', async () => {
+  const s = await testServer(), call = s.client('198.51.100.160');
+  await call('POST', '/api/auth/demo');
+  const { areaId: small } = await areaWithBook(call, 'toan2');   // the sample: numbers to 100
+  const t = await s.sql.one<{ teacher_id: string }>('select teacher_id from areas where id = $1', [small]);
+  await s.sql.query(`insert into areas (id, teacher_id, name, subject, grade) values ('big', $1, 'Toán 2 tập 2', 'math', 2)`, [t!.teacher_id]);
+  await s.sql.query(`insert into books (id, area_id, title, status) values ('bk2', 'big', 'Cánh Diều 58-77', 'ready')`);
+  await s.sql.query(`insert into sections (id, book_id, ord, title, page_from, page_to) values ('s2', 'bk2', 1, 'Phép trừ (có nhớ) trong phạm vi 1000', 71, 73)`);
+  const best = (await call('POST', '/api/t/areas/best', { request: 'Đặt tính rồi tính – phép trừ có nhớ', sums: ['655 - 367', '964 - 478'], subject: 'math' })).json;
+  assert.equal(best.areaId, 'big');
+  // a sheet within 100 keeps to a source that reaches it, by its mistakes
+  const small2 = (await call('POST', '/api/t/areas/best', { request: 'phép cộng có nhớ', sums: ['36 + 27'], subject: 'math' })).json;
+  assert.ok([small, 'big'].includes(small2.areaId));
+  assert.equal((await call('POST', '/api/t/areas/best', { request: 'x', sums: [], subject: 'english' })).json.areaId, null);
 });

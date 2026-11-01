@@ -19,7 +19,7 @@ import type { Card, Item, Lesson, Slide } from '../lesson/types.ts';
 import type { Files } from '../files.ts';
 import { makeVideo } from '../lesson/video.ts';
 import { forPupil, hintOf, isRight } from './check.ts';
-import { greetOf, typeWork } from '../lesson/work.ts';
+import { findOf, greetOf, typeWork } from '../lesson/work.ts';
 
 const PCOOKIE = 'lbm_p';
 const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -72,7 +72,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   const asWork = (r: Rec, name: string) => typeWork({ questions: r.items }, { recordId: r.id, pupilId: r.pupil_id, child: name, date: r.day, subject: r.subject as 'math', topic: r.topic });
   const REC = `select id, pupil_id, made_at, to_char(made_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, subject, topic, items from work_records`;
   // only what the table needs is kept: the question, what she wrote, the mark (and, for what code cannot read, the model's answer and type)
-  const rows = (w: ReturnType<typeof typeWork>) => J(w.questions.map((q) => ({ q: q.q, child: q.child, mark: q.mark === 'none' ? (q.ok ? 'right' : 'wrong') : q.mark, ...(q.calc ? {} : { right: q.right, kind: q.kind, ...(q.typeName ? { typeName: q.typeName } : {}) }) })));
+  const rows = (w: ReturnType<typeof typeWork>) => J(w.questions.map((q) => ({ q: q.q, child: q.child, mark: q.mark === 'none' ? (q.ok ? 'right' : 'wrong') : q.mark, ...(q.sure ? { sure: true } : {}), ...(q.sum ? { sum: q.sum } : {}), ...(q.calc ? {} : { right: q.right, kind: q.kind, ...(q.typeName ? { typeName: q.typeName } : {}) }) })));
   app.get('/api/t/pupils/:id/work', async (c) => {
     const p = await pupilOfMine(c, c.req.param('id'));
     if (!p) return fail(c, 'notFound', 404);
@@ -93,7 +93,8 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   });
   const recordOf = (c: Context<Env>) => sql.one<Rec & { name: string }>(`select r.id, r.pupil_id, r.made_at, to_char(r.made_at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day, r.subject, r.topic, r.items, p.name
       from work_records r join pupils p on p.id = r.pupil_id where r.id = $1 and r.teacher_id = $2`, [c.req.param('id'), c.get('teacher').id]);
-  app.get('/api/t/work/:id', async (c) => { const r = await recordOf(c); return r ? c.json({ record: asWork(r, r.name) }) : fail(c, 'notFound', 404); });
+  // request: what to look for in her books, by the sheet's mistakes (Chi #54, as for a photo read in the lesson)
+  app.get('/api/t/work/:id', async (c) => { const r = await recordOf(c); if (!r) return fail(c, 'notFound', 404); const record = asWork(r, r.name); return c.json({ record, request: findOf(record) }); });
   app.put('/api/t/work/:id', async (c) => {
     const r = await recordOf(c);
     if (!r) return fail(c, 'notFound', 404);
@@ -328,14 +329,15 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
     const b = await c.req.json<{ itemId?: string; answer?: unknown }>().catch(() => ({} as { itemId?: string; answer?: unknown }));
     const it = a.content.items.find((i) => i.id === b.itemId);
     if (!it) return fail(c, 'notFound', 404);
-    const before = await sql.one<{ n: string }>('select count(*) as n from answers where assignment_id = $1 and pupil_id = $2 and item_id = $3', [a.id, p.id, it.id]);
+    // wrong: her wrong tries at it so far (Chi #50: the second wrong try shows the method, not the same nudge)
+    const before = await sql.one<{ n: string; wrong: string }>('select count(*) as n, count(*) filter (where not correct) as wrong from answers where assignment_id = $1 and pupil_id = $2 and item_id = $3', [a.id, p.id, it.id]);
     if (!a.retry && Number(before?.n) > 0) return c.json({ correct: null, again: false, explain: a.hints ? hintOf(it, String(b.answer ?? ''), a.content.lang) : '' });
     const correct = isRight(it, b.answer);
     await sql.query('insert into answers (assignment_id, pupil_id, item_id, skill, level, answer, correct) values ($1, $2, $3, $4, $5, $6, $7)', [a.id, p.id, it.id, it.skill, it.level, String(b.answer ?? '').slice(0, 300), correct]);
     const left = await sql.one<{ n: string }>(`select count(*) as n from jsonb_array_elements(($3::jsonb)) x where not exists (select 1 from answers w where w.assignment_id = $1 and w.pupil_id = $2 and w.item_id = x->>'id')`, [a.id, p.id, J(a.content.items.map((i) => ({ id: i.id })))]);
     if (Number(left?.n) === 0) await sql.query(`insert into pupil_progress (assignment_id, pupil_id, done_at) values ($1, $2, now()) on conflict (assignment_id, pupil_id) do update set done_at = coalesce(pupil_progress.done_at, now())`, [a.id, p.id]);
     // a wrong answer: try again (when allowed), with the explanation as a hint when hints are on
-    return c.json({ correct, again: !correct && a.retry, explain: correct ? it.explain : a.hints ? hintOf(it, String(b.answer ?? ''), a.content.lang) : '', done: Number(left?.n) === 0 });
+    return c.json({ correct, again: !correct && a.retry, explain: correct ? it.explain : a.hints ? hintOf(it, String(b.answer ?? ''), a.content.lang, Number(before?.wrong) || 0) : '', done: Number(left?.n) === 0 });
   });
 
   app.post('/api/p/a/:id/seen', async (c) => {

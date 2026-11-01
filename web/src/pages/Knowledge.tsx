@@ -27,7 +27,8 @@ const T = {
     oneLesson: 'Sách này chưa chia được bài, bạn tách tay theo trang: bấm "Tách" và chọn trang bắt đầu bài tiếp theo.',
     pageOneAsk: 'Số trang khác sách giấy?', pageOne: 'Trang 1 của sách là trang', pageOneEnd: 'trong file', pageOneHint: 'App chưa đọc được số trang in trong sách, nên đang ghi theo vị trí trong file. Cho biết trang 1 của sách nằm ở đâu để số trang khớp sách giấy.', pageOneSaved: 'Đã lưu: số trang theo sách giấy.', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Tải sách của bạn: PDF hoặc ảnh trang sách.', orSample: 'Hoặc thử nhanh với sách mẫu do LessonBloom soạn:', noneHere: (s: string) => `Chưa có nguồn ${s} nào. Bấm "+ Thêm nguồn kiến thức" hoặc chọn "Tất cả".`,
     st: { waiting: (n: number) => `Đang chờ (thứ ${n} trong hàng): sẽ đọc khi xong việc đang làm.`, reading: 'Đang đọc sách: tách bài, đọc chữ từng trang…', readingPage: (p: string) => `Đang đọc sách · trang ${p}`, leave: 'Cô có thể rời trang; đọc xong sẽ có thông báo ở chuông.',
-      done: (title: string, n: number, p: number) => `Đã thêm: ${title} · ${n} bài · ${p} trang.`, cost: (u: number, r: number) => ` Đã dùng ${u} lượt · trả lại ${r} lượt.`, retry: 'Thử lại', again: 'Xoá và thêm lại' },
+      done: (title: string, n: number, p: number) => `Đã thêm: ${title} · ${n} bài · ${p} trang.`, cost: (u: number, r: number) => ` Đã dùng ${u} lượt · trả lại ${r} lượt.`, retry: 'Thử lại', again: 'Xoá và thêm lại',
+      resplit: 'Đọc lại để tách bài', resplitLead: 'Sách này chưa chia được bài (đọc trước khi app nhận tiêu đề không đánh số). Đọc lại để tách thành từng bài.', resplitAsk: (n: number, p: number, h: number) => `Đọc lại ${n} trang từ ảnh đã lưu: dự kiến khoảng ${p} lượt (giữ ${h} lượt, trả lại phần thừa). Các phần cũ của sách sẽ được thay; bài giảng đã soạn vẫn giữ nguyên.`, resplitGo: 'Đọc lại' },
     form: { title: 'Thêm nguồn kiến thức', name: 'Tên nguồn', namePh: 'Ví dụ: Toán 2 · Tập 1', subject: 'Môn', grade: 'Lớp', file: 'Tệp PDF có chữ (tối đa 30 MB)', tooBig: (mb: number) => `Tệp này ${mb} MB, quá 30 MB. Cô tách sách ra từng chương rồi tải từng phần nhé.`, sent: (p: number) => `Đang tải lên… ${p}%`, go: 'Tải lên', busy: 'Đang tải lên…', chooseSubject: 'Chọn môn', supported: 'Hiện hỗ trợ Toán và Tiếng Anh lớp 1–5', guessed: (s: string) => `Máy đoán: ${s} – sửa nếu sai`, needSubject: 'Chọn môn trước khi thêm vào kho.', sample: 'Hoặc dùng sách mẫu (đội LessonBloom tự viết):', toan: 'Toán 2', maths: 'Maths 2 (tiếng Anh)', eng: 'Tiếng Anh 3' },
   },
   en: {
@@ -40,7 +41,8 @@ const T = {
     oneLesson: 'This book could not be split into lessons; split it by page: press "Split" and choose the page where the next lesson starts.',
     pageOneAsk: 'Page numbers differ from the paper book?', pageOne: 'Page 1 of the book is page', pageOneEnd: 'in the file', pageOneHint: 'The printed page numbers could not be read, so pages are counted as in the file. Say where the book\'s page 1 is so the numbers match the paper book.', pageOneSaved: 'Saved: pages follow the paper book.', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Upload your book: a PDF or photos of its pages.', orSample: 'Or try it quickly with a sample book written by LessonBloom:', noneHere: (s: string) => `No ${s} sources yet. Press "+ Add a source" or choose "All".`,
     st: { waiting: (n: number) => `Waiting (number ${n} in your line): it is read when the job before is done.`, reading: 'Reading the book: finding the lessons, reading each page…', readingPage: (p: string) => `Reading the book · page ${p}`, leave: 'You can leave this page; the bell tells you when it is done.',
-      done: (title: string, n: number, p: number) => `Added: ${title} · ${pl(n, 'lesson')} · ${pl(p, 'page')}.`, cost: (u: number, r: number) => ` Used ${pl(u, 'credit')} · ${r} given back.`, retry: 'Try again', again: 'Remove and add again' },
+      done: (title: string, n: number, p: number) => `Added: ${title} · ${pl(n, 'lesson')} · ${pl(p, 'page')}.`, cost: (u: number, r: number) => ` Used ${pl(u, 'credit')} · ${r} given back.`, retry: 'Try again', again: 'Remove and add again',
+      resplit: 'Read again to split into lessons', resplitLead: 'This book is not split into lessons yet (it was read before the app knew titles with no number). Read it again to split it.', resplitAsk: (n: number, p: number, h: number) => `Read the ${n} pages again from the kept pictures: about ${p} credits (holds ${h}, the rest comes back). The book\'s old parts are replaced; lessons already made stay as they are.`, resplitGo: 'Read again' },
     form: { title: 'Add a source', name: 'Name', namePh: 'e.g. Maths 2 · Book 1', subject: 'Subject', grade: 'Grade', file: 'PDF file with text (up to 30 MB)', tooBig: (mb: number) => `This file is ${mb} MB, over 30 MB. Split the book into chapters and upload them one by one.`, sent: (p: number) => `Uploading… ${p}%`, go: 'Upload', busy: 'Uploading…', chooseSubject: 'Choose a subject', supported: 'Maths and English, grades 1–5, for now', guessed: (s: string) => `Guessed: ${s} – change it if wrong`, needSubject: 'Choose the subject before adding it.', sample: 'Or use a sample book (written by the LessonBloom team):', toan: 'Toán 2 (Vietnamese)', maths: 'Maths 2', eng: 'English 3' },
   },
 };
@@ -155,7 +157,22 @@ function BookStatus({ t, book, sections, onChange, onAgain }: { t: (typeof T)['v
     void tick();
     return () => { alive = false; clearTimeout(h); };
   }, [book.id, book.status]);
-  if (book.status === 'ready') return <p className="banner small">✓ {t.st.done(book.title, book.sections ?? sections, book.pages)}{book.used != null ? t.st.cost(Number(book.used), Number(book.returned ?? 0)) : ''}</p>;
+  // one part for a book of several pages: read before unnumbered titles were known (Chi #48, #54d)
+  const resplit = async () => {
+    setBusy(true); setErr('');
+    try {
+      let r = await api.resplit(book.id);
+      if (!r.ok && r.estimate) { if (!(await ask(t.st.resplitAsk(r.estimate.pages, r.estimate.predicted, r.estimate.need), { ok: t.st.resplitGo }))) return; r = await api.resplit(book.id, true); }
+      window.dispatchEvent(new Event('lbm-jobs')); onChange();
+    } catch (e) { setErr(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); }
+  };
+  if (book.status === 'ready') return (
+    <div className="stack" style={{ gap: 6 }}>
+      <p className="banner small">✓ {t.st.done(book.title, book.sections ?? sections, book.pages)}{book.used != null ? t.st.cost(Number(book.used), Number(book.returned ?? 0)) : ''}</p>
+      {(book.sections ?? sections) <= 1 && book.pages >= 4 && <div className="banner warn small row"><span className="grow">{t.st.resplitLead}</span><button className="btn small" disabled={busy} onClick={() => void resplit()}>{t.st.resplit}</button></div>}
+      {err && <span className="small note">{err}</span>}
+    </div>
+  );
   if (book.status === 'processing') {
     const pg = job?.status === 'running' && /^(\d+)\/(\d+)$/.exec(job.progress);
     return (

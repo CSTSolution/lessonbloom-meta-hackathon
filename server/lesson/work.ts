@@ -12,11 +12,12 @@ export const WORK_KINDS: WorkKind[] = ['add_carry', 'add_no_carry', 'sub_borrow'
 export type Mark = 'right' | 'wrong' | 'none';
 export interface Words { vi: string; en: string }
 // calc: the question as numbers, when code can read it ("655 − 367", "245 + 615 … 791", "? + 25 = 60")
-export interface Calc { a: number; op?: Op; b?: number; c?: number; blank?: 'a' | 'b' | 'result'; cmp?: boolean }
-export interface WorkQ { q: string; child: string; mark: Mark; right: string; ok: boolean; kind: WorkKind; label: Words; slip?: Words; unsure?: boolean; typeName?: string; calc?: Calc }
+export interface Calc { a: number; op?: Op; b?: number; c?: number; blank?: 'a' | 'b' | 'result'; cmp?: boolean; unit?: string }
+// unsure: the adult's mark and the sum disagree; it is not counted as a mistake until she sets the mark herself (sure)
+export interface WorkQ { q: string; child: string; mark: Mark; right: string; ok: boolean; kind: WorkKind; label: Words; slip?: Words; unsure?: boolean; sure?: boolean; typeName?: string; sum?: string; calc?: Calc }
 export interface Work {
   recordId?: string; pupilId?: string; child?: string; date: string; subject: 'math' | 'english'; topic: string;
-  questions: WorkQ[]; total: number; right: number; wrong: number; types: { kind: WorkKind; label: Words; count: number }[];
+  questions: WorkQ[]; total: number; right: number; wrong: number; check?: number; types: { kind: WorkKind; label: Words; count: number }[];
   base?: string;   // the lesson's title before "Made for …" was added (prompts use it: no child's name goes to a model)
 }
 
@@ -30,9 +31,18 @@ const N = '(\\d{1,7}|\\?)';
 const CALC = new RegExp(`^${N} ?([+\\-×:]) ?${N}(?: ?= ?${N}?)?$`);
 const CMP = /^(\d{1,7})(?: ?([+-]) ?(\d{1,7}))? ?\? ?(\d{1,7})$/;
 const num = (s: string) => (s === '?' ? undefined : Number(s));
+// "329 cm + 183 cm" is a sum too (Chi #54): one unit after the numbers is set aside and given back with the answer
+const UNIT = /(\d)\s*(cm|dm|mm|km|m|kg|g|ml|l|đồng|giờ|phút|ngày|tuổi|quyển|cái|con|bạn|quả)(?!\p{L})/giu;
+// the number in what she wrote ("486 quyển", "3,5") or in a right answer with its unit
+export const numIn = (s: string) => { const m = /\d+(?:[.,]\d+)?/.exec(s); return m ? Number(m[0].replace(',', '.')) : NaN; };
 
 export function readCalc(q: string): Calc | null {
-  const t = tidy(q), m = CALC.exec(t);
+  const units = new Set<string>(), t0 = tidy(q).replace(UNIT, (_, d: string, u: string) => { units.add(u.toLowerCase()); return d; });
+  const x = calcOf(t0);
+  return x && units.size === 1 ? { ...x, unit: [...units][0] } : units.size > 1 ? null : x;
+}
+function calcOf(t: string): Calc | null {
+  const m = CALC.exec(t);
   if (m) {
     const [a, b, c] = [num(m[1]), num(m[3]), m[4] === undefined ? undefined : num(m[4])], op = m[2] as Op;
     const blanks = [a, b, c].filter((x) => x === undefined).length;
@@ -54,7 +64,7 @@ export function rightOf(x: Calc): string | null {
   const { a, op, b = 0, c = 0 } = x;
   const r = x.blank === 'a' ? (op === '+' ? c - b : op === '-' ? c + b : op === '×' ? c / b : c * b)
     : x.blank === 'b' ? (op === '+' ? c - a : op === '-' ? a - c : op === '×' ? c / a : a / c) : compute(a, op!, b);
-  return Number.isInteger(r) && r >= 0 ? String(r) : null;
+  return Number.isInteger(r) && r >= 0 ? `${r}${x.unit ? ` ${x.unit}` : ''}` : null;
 }
 
 // which columns carry (+) or borrow (−): "011" = the tens and hundreds do, not the ones
@@ -131,12 +141,15 @@ export function typeWork(raw: unknown, base: Partial<Pick<Work, 'recordId' | 'pu
   for (const r of rows) {
     const q = clip(r?.q, 60), child = clip(r?.child, 20), mark: Mark = r?.mark === 'right' || r?.mark === 'wrong' ? r.mark : 'none', typeName = clip(r?.typeName, 60) || undefined;
     if (!q) continue;
-    const x = readCalc(q), right = x ? rightOf(x) : null;
+    // a word problem: the one sum the model said it needs ("964 - 478"), checked by code like any other (Chi #54)
+    const sum = clip(r?.sum, 40), x = readCalc(q) ?? (sum ? readCalc(sum) : null), right = x ? rightOf(x) : null, sure = r?.sure === true;
     if (x && right !== null) {
-      const given = x.cmp ? (child.match(/[<>=]/)?.[0] ?? '') : child.replace(',', '.').trim(), byCode = x.cmp ? given === right : given !== '' && Number(given) === Number(right);
-      const ok = mark === 'none' ? byCode : mark === 'right', kind = kindOf(x);
+      const given = x.cmp ? (child.match(/[<>=]/)?.[0] ?? '') : String(numIn(child)), byCode = x.cmp ? given === right : given !== 'NaN' && Number(given) === numIn(right);
+      // the mark first (Chi); one that disagrees with the sum is not a mistake until she sets it herself (Chi #54:
+      // a sheet marked wrong by mistake put a right answer on the "still tricky" slide)
+      const differ = mark !== 'none' && byCode !== (mark === 'right'), ok = mark === 'none' ? byCode : differ && !sure ? true : mark === 'right', kind = kindOf(x);
       const slip = !ok ? slipOf(x, given) : undefined;
-      questions.push({ q, child, mark, right, ok, kind, label: labelOf(kind, x), ...(slip ? { slip } : {}), ...(mark !== 'none' && byCode !== ok ? { unsure: true } : {}), calc: x });
+      questions.push({ q, child, mark, right, ok, kind, label: labelOf(kind, x), ...(slip ? { slip } : {}), ...(differ && !sure ? { unsure: true } : {}), ...(sure ? { sure } : {}), ...(sum && !readCalc(q) ? { sum } : {}), calc: x });
     } else {
       // not a sum code can read (English, a word problem): the model's reading and its mark
       const kind = (WORK_KINDS as string[]).includes(String(r?.kind)) ? (r.kind as WorkKind) : 'other';
@@ -151,9 +164,9 @@ export function typeWork(raw: unknown, base: Partial<Pick<Work, 'recordId' | 'pu
   types.sort((a, b) => b.count - a.count);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(base.date ?? o.date ?? '')) ? String(base.date ?? o.date) : vnDay();
   const subject = (base.subject ?? o.subject) === 'english' ? 'english' : 'math';
-  const right = questions.filter((x) => x.ok).length;
+  const right = questions.filter((x) => x.ok && !x.unsure).length, check = questions.filter((x) => x.unsure).length;
   return { ...(base.recordId ? { recordId: base.recordId } : {}), ...(base.pupilId ? { pupilId: base.pupilId } : {}), ...(base.child ? { child: clip(base.child, 40) } : {}),
-    date, subject, topic: clip(base.topic ?? o.topic, 200), questions, total: questions.length, right, wrong: questions.length - right, types };
+    date, subject, topic: clip(base.topic ?? o.topic, 200), questions, total: questions.length, right, wrong: questions.length - right - check, ...(check ? { check } : {}), types };
 }
 
 // What a model may see of the work: no name, no record or pupil id, the title without "Made for …".

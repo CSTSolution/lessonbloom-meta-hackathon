@@ -13,16 +13,16 @@ import { go } from '../router.ts';
 
 const T = {
   vi: {
-    readFrom: (n: string) => (n ? `Máy đọc được từ bài của ${n}` : 'Máy đọc được từ bài em làm'), counts: (t: number, r: number, w: number) => `${t} câu · đúng ${r} · sai ${w}`,
-    q: 'Câu hỏi', child: 'Em viết', right: 'Đúng là', kind: 'Dạng lỗi', mark: 'Đúng / sai', ok: 'Đúng', bad: 'Sai', noWrong: 'Không thấy câu nào sai trong bài này.', unsure: 'Dấu chấm và phép tính chưa khớp: cô xem lại câu này.',
+    readFrom: (n: string) => (n ? `Máy đọc được từ bài của ${n}` : 'Máy đọc được từ bài em làm'), counts: (t: number, r: number, w: number, c = 0) => `${t} câu · đúng ${r} · sai ${w}${c ? ` · ${c} câu cần cô xem lại` : ''}`,
+    q: 'Câu hỏi', child: 'Em viết', right: 'Đúng là', kind: 'Dạng lỗi', mark: 'Đúng / sai', ok: 'Đúng', bad: 'Sai', noWrong: 'Không thấy câu nào sai trong bài này.', unsure: 'Dấu chấm và phép tính chưa khớp: chưa tính là lỗi. Cô xem lại và chọn Đúng / Sai.',
     fix: 'Sửa nếu máy đọc nhầm', all: (n: number) => `Xem và sửa cả ${n} câu`, check: 'Kiểm tra lại', remove: 'Bỏ câu', addQ: '+ Thêm câu', done: 'Xong',
     hint: 'Chữ viết tay đôi khi bị đọc nhầm (nhất là chữ số bị gạch). Cô xem lại bảng trước khi soạn bài.',
     work: 'Bài làm', upload: 'Tải bài em đã làm', uploadLead: 'Chụp bài đã chấm (tối đa 5 ảnh). Máy đọc từng câu, dấu chấm đúng/sai, và tìm dạng lỗi. Bài làm được lưu vào hồ sơ của em, không vào Kho kiến thức.', reading: 'Máy đang đọc bài…',
     save: 'Lưu bài làm', saved: 'Đã lưu vào hồ sơ.', make: 'Soạn bài từ lỗi này', none: 'Chưa có bài làm nào.', del: 'Xoá', delAsk: 'Xoá bài làm này khỏi hồ sơ?', on: (d: string) => `Bài ngày ${d}`, cancel: 'Huỷ',
   },
   en: {
-    readFrom: (n: string) => (n ? `Read from ${n}'s work` : "Read from the pupil's work"), counts: (t: number, r: number, w: number) => `${pl(t, 'question')} · ${r} right · ${w} wrong`,
-    q: 'Question', child: 'Wrote', right: 'Right answer', kind: 'Mistake type', mark: 'Right / wrong', ok: 'Right', bad: 'Wrong', noWrong: 'No wrong answers found on this sheet.', unsure: 'The mark and the sum do not agree: please check this one.',
+    readFrom: (n: string) => (n ? `Read from ${n}'s work` : "Read from the pupil's work"), counts: (t: number, r: number, w: number, c = 0) => `${pl(t, 'question')} · ${r} right · ${w} wrong${c ? ` · ${c} to check` : ''}`,
+    q: 'Question', child: 'Wrote', right: 'Right answer', kind: 'Mistake type', mark: 'Right / wrong', ok: 'Right', bad: 'Wrong', noWrong: 'No wrong answers found on this sheet.', unsure: 'The mark and the sum do not agree: not counted as a mistake. Please check it and choose Right / Wrong.',
     fix: 'Correct it if it was misread', all: (n: number) => `See and correct all ${n}`, check: 'Check again', remove: 'Remove', addQ: '+ Add a question', done: 'Done',
     hint: 'Handwriting is sometimes misread (crossed-out digits most of all). Check the table before making the lesson.',
     work: 'Work', upload: "Upload the pupil's work", uploadLead: 'Photograph the marked sheet (up to 5 photos). Each question, the right/wrong marks and the kinds of mistake are read. The work is kept in the pupil\'s profile, not in Knowledge.', reading: 'Reading the work…',
@@ -37,7 +37,7 @@ const sign = (s: string) => s.replace(/ - /g, ' − ').replace(/\.\.\.|…/g, ' 
 export function WorkTable({ work, parent, onChange, busy = false }: { work: Work; parent: boolean; onChange?: (w: Work) => void; busy?: boolean }) {
   const t0 = useT(T), lang = useLang(), t = parent ? { ...t0, ...P[lang] } : t0, L = lang === 'en' ? 'en' : 'vi';
   const [edit, setEdit] = useState<WorkQ[] | null>(null), [err, setErr] = useState(''), [checking, setChecking] = useState(false);
-  const wrong = work.questions.filter((q) => !q.ok);
+  const wrong = work.questions.filter((q) => !q.ok || q.unsure);
   const recheck = async (rows: WorkQ[]) => {
     setErr(''); setChecking(true);
     try { const r = await api.workCheck({ ...work, questions: rows }); onChange?.({ ...r.work, recordId: work.recordId, pupilId: work.pupilId, child: work.child }); setEdit(null); }
@@ -46,10 +46,10 @@ export function WorkTable({ work, parent, onChange, busy = false }: { work: Work
   const set = (i: number, f: Partial<WorkQ>) => setEdit((xs) => xs && xs.map((x, j) => (j === i ? { ...x, ...f } : x)));
   return (
     <div className="card stack" style={{ gap: 8, borderColor: 'var(--sun)' }}>
-      <b>{t.readFrom(work.child || '')}: {t.counts(work.total, work.right, work.wrong)}</b>
+      <b>{t.readFrom(work.child || '')}: {t.counts(work.total, work.right, work.wrong, work.check)}</b>
       {!!work.types.length && <div className="row small" style={{ gap: 6 }}>{work.types.map((x) => <span key={x.label.en} className="tag repeat">{x.label[L]} ×{x.count}</span>)}</div>}
       {!edit && (wrong.length ? <table className="tbl stack-sm"><thead><tr><th>{t.q}</th><th>{t.child}</th><th>{t.right}</th><th>{t.kind}</th></tr></thead><tbody>
-        {wrong.map((q, i) => <tr key={i}><td>{sign(q.q)}</td><td><s>{q.child || '…'}</s></td><td><b>{q.right || '?'}</b></td><td>{q.label[L]}{q.slip && <span className="muted"> · {q.slip[L]}</span>}{q.unsure && <span className="muted"> · {t.unsure}</span>}</td></tr>)}
+        {wrong.map((q, i) => <tr key={i} style={q.unsure ? { background: 'var(--sun-2)' } : undefined}><td>{sign(q.q)}</td><td>{q.unsure ? q.child || '…' : <s>{q.child || '…'}</s>}</td><td><b>{q.right || '?'}</b></td><td>{q.label[L]}{q.slip && <span className="muted"> · {q.slip[L]}</span>}{q.unsure && <span className="muted"> · {t.unsure}</span>}</td></tr>)}
       </tbody></table> : <p className="small muted">{t.noWrong}</p>)}
       {edit && <div className="stack" style={{ gap: 6 }}>
         <p className="small muted">{t.hint}</p>
@@ -57,7 +57,7 @@ export function WorkTable({ work, parent, onChange, busy = false }: { work: Work
           {edit.map((q, i) => <tr key={i} style={q.unsure ? { background: 'var(--sun-2)' } : undefined}>
             <td><input value={q.q} maxLength={60} aria-label={t.q} onChange={(e) => set(i, { q: e.target.value })} style={{ width: 150 }} /></td>
             <td><input value={q.child} maxLength={20} aria-label={t.child} onChange={(e) => set(i, { child: e.target.value })} style={{ width: 70 }} /></td>
-            <td><select value={q.mark === 'none' ? (q.ok ? 'right' : 'wrong') : q.mark} aria-label={t.mark} onChange={(e) => set(i, { mark: e.target.value as WorkQ['mark'] })}><option value="right">{t.ok}</option><option value="wrong">{t.bad}</option></select></td>
+            <td><select value={q.mark === 'none' ? (q.ok ? 'right' : 'wrong') : q.mark} aria-label={t.mark} onChange={(e) => set(i, { mark: e.target.value as WorkQ['mark'], sure: true })}><option value="right">{t.ok}</option><option value="wrong">{t.bad}</option></select></td>
             <td className="small">{q.right}</td>
             <td><button className="link small muted" onClick={() => setEdit(edit.filter((_, j) => j !== i))}>{t.remove}</button></td>
           </tr>)}
@@ -94,7 +94,7 @@ export function WorkPanel({ pupilId, name, parent }: { pupilId: string; name: st
       {list && !list.length && !draft && <p className="small muted">{t.none}</p>}
       {list?.map((w) => (
         <details key={w.recordId} className="card small">
-          <summary><b>{t.on(dm(w.date))}</b> · {t.counts(w.total, w.right, w.wrong)}{w.topic ? <span className="muted"> · {w.topic}</span> : null}</summary>
+          <summary><b>{t.on(dm(w.date))}</b> · {t.counts(w.total, w.right, w.wrong, w.check)}{w.topic ? <span className="muted"> · {w.topic}</span> : null}</summary>
           <div className="stack" style={{ gap: 8, paddingTop: 8 }}>
             <WorkTable work={w} parent={parent} busy={!!busy} onChange={(nw) => void run('upd', async () => { await api.updateWork(w.recordId!, nw); await load(); })} />
             <div className="row"><button className="link small danger" onClick={async () => { if (await ask(t.delAsk, { danger: true })) { await api.deleteWork(w.recordId!); await load(); } }}>{t.del}</button><span className="grow" />

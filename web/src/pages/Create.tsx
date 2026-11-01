@@ -16,10 +16,11 @@ export const STEPS = { vi: ['Tài liệu', 'Câu hỏi', 'Slide', 'Video', 'Bài
 // Chi's role table: Questions (2) is the teacher's step; a parent's run 1, 3, 4, 5, 6, shown as 1-5. The
 // video is a step for parents too, so they see it before their child does (Chi #32).
 export const PARENT_STEPS = [1, 3, 4, 5, 6];
-export function Stepper({ at, onStep, done = at - 1, parent = false }: { at: number; onStep?: (i: number) => void; done?: number; parent?: boolean }) {
+// open: steps seen but not finished, with what they wait for (Chi #53: Video had a ✓ while no video was made)
+export function Stepper({ at, onStep, done = at - 1, parent = false, open = {} }: { at: number; onStep?: (i: number) => void; done?: number; parent?: boolean; open?: Record<number, string> }) {
   const lang = useLang();
   const steps = STEPS[lang].map((s, i) => ({ s, n: i + 1 })).filter((x) => !parent || PARENT_STEPS.includes(x.n));
-  return <div className="stepper noprint">{steps.map(({ s, n }, i) => { const cls = n === at ? 'on' : n <= done ? 'done' : ''; const body = <span className={cls}><i>{n <= done && n !== at ? '✓' : i + 1}</i>{s}</span>; return onStep && n >= 3 ? <button key={s} onClick={() => onStep(n)}>{body}</button> : <span key={s} style={{ display: 'contents' }}>{body}</span>; })}</div>;
+  return <div className="stepper noprint">{steps.map(({ s, n }, i) => { const ok = n <= done && !open[n], cls = n === at ? 'on' : ok ? 'done' : ''; const body = <span className={cls}><i>{ok && n !== at ? '✓' : i + 1}</i>{s}{open[n] && <small className="muted"> · {open[n]}</small>}</span>; return onStep && n >= 3 ? <button key={s} onClick={() => onStep(n)}>{body}</button> : <span key={s} style={{ display: 'contents' }}>{body}</span>; })}</div>;
 }
 
 const T = {
@@ -92,7 +93,9 @@ export function Create({ parent }: { parent: boolean }) {
   useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, part: sections.find((s) => s.id === sectionId)?.title, kind, text, focus, match, at: Date.now(), work, pupilId }); }, [areaId, sectionId, kind, text, focus, match, sections, work, pupilId]);
   useEffect(() => { api.learners().then((r) => { const ls = r.learners.filter((x) => !parent || x.kind === 'child'); setLearners(ls); if (parent && ls.length === 1) setPupilId((p) => p || ls[0].id); }).catch(() => {}); }, []);
   // "Make a lesson from these mistakes" on the child's page: /create?work=<record>
-  useEffect(() => { const rid = q.get('work'); if (rid) api.workRecord(rid).then((r) => { setKind('work'); setMoreMat(true); setWork(r.record); setPupilId(r.record.pupilId || ''); setText(r.record.topic || r.record.questions[0]?.q || ''); setFocus(focusOf(r.record, lang)); }).catch(() => {}); }, []);
+  useEffect(() => { const rid = q.get('work'); if (rid) api.workRecord(rid).then((r) => { setKind('work'); setMoreMat(true); setWork(r.record); setPupilId(r.record.pupilId || ''); const req = r.request || r.record.topic || r.record.questions[0]?.q || ''; setText(req); setFocus(focusOf(r.record, lang)); bestFor(r.record, req); }).catch(() => {}); }, []);
+  // the source that fits the sheet: its numbers' range, then its mistakes (Chi #54; code only, no credits)
+  const bestFor = (w: Work, req: string) => { if (q.get('area')) return; void api.bestArea(req, w.questions.map((x) => x.q), w.subject).then((r) => { if (r.areaId) { setAreaId(r.areaId); setSectionId(''); setMatch(null); } }).catch(() => {}); };
   const [busy, setBusy] = useState(''), [err, setErr] = useState(''), [rec, setRec] = useState<MediaRecorder | null>(null);
   // no book yet (Chi #39): the sample books are offered here; a book still being read is said so
   const [reading, setReading] = useState(false), [pickSample, setPickSample] = useState(false);
@@ -112,7 +115,7 @@ export function Create({ parent }: { parent: boolean }) {
   };
   const photos = (fs: File[], what: 'lesson' | 'work') => run('photo', async () => {
     const imgs = await Promise.all(fs.slice(0, 5).map((f) => shrink(f)));
-    if (what === 'work') { const r = await api.work(imgs); setText(r.request); setWork(r.work); setFocus(focusOf(r.work, lang)); } else setText((await api.photos(imgs)).text.slice(0, 2000));
+    if (what === 'work') { const r = await api.work(imgs); setText(r.request); setWork(r.work); setFocus(focusOf(r.work, lang)); if (!sectionId) bestFor(r.work, r.request); } else setText((await api.photos(imgs)).text.slice(0, 2000));
   });
   const find = () => run('find', async () => {
     setMissing(false);

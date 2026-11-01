@@ -20,7 +20,7 @@ const T = {
     working: 'Trợ lý đang soạn bài…', queued: (n: number) => `Đang chờ (thứ ${n}): bài sẽ được soạn khi xong việc đang làm. Mỗi tài khoản làm một việc một lúc.`, left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', drawing: 'Đang vẽ hình minh hoạ…',
     rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
-    makeVideo: 'Tạo video', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', enOnly: 'Hiện chỉ làm video cho bài tiếng Anh. Bài tiếng Việt: bấm ▶ để nghe thử bằng giọng của trình duyệt; bài tập và link của con vẫn đọc câu hỏi.', preview: 'Nghe thử từng đoạn',
+    makeVideo: 'Tạo video (~3 phút)', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', enOnly: 'Hiện chỉ làm video cho bài tiếng Anh. Bài tiếng Việt: bấm ▶ để nghe thử bằng giọng của trình duyệt; bài tập và link của con vẫn đọc câu hỏi.', preview: 'Nghe thử từng đoạn',
     redoneWhy: 'Tạo lại vì', edit: 'Sửa', qText: 'Câu hỏi', save: 'Lưu', cancel: 'Huỷ', similar: 'Tạo câu tương tự', addTpl: '+ Thêm mẫu', tplKind: 'Dạng câu', skill: 'Dạng bài', level: 'Mức', create: 'Tạo 2 câu', working2: 'Đang viết…', story: 'Đề bài', unit: 'Đơn vị', wrongs: 'Đáp án sai (cách nhau bằng dấu phẩy)', shown: 'Kết quả ghi trong câu', opts: 'Lựa chọn (cách nhau bằng dấu phẩy)', ans: 'Đáp án', sentence: 'Câu có chỗ trống ___', sayIt: 'Từ được đọc to', words: 'Các từ (cách nhau bằng dấu phẩy)', codeAns: 'Đáp án do code tính.',
     newPic: 'Đổi hình minh họa', cut: 'Cắt từ ảnh của cô', cutHint: 'Chọn ảnh đồ vật (không có người) và gõ tên đồ vật cần cắt.', cutName: 'Ví dụ: quả táo', cutGo: 'Cắt bằng SAM 3.1', cutDone: (n: number) => `Đã cắt ${n} vật.`, busy: 'Đang làm…',
     video: 'Video bài giảng', videoLead: 'Slide + giọng đọc', voice: 'Giọng đọc', parts: 'Các đoạn', subs: 'Phụ đề', toItems: 'Tiếp: bài tập',
@@ -32,7 +32,7 @@ const T = {
     working: 'The agent is making your lesson…', queued: (n: number) => `Waiting (number ${n} in your line): the lesson is made once the job before it is done. Each account runs one job at a time.`, left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
     slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', drawing: 'Drawing the picture…',
     rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
-    makeVideo: 'Make the video', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', enOnly: 'Videos are made for English lessons only for now. Vietnamese lessons: press ▶ to hear each part in the browser\'s own voice; practice and the child\'s link still read the questions aloud.', preview: 'Listen to each part',
+    makeVideo: 'Make the video (~3 min)', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', enOnly: 'Videos are made for English lessons only for now. Vietnamese lessons: press ▶ to hear each part in the browser\'s own voice; practice and the child\'s link still read the questions aloud.', preview: 'Listen to each part',
     redoneWhy: 'Written again because', edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
     newPic: 'New picture', cut: 'Cut out from your photo', cutHint: 'Choose a photo of objects (no people) and type what to cut out.', cutName: 'e.g. apples', cutGo: 'Cut out with SAM 3.1', cutDone: (n: number) => `Cut out ${n}.`, busy: 'Working…',
     video: 'Lesson video', videoLead: 'Slides + narration', voice: 'Voice', parts: 'Parts', subs: 'Subtitles', toItems: 'Next: practice',
@@ -67,7 +67,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
   const ref = l.refs?.[0], refText = ref ? (lang === 'en' ? ref.en : ref.vi) : '';
   return (
     <div className="page">
-      <Stepper parent={parent} at={l.status === 'ready' ? step : 3} done={l.status === 'ready' ? seen : 2} onStep={l.status === 'ready' ? setStep : undefined} />
+      <Stepper parent={parent} at={l.status === 'ready' ? step : 3} done={l.status === 'ready' ? seen : 2} onStep={l.status === 'ready' ? setStep : undefined} open={l.status === 'ready' ? videoOpen(l, lang) : {}} />
       {l.setup.work && <MadeFor l={l} parent={parent} />}
       {l.status !== 'ready' && (
         <div className="card stack" style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -138,6 +138,11 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
     </>
   );
 }
+// the Video step until the video is there (Chi #53): being made, not made yet, or none (Vietnamese, Chi #49)
+const videoOpen = (l: Lesson, lang: string): Record<number, string> => {
+  const st = String(l.video_status || 'none'), en = lang === 'en';
+  return st === 'ready' ? {} : { 4: l.voiced === false ? (en ? 'English only' : 'chỉ bài tiếng Anh') : st.startsWith('working') ? (en ? 'being made' : 'đang tạo') : (en ? 'not made yet' : 'chưa có') };
+};
 const ref = (refText: string, page?: number) => (page ? refText.replace(/(tr\.|p\.)\s*[\d–-]+$/, `$1 ${page}`) : refText).replace(/^(Theo|From):\s*/, '');
 
 function Video({ l, t, onNext, onStarted }: { l: Lesson; t: Dict; onNext: () => void; onStarted: () => void }) {

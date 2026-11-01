@@ -92,3 +92,42 @@ test('files: her allowance is checked before anything is sent', async () => {
   const a2 = (await c2('POST', '/api/t/areas', { name: 'x', subject: 'math', grade: 2 })).json.area;
   assert.equal((await c2('POST', `/api/t/areas/${a2.id}/books/original`, { size: 1000 })).json.code, 'storageOff', 'no R2 set: the app says so (the browser then uploads as before)');
 });
+
+test('"Read again to split into lessons" (Chi #48, #54d): from the kept text, free; an older scan from its kept pictures, at the scan price', async () => {
+  const store = new MemoryStore(), s = await testServer({ store }), call = s.client('198.51.100.170');
+  await call('POST', '/api/auth/demo', { lang: 'vi' });
+  const { area } = (await call('POST', '/api/t/areas', { name: 'Toán 2 tập 2', subject: 'math', grade: 2 })).json;
+  const pages = [58, 59, 60, 61, 62];
+  const made = (await call('POST', `/api/t/areas/${area.id}/books/scan`, { title: 'Cánh Diều 58-62', pages })).json;
+  for (const n of pages) await call('PUT', `/api/t/books/${made.book.id}/pages/${n}`, undefined, jpg(n));
+  // the pages as Cánh Diều prints them: a title in capitals at the top, no "Bài N"
+  const TITLES: Record<number, string> = { 58: 'PHÉP CỘNG (KHÔNG NHỚ) TRONG PHẠM VI 1000', 60: 'PHÉP CỘNG (CÓ NHỚ) TRONG PHẠM VI 1000', 62: 'LUYỆN TẬP CHUNG' };
+  s.ai.answers.set('ocr', (r) => { const p = (r.fixture as { page: number }).page; return { usable: true, text: `${TITLES[p] ? `# ${TITLES[p]}\n` : ''}Tính: ${p} + 125 = ?\nĐặt tính rồi tính.` }; });
+  await call('POST', `/api/t/books/${made.book.id}/scan/start`);
+  assert.equal((await ready(call, area.id, made.book.id)).status, 'ready');
+  for (let i = 0; i < 200 && (await s.sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [made.book.id])); i++) await wait(15);   // its job is over
+  const parts = async () => (await call('GET', `/api/t/areas/${area.id}`)).json.sections.map((x: any) => x.title);
+  assert.equal((await parts()).length, 3);
+  // read before 1 Nov: one part and no kept text
+  await s.sql.query(`update books set page_text = null where id = $1`, [made.book.id]);
+  await s.sql.query(`delete from passages where book_id = $1`, [made.book.id]);
+  await s.sql.query(`delete from sections where book_id = $1 and ord > 1`, [made.book.id]);
+  const credits = async () => (await call('GET', '/api/t/me')).json.credits.left;
+  const before = await credits();
+  // first the cost, nothing done; then read again from the kept pictures, its own hold settled
+  const ask = (await call('POST', `/api/t/books/${made.book.id}/resplit`)).json;
+  assert.equal(ask.ok, false); assert.equal(ask.estimate.pages, 5);
+  assert.equal(await credits(), before);
+  assert.equal((await call('POST', `/api/t/books/${made.book.id}/resplit?confirm=1`)).json.ok, true);
+  assert.equal((await ready(call, area.id, made.book.id)).status, 'ready');
+  assert.deepEqual(await parts(), ['Phép cộng (không nhớ) trong phạm vi 1000', 'Phép cộng (có nhớ) trong phạm vi 1000', 'Luyện tập chung']);
+  for (let i = 0; i < 200 && !(await s.sql.one(`select 1 from credit_log where reason = 'refund' and ref like $1`, [`${made.book.id}~%`])); i++) await wait(15);
+  const spent = before - await credits();
+  assert.ok(spent > 0 && spent <= ask.estimate.need, `spent ${spent}`);
+  assert.equal(store.objects.size, 5, 'the page pictures are still kept');
+  // now the text is kept: reading again is free
+  const free = (await call('POST', `/api/t/books/${made.book.id}/resplit`)).json;
+  assert.equal(free.free, true);
+  assert.equal((await ready(call, area.id, made.book.id)).status, 'ready');
+  assert.equal((await parts()).length, 3);
+});

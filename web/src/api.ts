@@ -6,8 +6,8 @@ export interface Credits { balance: number; subscriber: boolean; planUntil: stri
 export type Level = 'basic' | 'good' | 'advanced';
 // A child's marked work, read from photos and typed by code on the server (Chi #46)
 export interface Words { vi: string; en: string }
-export interface WorkQ { q: string; child: string; mark: 'right' | 'wrong' | 'none'; right: string; ok: boolean; kind: string; label: Words; slip?: Words; unsure?: boolean; typeName?: string; calc?: unknown }
-export interface Work { recordId?: string; pupilId?: string; child?: string; date: string; subject: 'math' | 'english'; topic: string; questions: WorkQ[]; total: number; right: number; wrong: number; types: { kind: string; label: Words; count: number }[]; base?: string }
+export interface WorkQ { q: string; child: string; mark: 'right' | 'wrong' | 'none'; right: string; ok: boolean; kind: string; label: Words; slip?: Words; unsure?: boolean; sure?: boolean; typeName?: string; sum?: string; calc?: unknown }
+export interface Work { recordId?: string; pupilId?: string; child?: string; date: string; subject: 'math' | 'english'; topic: string; questions: WorkQ[]; total: number; right: number; wrong: number; check?: number; types: { kind: string; label: Words; count: number }[]; base?: string }
 export interface Learner { id: string; name: string; class_id: string; class_name: string; kind: 'class' | 'child' }
 export interface Setup { subject: 'math' | 'english'; grade: number; title: string; objectives: string[]; minutes: number; lang: 'vi' | 'en'; note?: string; level?: 'mixed' | 'basic' | 'advanced'; make?: { video: boolean; cards: boolean }; work?: Work; forParent?: boolean }
 export type UsageKind = 'lessons' | 'pictures' | 'books' | 'photos' | 'voice' | 'advice' | 'requests';
@@ -117,7 +117,7 @@ export const api = {
   pupilWork: (pupilId: string) => call<{ pupil: { id: string; name: string }; records: Work[] }>('GET', `/t/pupils/${pupilId}/work`),
   saveWork: (pupilId: string, work: Work) => call<{ record: Work }>('POST', `/t/pupils/${pupilId}/work`, { work }),
   updateWork: (id: string, work: Work) => call<{ record: Work }>('PUT', `/t/work/${id}`, { work }),
-  workRecord: (id: string) => call<{ record: Work }>('GET', `/t/work/${id}`),
+  workRecord: (id: string) => call<{ record: Work; request?: string }>('GET', `/t/work/${id}`),
   deleteWork: (id: string) => call<{ ok: boolean }>('DELETE', `/t/work/${id}`),
   renameSection: (id: string, title: string) => call<{ ok: boolean }>('PUT', `/t/sections/${id}`, { title }),
   splitSection: (id: string, page: number, title: string) => call<{ id: string }>('POST', `/t/sections/${id}/split`, { page, title }),
@@ -134,7 +134,7 @@ export const api = {
   deleteBook: (id: string) => call<{ ok: boolean }>('DELETE', `/t/books/${id}`),
   path: (classId: string, areaId: string) => call<PathView>('GET', `/t/path?classId=${classId}&areaId=${areaId}`),
   savePath: (id: string, p: { start?: string; steps: { sectionId: string; weeks: number }[] }) => call<{ ok: boolean }>('PUT', `/t/path/${id}`, p),
-  summary: (q: { classId?: string; lessonId?: string } = {}) => call<Summary>('GET', `/t/summary?${new URLSearchParams(q as Record<string, string>)}`),
+  summary: (q: { classId?: string; lessonId?: string; lang?: string } = {}) => call<Summary>('GET', `/t/summary?${new URLSearchParams(q as Record<string, string>)}`),
   comments: (classId: string) => call<{ comments: { pupilId: string; name: string; text: string }[] }>('POST', '/t/summary/comments', { classId }),
   criteria: () => call<{ criteria: Criteria }>('GET', '/t/criteria'),
   previewCriteria: (c: Criteria) => call<{ class: string | null; skill?: string; pupils?: { name: string; right: number; of: number; mistake: string | null; label: Label }[]; classLabel?: Label; share?: { repeat: number; of: number } }>('POST', '/t/criteria/preview', c),
@@ -150,6 +150,7 @@ export const api = {
   voice: (audio: Blob) => call<{ text: string }>('POST', '/t/notes/voice', undefined, audio),
   areas: () => call<{ areas: AreaRow[] }>('GET', '/t/areas'),
   createArea: (a: { name: string; subject: string; grade: number; fingerprint?: string }) => call<{ area: AreaRow }>('POST', '/t/areas', a),
+  bestArea: (request: string, sums: string[], subject: string) => call<{ areaId: string | null }>('POST', '/t/areas/best', { request, sums, subject }),
   sameArea: (fingerprint: string) => call<{ same: { id: string; name: string; created_at: string } | null }>('POST', '/t/areas/same', { fingerprint }),
   sampleArea: (book: 'toan2' | 'english3' | 'maths2') => call<{ area: { id: string } }>('POST', '/t/areas/sample', { book }),
   area: (id: string) => call<{ area: AreaRow; books: BookRow[]; sections: SectionRow[] }>('GET', `/t/areas/${id}`),
@@ -163,6 +164,7 @@ export const api = {
   originalDone: (bookId: string, read: boolean) => call<{ ok: boolean; text?: boolean; pages?: number; estimate?: ScanEstimate }>('POST', `/t/books/${bookId}/original/done`, { read }),
   originalScan: (bookId: string, pages: number[]) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/original/scan`, { pages }),
   retryBook: (bookId: string) => call<{ ok: boolean }>('POST', `/t/books/${bookId}/retry`),
+  resplit: (bookId: string, confirm = false) => call<{ ok: boolean; free?: boolean; estimate?: ScanEstimate }>('POST', `/t/books/${bookId}/resplit${confirm ? '?confirm=1' : ''}`),
   scanStart: (bookId: string) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/scan/start`),
   jobs: () => call<{ jobs: Job[] }>('GET', '/t/jobs'),
   usage: (days: number) => call<Usage>('GET', `/t/usage?days=${days}`),

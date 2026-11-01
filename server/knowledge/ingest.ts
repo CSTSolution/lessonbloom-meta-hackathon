@@ -202,6 +202,7 @@ export async function ingestBook(sql: Sql, ai: AI, areaId: string, bookId: strin
 // can be read, so every lesson can cite the page as the paper book shows it.
 export async function ingestPages(sql: Sql, ai: AI, areaId: string, bookId: string, pages: PdfPage[]) {
   pages = pages.filter((p) => p.text.trim());
+  const asRead = pages.slice(0, 400);   // kept with the book, so it can be split again later for free (Chi #54d)
   if (!pages.length) throw new NotText();
   // the printed page numbers; a lone number line that is the page's own number is not lesson text (Chi #45)
   const printed = printedPages(pages);
@@ -233,7 +234,7 @@ export async function ingestPages(sql: Sql, ai: AI, areaId: string, bookId: stri
           [`${bookId}-p${ord}`, bookId, areaId, sid, p.page, ord, p.text, `${s.title}\n${p.text}`, printed.get(p.page) ?? null]);
       }
     }
-    await t.query(`update books set status = 'ready', pages = greatest(pages, $2) where id = $1`, [bookId, pages.length]);
+    await t.query(`update books set status = 'ready', pages = greatest(pages, $2), page_text = $3::jsonb where id = $1`, [bookId, pages.length, JSON.stringify(asRead)]);
   });
   return { pages: pages.length, sections: sections.length };
 }

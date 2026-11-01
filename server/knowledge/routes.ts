@@ -19,7 +19,7 @@ import { fail, MSG } from '../http.ts';
 import { ingestBook, ingestPages, NotText } from './ingest.ts';
 import { readPdf } from './pdf.ts';
 import type { PdfPage } from './pdf.ts';
-import { citation, findSection, NoMatch, printedRange, shownPages, sourceOf } from './search.ts';
+import { candidates, citation, findSection, NoMatch, printedRange, shownPages, sourceOf } from './search.ts';
 
 // a file's SHA-256 in hex, for a scanned PDF with the pages read (":3-22")
 const FINGERPRINT = /^[0-9a-f]{64}(:\d{1,4}-\d{1,4})?$/;
@@ -77,6 +77,25 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   });
 
   // the same file added before (Chi #44): her newest source with this fingerprint that was not a failed reading
+  // Which of her sources fits a child's marked work (Chi #54: "Make a lesson from these mistakes" opened the
+  // sample book, numbers to 100, for a sheet to 1000). By code, no AI: a source whose parts reach the sheet's
+  // biggest number first ("phạm vi 1000", "within 1000"), then one whose passages match its mistakes.
+  app.post('/api/t/areas/best', async (c) => {
+    const b = await c.req.json<{ request?: string; sums?: string[]; subject?: string }>().catch(() => ({} as { request?: string; sums?: string[]; subject?: string }));
+    const request = clip(b.request, 300), sums = (Array.isArray(b.sums) ? b.sums : []).slice(0, 40).map((x) => clip(x, 60));
+    const top = Math.max(0, ...sums.flatMap((x) => (x.match(/\d{1,7}/g) ?? []).map(Number)));
+    const areas = await sql.query<{ id: string; subject: string; titles: string[] }>(`select a.id, a.subject, coalesce(array_agg(s.title) filter (where s.title is not null), '{}') as titles from areas a
+        join books bk on bk.area_id = a.id and bk.status = 'ready' left join sections s on s.book_id = bk.id where a.teacher_id = $1 group by a.id, a.created_at order by a.created_at desc`, [c.get('teacher').id]);
+    const scored = await Promise.all(areas.filter((a) => !b.subject || a.subject === b.subject).map(async (a) => {
+      const caps = a.titles.flatMap((t) => [...t.toLowerCase().matchAll(/(?:phạm vi|within|up to|to)\s+(\d{1,3}(?:[ .,]\d{3})+|\d{1,7})(?!\d)/g)].map((m) => Number(m[1].replace(/[ .,]/g, ''))));
+      const reach = !top || !caps.length ? 0 : Math.max(...caps) >= top ? 1 : -1;
+      const hit = request ? (await candidates(sql, a.id, request, 1))[0]?.score ?? 0 : 0;
+      return { id: a.id, reach, hit };
+    }));
+    scored.sort((x, y) => y.reach - x.reach || y.hit - x.hit);
+    return c.json({ areaId: scored[0]?.id ?? null });
+  });
+
   app.post('/api/t/areas/same', async (c) => {
     const b = await c.req.json<{ fingerprint?: string }>().catch(() => ({} as { fingerprint?: string }));
     if (!FINGERPRINT.test(String(b.fingerprint))) return fail(c, 'bad');
@@ -179,6 +198,42 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       await d.jobs.add(t.id, 'book', bk.id, bk.title, () => d.as(t.id, () => readBook(bk.id, () => ingestBook(sql, d.ai, bk.area_id, bk.id, pdf)), undefined, bk.id));
     }
     return c.json({ ok: true });
+  });
+
+  // "Đọc lại để tách bài" (Chi #54d, #48): a book read before the splitting knew unnumbered titles is one
+  // part. From the text kept with it, free; from its uploaded PDF, free; else its kept page pictures are read
+  // again like a scan (the estimate first, credits held). Its old parts go (lessons keep their own copy).
+  app.post('/api/t/books/:id/resplit', async (c) => {
+    const t = c.get('teacher'), bk = await bookMine(c);
+    if (!bk || bk.status !== 'ready') return fail(c, 'notFound', 404);
+    if (await sql.one(`select 1 from jobs where ref = $1 and status in ('queued', 'running')`, [bk.id])) return c.json({ ok: true });
+    const kept = (await sql.one<{ page_text: PdfPage[] | null }>('select page_text from books where id = $1', [bk.id]))?.page_text;
+    const pdf = !kept?.length && (bk.source ?? 'pdf') === 'pdf' ? await readFile(bookFile(bk.id)).catch(() => null) : null;
+    const clear = async () => { await sql.query('delete from passages where book_id = $1', [bk.id]); await sql.query('delete from sections where book_id = $1', [bk.id]); await sql.query(`update books set status = 'processing', error = null where id = $1`, [bk.id]); };
+    if (kept?.length || pdf) {
+      await clear();
+      await d.jobs.add(t.id, 'book', bk.id, bk.title, () => d.as(t.id, () => readBook(bk.id, () => (kept?.length ? ingestPages(sql, d.ai, bk.area_id, bk.id, kept) : ingestBook(sql, d.ai, bk.area_id, bk.id, pdf!))), undefined, bk.id));
+      return c.json({ ok: true, free: true });
+    }
+    const pics = d.store ? await sql.query<{ key: string; page: number }>(`select key, page from book_files where book_id = $1 and kind = 'page' order by page`, [bk.id]) : [];
+    if (!pics.length) return fail(c, 'retryAdd', 400);
+    const est = scanEstimate(pics.length, (await spare(sql, t.id)).spare);
+    if (!est.enough) return short(c, est);
+    if (c.req.query('confirm') !== '1') return c.json({ ok: false, estimate: est });   // she sees the cost first
+    const g = await d.budget.check(t.id);
+    if (g && g !== 'credits') return fail(c, 'budget', 503);
+    const dir = scanDir(bk.id), want = pics.map((p) => Number(p.page));
+    await mkdir(dir, { recursive: true });
+    for (const p of pics) { const data = await d.store!.get(p.key); if (!data) return fail(c, 'retryAdd', 400); await writeFile(join(dir, `${p.page}.jpg`), data); }
+    await clear();
+    // its own hold: the first reading's was settled under the book's id, and a hold is given back only once
+    const ref = `${bk.id}~${Date.now().toString(36)}`, hold = { used: 0 };
+    const done = async () => { await settleHold(sql, t.id, ref, hold.used); await rm(dir, { recursive: true, force: true }); };
+    await holdCredits(t.id, est.need, ref);
+    await d.jobs.add(t.id, 'book', bk.id, bk.title,
+      (job) => d.held(t.id, hold, () => readBook(bk.id, () => readScan(bk.area_id, bk.id, want, est.need, hold, job)), bk.id).finally(done),
+      async () => { await done(); await sql.query(`update books set status = 'error', error = 'stopped' where id = $1`, [bk.id]); }, est.need);
+    return c.json({ ok: true, estimate: est });
   });
 
   // A big PDF with text: the browser reads the text layer and sends only the text (the file stays with her).

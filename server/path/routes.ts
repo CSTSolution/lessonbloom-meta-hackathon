@@ -201,7 +201,9 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
 
   // ---- the learning summary ----
   // Everything the summary needs about one class: answers by learner and skill, with the items.
-  const classData = async (classId: string, assignmentId?: string) => {
+  // ui: the language the page is read in, for the labels code writes (Chi #52c: "Dạng đang lặp lỗi: Wrong
+  // calculation" on a Vietnamese screen, because the last lesson was in English)
+  const classData = async (classId: string, assignmentId?: string, ui?: 'vi' | 'en') => {
     const assignments = await sql.query<{ id: string; content: { items: Item[]; lang?: 'vi' | 'en'; title: string }; skills: Skill[] }>(
       `select a.id, a.content, coalesce(l.skills, '[]') as skills from assignments a left join lessons l on l.id = a.lesson_id where a.class_id = $1 ${assignmentId ? 'and a.id = $2' : ''} order by a.created_at desc`, assignmentId ? [classId, assignmentId] : [classId]);
     const items = new Map<string, Item>(), skills = new Map<string, string>();
@@ -213,7 +215,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
       from answers w where w.assignment_id = any($1) order by w.at`, [assignments.map((a) => a.id)]);
     // the lessons' language; with none assigned yet (only marked work), the account's own (live test, 1 Nov:
     // an English account was shown "Quên nhớ 1 sang hàng chục")
-    const lang = (assignments[0]?.content.lang || (await sql.one<{ lang: string }>('select t.lang from classes k join teachers t on t.id = k.teacher_id where k.id = $1', [classId]))?.lang || 'vi') as 'vi' | 'en';
+    const lang = (ui || assignments[0]?.content.lang || (await sql.one<{ lang: string }>('select t.lang from classes k join teachers t on t.id = k.teacher_id where k.id = $1', [classId]))?.lang || 'vi') as 'vi' | 'en';
     // the child's marked work (Chi #46) counts like practice done in the app: each question one answer, under
     // the lesson skill of the same kind (or its own), with the kind of mistake code found. Not in one lesson's view.
     if (!assignmentId) {
@@ -226,6 +228,7 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
         if (!skills.has(tag)) skills.set(tag, q.label[lang]);
         if (x && !x.cmp && x.op && x.b !== undefined) items.set(id, { id, subject: 'math', template: 'fill', skill: tag, level: 'basic', prompt: q.q, explain: '', a: x.a, op: x.op, b: x.b, blank: x.blank, answer: q.right });
         const coded = q.slip?.[lang] ?? (lang === 'en' ? `${q.label.en}: not right yet` : `${q.label.vi} chưa đúng`);
+        if (q.unsure) return;   // the mark and the sum disagree: not counted until she settles it (Chi #54)
         answers.push({ pupil_id: r.pupil_id, item_id: id, skill: tag, correct: q.ok, answer: q.child, at: r.at, day: r.day, mistake: q.ok ? null : coded });
       });
       answers.sort((p, q) => Date.parse(p.at) - Date.parse(q.at));
@@ -245,12 +248,12 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   app.get('/api/t/summary', async (c) => {
     const t = c.get('teacher'), cr = await criteriaOf(t.id);
     const classes = await sql.query<{ id: string; name: string; kind: string }>('select id, name, kind from classes where teacher_id = $1 order by created_at', [t.id]);
-    const pick = c.req.query('classId'), lessonId = c.req.query('lessonId') || '';
+    const pick = c.req.query('classId'), lessonId = c.req.query('lessonId') || '', q = c.req.query('lang'), ui = q === 'vi' || q === 'en' ? q : t.lang;
     const out = [];
     for (const k of classes) {
       const asg = lessonId ? (await sql.one<{ id: string }>('select id from assignments where class_id = $1 and lesson_id = $2 and removed_at is null order by created_at desc limit 1', [k.id, lessonId]))?.id : undefined;
       if (lessonId && !asg) { out.push({ id: k.id, name: k.name, kind: k.kind, skills: [], pupils: [], mistakes: [] }); continue; }
-      const data = await classData(k.id, asg), labels = labelsFor(data, cr);
+      const data = await classData(k.id, asg, ui), labels = labelsFor(data, cr);
       const skills = [...labels.entries()].map(([sk, m]) => {
         const ls = [...m.values()].map((x) => x.label);
         return { skill: sk, name: data.skills.get(sk) || sk, label: classLabel(ls, cr), counts: { solid: ls.filter((l) => l === 'solid').length, practising: ls.filter((l) => l === 'practising').length, repeat: ls.filter((l) => l === 'repeat').length } };
@@ -287,9 +290,9 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
   });
 
   app.post('/api/t/criteria/preview', async (c) => {
-    const t = c.get('teacher'), cr = cleanCriteria(await c.req.json().catch(() => ({})));
+    const t = c.get('teacher'), cr = cleanCriteria(await c.req.json().catch(() => ({}))), q = c.req.query('lang');
     for (const k of await sql.query<{ id: string; name: string }>('select id, name from classes where teacher_id = $1 order by created_at', [t.id])) {
-      const data = await classData(k.id), labels = labelsFor(data, cr);
+      const data = await classData(k.id, undefined, q === 'vi' || q === 'en' ? q : t.lang), labels = labelsFor(data, cr);
       const [sk, m] = [...labels.entries()].sort((a, b) => b[1].size - a[1].size)[0] ?? [];
       if (!sk || !m) continue;
       const pupils = [...m.entries()].slice(0, 4).map(([pid, l]) => ({ name: data.pupils.find((p) => p.id === pid)?.name ?? '', right: l.right, of: l.of, mistake: l.mistake, label: l.label }));
@@ -338,35 +341,43 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
 
   // `ui`: the language the assigner reads the page in (Chi: advice in English on a Vietnamese screen was wrong)
   const learner = async (tid: string, p: { id: string; name: string; class_id: string }, ui?: 'vi' | 'en') => {
-    const cr = await criteriaOf(tid), data = await classData(p.class_id), labels = labelsFor(data, cr), lang = ui ?? data.lang;
+    const cr = await criteriaOf(tid), data = await classData(p.class_id, undefined, ui), labels = labelsFor(data, cr), lang = ui ?? data.lang;
     const skills = [...labels.entries()].filter(([, m]) => m.has(p.id)).map(([sk, m]) => ({ skill: sk, name: data.skills.get(sk) || sk, ...m.get(p.id)! }));
     const mine = data.answers.filter((a) => a.pupil_id === p.id);
     const sessions = [...new Set(mine.map((a) => a.day))].reverse().slice(0, 6).map((day) => {
       const xs = mine.filter((a) => a.day === day), times = xs.map((a) => Date.parse(a.at));
       return { day, answers: xs.length, minutes: Math.max(1, Math.round((Math.max(...times) - Math.min(...times)) / 60000)) };
     });
-    // where she is on the path (the first path of her class with a current part)
-    const paths = await sql.query<{ id: string; start: string; area_id: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start, area_id from paths where class_id = $1`, [p.class_id]);
+    // where she is on the path: the lesson assigned last (Chi #50: "Đang học" showed the sample book's part
+    // while she had just assigned one from her scanned book; paths are per source), its path made now if
+    // assigning reset it; else the first path of her class with a current part
+    const last = await sql.one<{ area_id: string | null; section: string | null }>(`select l.area_id, l.refs->0->>'sectionId' as section from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and a.removed_at is null order by a.created_at desc limit 1`, [p.class_id]);
+    if (last?.area_id && last.section) await pathFor(tid, p.class_id, last.area_id);
+    const paths = (await sql.query<{ id: string; start: string; area_id: string }>(`select id, to_char(start_date, 'YYYY-MM-DD') as start, area_id from paths where class_id = $1`, [p.class_id])).sort((x, y) => Number(y.area_id === last?.area_id) - Number(x.area_id === last?.area_id));
     let current: (ReturnType<typeof layout>[number] & { pathId: string; week: number; daysLeft: number; itemsLeft: number; slidesSeen: boolean; videoSeen: boolean; assignmentId: string | null }) | null = null;
     for (const pa of paths) {
       const steps = await sql.query<StepRow>(`select ps.section_id, s.title, s.page_from, s.page_to, s.topic, ps.weeks, ps.ord from path_steps ps join sections s on s.id = ps.section_id where ps.path_id = $1 order by ps.ord`, [pa.id]);
       const extra = Object.fromEntries((await sql.query<{ section_id: string; weeks: number }>('select section_id, weeks from pupil_weeks where path_id = $1 and pupil_id = $2', [pa.id, p.id])).map((x) => [x.section_id, x.weeks]));
-      const cur = layout(pa.start, steps, vnToday(), extra).find((x) => x.status === 'current');
+      const laid = layout(pa.start, steps, vnToday(), extra), cur = (pa.area_id === last?.area_id && laid.find((x) => x.sectionId === last?.section)) || laid.find((x) => x.status === 'current');
       if (!cur) continue;
       const asg = await sql.one<{ id: string; content: { items: Item[] } }>(`select a.id, a.content from assignments a join lessons l on l.id = a.lesson_id where a.class_id = $1 and a.removed_at is null and l.refs->0->>'sectionId' = $2 order by a.created_at desc limit 1`, [p.class_id, cur.sectionId]);
       const tried = asg ? Number((await sql.one<{ n: string }>('select count(distinct item_id) as n from answers where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]))?.n) : 0;
       const g = asg ? await sql.one<{ slides: boolean; video: boolean }>('select slides_at is not null as slides, video_at is not null as video from pupil_progress where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]) : undefined;
       const extraItems = asg ? Number((await sql.one<{ n: string }>('select coalesce(sum(jsonb_array_length(items)), 0) as n from pupil_extra where assignment_id = $1 and pupil_id = $2', [asg.id, p.id]))?.n) : 0;
-      current = { ...cur, pathId: pa.id, week: Math.min(cur.weeks, Math.floor(daysBetween(cur.start, vnToday()) / 7) + 1), daysLeft: daysBetween(vnToday(), cur.end), itemsLeft: asg ? Math.max(0, asg.content.items.length + extraItems - tried) : 0, slidesSeen: !!g?.slides, videoSeen: !!g?.video, assignmentId: asg?.id ?? null };
+      current = { ...cur, pathId: pa.id, week: Math.max(1, Math.min(cur.weeks, Math.floor(daysBetween(cur.start, vnToday()) / 7) + 1)), daysLeft: daysBetween(vnToday(), cur.end), itemsLeft: asg ? Math.max(0, asg.content.items.length + extraItems - tried) : 0, slidesSeen: !!g?.slides, videoSeen: !!g?.video, assignmentId: asg?.id ?? null };
       break;
     }
     // advice, by code (the sentence is a template; Chi: "code works it out, the AI only words it")
     const done = await sql.query<{ kind: string; skill: string; status: string; id: string }>(`select id::text, kind, skill, status from advice where pupil_id = $1 and at > now() - interval '30 days'`, [p.id]);
     const isDone = (kind: string, skill = '') => done.find((a) => a.kind === kind && a.skill === skill && a.status !== 'undone');
     const vi = lang === 'vi', cards: { kind: 'practice' | 'next' | 'time'; skill: string; text: string; why: string; applied: string | null; kept: boolean }[] = [];
-    const weak = skills.find((s) => s.label !== 'solid'), strong = skills.find((s) => s.label === 'solid');
-    if (weak && cr.practice) { const a = isDone('practice', weak.skill); cards.push({ kind: 'practice', skill: weak.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
-      text: vi ? `Dạng ${weak.name}${weak.mistake ? ` (${weak.mistake.toLowerCase()})` : ''} ${p.name} đang luyện. Nên thêm 5 câu cùng dạng vào bài đang học.` : `${p.name} is practising ${weak.name}${weak.mistake ? ` (${weak.mistake.toLowerCase()})` : ''}. Add 5 more items of this kind to the current lesson.`,
+    // the newest repeated mistake leads (Chi #50: the card spoke of older kinds while "Cộng 9 qua 10: Lỗi lặp lại"
+    // was the one going wrong now), then the newest kind still being practised
+    const lastWrong = (sk: string) => Math.max(0, ...mine.filter((a) => a.skill === sk && !a.correct).map((a) => new Date(a.at).getTime() || 0));
+    const weak = skills.filter((s) => s.label !== 'solid').sort((x, y) => Number(y.label === 'repeat') - Number(x.label === 'repeat') || lastWrong(y.skill) - lastWrong(x.skill))[0], strong = skills.find((s) => s.label === 'solid');
+    if (weak && cr.practice) { const a = isDone('practice', weak.skill), m = weak.mistake ? ` (${weak.mistake.toLowerCase()})` : ''; cards.push({ kind: 'practice', skill: weak.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
+      text: weak.label === 'repeat' ? (vi ? `${p.name} đang lặp lại lỗi ở dạng ${weak.name}${m}. Nên thêm 5 câu cùng dạng vào bài đang học.` : `${p.name} keeps making the same mistake in ${weak.name}${m}. Add 5 more items of this kind to the current lesson.`)
+        : vi ? `Dạng ${weak.name}${m} ${p.name} đang luyện. Nên thêm 5 câu cùng dạng vào bài đang học.` : `${p.name} is practising ${weak.name}${m}. Add 5 more items of this kind to the current lesson.`,
       why: vi ? `${weak.right}/${weak.of} câu gần nhất đúng. Đã vững khi từ ${cr.solid}%.` : `${weak.right}/${weak.of} recent answers right. Mastered from ${cr.solid}%.` }); }
     if (strong && cr.next) { const a = isDone('next', strong.skill); cards.push({ kind: 'next', skill: strong.skill, applied: a?.status === 'applied' ? a.id : null, kept: a?.status === 'kept',
       text: vi ? `${p.name} đã vững dạng ${strong.name}. Có thể làm thêm bài nâng cao.` : `${p.name} has mastered ${strong.name}. Ready for harder items.`,

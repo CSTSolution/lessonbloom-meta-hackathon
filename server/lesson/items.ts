@@ -100,6 +100,52 @@ function shuffle<T>(xs: T[], seed: string): T[] {
   return out;
 }
 
+// --- numbers in words (Chi #52: "Say, read and write numbers to 1000" got only sums) ---
+// Code writes the words, so they are always right: 321 -> "three hundred and twenty-one", "ba trăm hai mươi mốt".
+const EN1 = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const EN10 = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+const VI1 = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+const en99 = (n: number) => (n < 20 ? EN1[n] : EN10[Math.floor(n / 10)] + (n % 10 ? `-${EN1[n % 10]}` : ''));
+const en999 = (n: number) => { const h = Math.floor(n / 100), r = n % 100; return h ? `${EN1[h]} hundred${r ? ` and ${en99(r)}` : ''}` : en99(r); };
+// mười lăm, hai mươi mốt (but mười một), hai mươi lăm
+const vi99 = (n: number) => { const t = Math.floor(n / 10), o = n % 10; return !t ? VI1[o] : (t === 1 ? 'mười' : `${VI1[t]} mươi`) + (!o ? '' : o === 5 ? ' lăm' : o === 1 && t > 1 ? ' mốt' : ` ${VI1[o]}`); };
+// after a thousand every hundred is said, "không trăm" too: 2005 = hai nghìn không trăm linh năm
+const vi999 = (n: number, lead: boolean) => { const h = Math.floor(n / 100), r = n % 100; return lead && !h ? vi99(r) : `${VI1[h]} trăm${!r ? '' : r < 10 ? ` linh ${VI1[r]}` : ` ${vi99(r)}`}`; };
+export function numberWords(n: number, lang: Lang): string {
+  if (!Number.isInteger(n) || n < 0 || n >= 1e6) return '';
+  const th = Math.floor(n / 1000), r = n % 1000;
+  if (lang === 'vi') return th ? `${vi999(th, true)} nghìn${r ? ` ${vi999(r, false)}` : ''}` : vi999(r, true);
+  return th ? `${en999(th)} thousand${!r ? '' : r < 100 ? ` and ${en99(r)}` : ` ${en999(r)}`}` : en999(r);
+}
+// the numbers children write for one read aloud: 321 -> 312, 30021 (written as heard: 300, 21), 231; 305 -> 350, 3005
+export function readSlips(n: number): number[] {
+  const s = String(n), out: number[] = [], add = (x: string) => { if (x[0] !== '0' && Number(x) !== n && !out.includes(Number(x))) out.push(Number(x)); };
+  if (s.length >= 2) add(s.slice(0, -2) + s.at(-1) + s.at(-2));
+  const big = n >= 100 ? n - (n % 100) : n - (n % 10);
+  if (n >= 20 && n < 1000 && n !== big) add(`${big}${n - big}`);
+  if (s.length === 3 && s[1] === '0' && s[2] !== '0') add(s[0] + s[2] + '0');
+  if (s.length === 3 && s[2] === '0' && s[1] !== '0') add(s[0] + '0' + s[1]);
+  if (s.length >= 3) add(s[1] + s[0] + s.slice(2));
+  for (const d of [10, 100, 1]) if (out.length < 3) add(String(n + d));
+  return out.slice(0, 3);
+}
+const READ = {
+  vi: { mcq: (w: string) => `Số nào đọc là “${w}”?`, fill: (w: string) => `Viết số: ${w}`, truefalse: (n: number, w: string) => `Đúng hay sai? Số ${n} đọc là “${w}”.` },
+  en: { mcq: (w: string) => `Which number is “${w}”?`, fill: (w: string) => `Write this number in digits: ${w}`, truefalse: (n: number, w: string) => `True or false? ${n} in words is “${w}”.` },
+};
+const READ_PROMPT = /^(?:Which number is “|Write this number in digits: |True or false\? \d+ in words is “|Số nào đọc là “|Viết số: |Đúng hay sai\? Số \d+ đọc là “)/;
+// a number-in-words item is sent as a + 0 (b = 0), so a teacher's edit, rebuilt from a, op and b, stays one
+export const isReading = (e: MathItem) => e.op === '+' && e.b === 0 && READ_PROMPT.test(e.prompt);
+// a skill about saying, reading or writing numbers ("Say, read and write numbers to 1000", "Đọc, viết số")
+const READ_SKILL = /(?<!\p{L})(?:say|read|write|name)s?(?!\p{L}).*(?<!\p{L})numbers?(?!\p{L})|(?<!\p{L})in words(?!\p{L})|number names?|(?<!\p{L})đọc(?!\p{L}).*(?<!\p{L})số(?!\p{L})|viết số/iu;
+export const readsNumbers = (s: Skill | undefined) => !!s && s.kind === 'other' && READ_SKILL.test(`${s.name} ${s.tag.replace(/_/g, ' ')}`) && !/missing|còn thiếu|thích hợp/iu.test(s.name);
+function readExplain(n: number, w: string, lang: Lang): string {
+  if (n < 10 || n >= 1000) return lang === 'vi' ? `${n} đọc là “${w}”.` : `${n} in words is “${w}”.`;
+  const [h, t, o] = String(n).padStart(3, '0').split('').map(Number), pl = (k: number, x: string) => `${k} ${x}${k === 1 ? '' : 's'}`;
+  if (lang === 'vi') return `${n} gồm ${h ? `${h} trăm, ` : ''}${t} chục và ${o} đơn vị, đọc là “${w}”.`;
+  return `${n} has ${h ? `${pl(h, 'hundred')}, ` : ''}${pl(t, 'ten')} and ${pl(o, 'one')}: “${w}”.`;
+}
+
 // --- maths: from data to the item pupils see ---
 
 export interface RawMath { template: MathItem['template']; skill: string; level: Level; a: number; op: Op; b: number; blank?: MathItem['blank']; shown?: number; distractors?: number[]; story?: string; unit?: string; explain?: string }
@@ -108,6 +154,17 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
   const a = Math.trunc(Number(r.a)), b = Math.trunc(Number(r.b)), op = (['+', '-', '×', ':'] as Op[]).includes(r.op) ? r.op : '+';
   const result = compute(a, op, b), calc = `${a} ${SIGN[op]} ${b}`;
   const base = { id, subject: 'math' as const, template: r.template, skill: String(r.skill || ''), level: r.level, a, op, b, explain: String(r.explain || '').trim() };
+  // Chi #52: a number in words (a + 0): words -> number as a choice or written in digits, number -> words as true or false
+  // (a choice of word options is not possible yet: a pupil's maths answer is checked as a number)
+  if (op === '+' && b === 0 && numberWords(a, lang)) {
+    const w = numberWords(a, lang), explain = readExplain(a, w, lang);
+    if (r.template === 'mcq') { const distractors = readSlips(a); return { ...base, explain, distractors, prompt: READ[lang].mcq(w), options: shuffle([a, ...distractors].map(String), id + a), answer: String(a) }; }
+    if (r.template === 'truefalse' || r.template === 'word') {
+      const s = Math.trunc(Number(r.shown)), shown = r.shown != null && numberWords(s, lang) ? s : a;
+      return { ...base, template: 'truefalse', explain, shown, prompt: READ[lang].truefalse(a, numberWords(shown, lang)), answer: shown === a ? 'true' : 'false' };
+    }
+    return { ...base, template: 'fill', blank: 'result', explain, prompt: READ[lang].fill(w), answer: String(a) };
+  }
   switch (r.template) {
     case 'mcq': {
       let distractors = (r.distractors || []).map((d) => Math.trunc(Number(d))).filter(Number.isFinite).slice(0, 3);
@@ -139,9 +196,14 @@ export function buildMath(r: RawMath, id: string, lang: Lang): MathItem {
 
 export interface RawEnglish { template: EnglishItem['template']; skill: string; level: Level; prompt: string; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; options?: string[]; answer?: string; explain?: string }
 
-export function buildEnglish(r: RawEnglish, id: string): EnglishItem {
+// Chi #52: the model copied the book's own instruction ("Read and play the game.") onto matching, and a child did not
+// know to match. Code writes that instruction, like the maths ones; lang: the lesson's (else the model's prompt says it).
+const MATCH_PROMPT = { vi: 'Nối mỗi từ với hình đúng.', en: 'Match each word to its picture.' };
+
+export function buildEnglish(r: RawEnglish, id: string, lang?: Lang): EnglishItem {
   const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
   const it: EnglishItem = { id, subject: 'english', template: r.template, skill: clean(r.skill), level: r.level, prompt: clean(r.prompt), explain: clean(r.explain), answer: clean(r.answer) };
+  if (r.template === 'match') it.prompt = MATCH_PROMPT[lang ?? (VI.test(it.prompt) ? 'vi' : 'en')];
   if (r.template === 'match') { it.pairs = (r.pairs || []).map((p) => ({ word: clean(p.word), emoji: clean(p.emoji) })).slice(0, 5); it.answer = it.pairs.map((p) => `${p.word}=${p.emoji}`).join(','); }
   if (r.template === 'fill') { it.sentence = clean(r.sentence); it.options = (r.options || []).map(clean).slice(0, 4); }
   if (r.template === 'listen') { it.say = clean(r.say); it.options = (r.options || []).map(clean).slice(0, 4); }
@@ -168,12 +230,16 @@ export function askedThing(story: string): string[] | null {
 function mathRules(e: MathItem, ctx: CheckContext, out: Issue[]) {
   // the section's range when it names one (a grade-2 book goes to 1000 in its second volume), else the grade's
   const { max, floor } = rangeOf(ctx), result = compute(e.a, e.op, e.b);
-  const kind = ctx.skills.find((s) => s.tag === e.skill)?.kind;
+  const skill = ctx.skills.find((s) => s.tag === e.skill), kind = skill?.kind, reading = isReading(e);
+  // Chi #52: a skill on reading and writing numbers gets numbers in words, never sums; other skills never get them
+  if (reading && !readsNumbers(skill)) out.push({ code: 'Q', msg: `a number-in-words item, but the skill "${e.skill}" is not about reading or writing numbers` });
+  if (!reading && readsNumbers(skill)) out.push({ code: 'Q', msg: `the skill "${skill!.name}" is about reading and writing numbers: give a = the number and b = 0 (a number in words), not a sum` });
+  if (reading && floor && e.a <= floor) out.push({ code: 'scope', msg: `${e.a} is too small for this section, which works within ${max}` });
   if (!Number.isFinite(result) || !Number.isInteger(result)) out.push({ code: 'range', msg: 'the result is not a whole number' });
   if (ctx.scope?.max !== undefined && [e.a, e.b, result].some((n) => n > ctx.scope!.max!)) out.push({ code: 'scope', msg: `numbers above ${ctx.scope.max}, outside this section of the book` });
   // Chi #47: too small is outside the section too: "within 1000" means 3-digit numbers, not 48 + 37 or 100 − 28
-  if (floor && (e.op === '+' || e.op === '-') && [e.a, e.b, result].every((n) => n <= floor)) out.push({ code: 'scope', msg: `${e.a} ${SIGN[e.op]} ${e.b} only uses numbers up to ${floor}; this section works within ${max}, so use its bigger numbers` });
-  if (ctx.scope?.ops && !ctx.scope.ops.includes(e.op)) out.push({ code: 'scope', msg: `"${SIGN[e.op]}" is not taught in this section of the book` });
+  if (!reading && floor && (e.op === '+' || e.op === '-') && [e.a, e.b, result].every((n) => n <= floor)) out.push({ code: 'scope', msg: `${e.a} ${SIGN[e.op]} ${e.b} only uses numbers up to ${floor}; this section works within ${max}, so use its bigger numbers` });
+  if (!reading && ctx.scope?.ops && !ctx.scope.ops.includes(e.op)) out.push({ code: 'scope', msg: `"${SIGN[e.op]}" is not taught in this section of the book` });
   if ([e.a, e.b, result].some((n) => n < 0 || n > max)) out.push({ code: 'range', msg: ctx.scope?.max !== undefined ? `numbers outside 0–${max} or negative` : `numbers outside grade ${ctx.grade} (0–${max}) or negative` });
   if (e.template === 'mcq') {
     if ((e.distractors || []).length < 2) out.push({ code: 'shape', msg: 'needs at least 2 wrong options' });
@@ -224,6 +290,17 @@ const COLOUR_OF: Record<string, string[]> = {
   apple: ['red', 'green'], tomato: ['red'], tomatoes: ['red'], strawberry: ['red'], strawberries: ['red'], cherry: ['red'], cherries: ['red'], carrot: ['orange'], pumpkin: ['orange'],
   snow: ['white'], milk: ['white'], cloud: ['white'], coal: ['black'], crow: ['black'], chocolate: ['brown'], pig: ['pink'], flamingo: ['pink'], grape: ['purple', 'green'],
 };
+// Chi #52: "elbows" was shown as 💪, which reads as "strong" or "arm". An emoji that stands for something else fits
+// only its own words; a body part with no emoji of its own stays out of matching.
+const READS_AS: Record<string, string[]> = {
+  '💪': ['arm', 'strong', 'muscle'], '👋': ['hello', 'hi', 'bye', 'goodbye', 'wave'], '👍': ['good', 'ok', 'okay', 'yes', 'thumb'], '✋': ['hand', 'stop'], '🖐': ['hand', 'five'], '🤚': ['hand'],
+  '👆': ['finger', 'up'], '☝': ['finger', 'one'], '👏': ['clap', 'hand'], '👀': ['eye', 'look', 'see'], '👁': ['eye'], '👂': ['ear', 'listen', 'hear'], '👃': ['nose', 'smell'],
+  '👄': ['mouth', 'lip'], '👅': ['tongue', 'taste'], '🦷': ['tooth'], '🦵': ['leg'], '🦶': ['foot'], '🧠': ['brain'], '❤': ['heart', 'love'],
+};
+const NO_PICTURE = new Set(['elbow', 'knee', 'shoulder', 'neck', 'toe', 'chin', 'cheek', 'wrist', 'ankle', 'hip', 'back', 'tummy', 'stomach', 'chest', 'head', 'body']);
+const one = (w: string) => ({ teeth: 'tooth', feet: 'foot' } as Record<string, string>)[w] ?? (w.length > 3 ? w.replace(/s$/, '') : w);
+// the book's own game and activity lines, which do not tell a child what to do with the item
+const BOOK_LINE = /(?<!\p{L})(?:play the game|and play|let'?s play|look and say|let'?s (?:sing|chant|talk)|chơi trò chơi)(?!\p{L})/iu;
 const own = <T>(o: Record<string, T>, k: string): T | undefined => (Object.hasOwn(o, k) ? o[k] : undefined);
 const colourHints = (w: string) => own(COLOUR_OF, w) ?? own(COLOUR_OF, w.replace(/s$/, ''));
 
@@ -266,6 +343,10 @@ function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
     if (!inOptions(e.options)) out.push({ code: 'shape', msg: 'the answer must be exactly one of the options' });
     if (words(e.answer).some((w) => !lesson.has(w))) out.push({ code: 'offlesson', msg: `"${e.answer}" is not a word from the lesson` });
     fillClue(e, out);
+    // Chi #52: "You must only step on the ___." picked "floor", hint "We say must for a game rule.". The explanation
+    // is the hint after a wrong try (with the answer hidden), so it must be about the word in the gap
+    const aw = words(e.answer).filter((w) => !FUNCTION_WORDS.has(w)), ew: string[] = [...words(e.explain)];
+    if (e.explain && aw.length && !aw.every((w) => ew.includes(w))) out.push({ code: 'shape', msg: `the explanation must be about the answer "${e.answer}" (why it fits and the other options do not), not another word of the sentence` });
   }
   if (e.template === 'order') {
     const want = e.answer.replace(/[.!?]$/, '').split(/\s+/).map((x) => x.toLowerCase()).sort().join(' ');
@@ -283,8 +364,12 @@ function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
     for (const x of p) {
       const sw = own(SWATCH, x.word.toLowerCase());
       if (sw && !sw.includes(x.emoji.replace(/\uFE0F/g, ''))) out.push({ code: 'picture', msg: sw.length ? `"${x.word}" needs its plain colour swatch (${sw.join(' ')}), not ${x.emoji}` : `"${x.word}" has no plain colour swatch emoji; leave it out of matching` });
+      const w = one(x.word.toLowerCase()), means = own(READS_AS, x.emoji.replace(/[\uFE0F\u{1F3FB}-\u{1F3FF}]/gu, ''));
+      if (NO_PICTURE.has(w)) out.push({ code: 'picture', msg: `"${x.word}" has no clear emoji of its own; leave it out of matching` });
+      else if (means && !means.includes(w)) out.push({ code: 'picture', msg: `${x.emoji} reads as "${means.join('", "')}", not "${x.word}"` });
     }
   }
+  if (BOOK_LINE.test(e.prompt)) out.push({ code: 'shape', msg: `"${e.prompt}" is the book's own instruction; say what the child does here ("Choose the missing word.")` });
   for (const o of e.options || []) if (!o) out.push({ code: 'empty', msg: 'an empty option' });
   if (new Set((e.options || []).map((o) => o.toLowerCase())).size !== (e.options || []).length) out.push({ code: 'dup', msg: 'repeated options' });
   if (kind === 'comma_clause') {

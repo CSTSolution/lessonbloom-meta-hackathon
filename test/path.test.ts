@@ -91,7 +91,7 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   const add = lesson.items.find((i: any) => i.op === '+' && i.template === 'fill' && i.blank === 'result') ?? lesson.items.find((i: any) => i.op === '+' && i.template !== 'truefalse');
   for (let i = 0; i < 3; i++) await an('POST', `/api/p/a/${a.id}/answer`, { itemId: add.id, answer: String(Number(add.answer) - 10) });
   for (const it of lesson.items) { await an('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer }); await binh('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: it.answer }); }
-  const sum = (await call('GET', '/api/t/summary')).json;
+  const sum = (await call('GET', '/api/t/summary?lang=vi')).json;   // read on a Vietnamese screen (the demo account is English)
   const cls = sum.classes.find((x: any) => x.id === k.id);
   assert.ok(cls.skills.length && cls.pupils.length === 2);
   assert.equal(cls.pupils.find((x: any) => x.name === 'Bình').skills[add.skill], 'solid');
@@ -121,4 +121,50 @@ test('path, summary, advice for one learner, and her reminder', async () => {
   // criteria
   assert.equal((await call('PUT', '/api/t/criteria', { solid: 70, repeat: 75 })).json.criteria.repeat, 60, 'repeat stays below solid');
   assert.equal((await call('PUT', '/api/t/reminders', { time: '21:30' })).json.reminders.time, '18:00', 'never after 20:00');
+});
+
+test('a learner: "Đang học" is the lesson assigned last, advice leads with the newest repeated mistake, labels in the language on screen (Chi #50, #52c)', async () => {
+  const today = schoolToday(); onDay(today);
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  await call('POST', '/api/t/role', { role: 'teacher', name: 'Cô Hạnh', subject: 'math' });
+  const toan = (await areaWithBook(call, 'toan2')).areaId, maths = (await areaWithBook(call, 'maths2')).areaId;
+  const L1 = await lessonFrom(call, toan, 'Bài 21 cộng có nhớ'), L2 = await lessonFrom(call, maths, 'Lesson 21 adding with regrouping');
+  const k = (await call('POST', '/api/t/classes', { name: '2A' })).json.class;
+  await call('POST', `/api/t/classes/${k.id}/pupils`, { names: 'An' });
+  const a1 = (await call('POST', `/api/t/lessons/${L1.id}/assign`, { classId: k.id, confirmed: true })).json.assignment;
+  await call('GET', `/api/t/path?classId=${k.id}&areaId=${toan}`);   // the sample book's path is there
+  const kid = s.client('198.51.100.90'), room = (await kid('GET', `/api/p/class/${k.code}`)).json;
+  await kid('POST', '/api/p/enter', { code: k.code, pupilId: room.pupils[0].id });
+  const carry = (l: any) => l.items.find((i: any) => i.op === '+' && i.template !== 'truefalse' && Number(i.answer) >= 20 && (i.a % 10) + (i.b % 10) >= 10);
+  // the same mistake three times in the first lesson (yesterday), then in the second lesson (today)
+  const i1 = carry(L1.lesson);
+  for (let n = 0; n < 3; n++) await kid('POST', `/api/p/a/${a1.id}/answer`, { itemId: i1.id, answer: String(Number(i1.answer) - 10) });
+  await s.sql.query(`update answers set at = at - interval '1 day' where assignment_id = $1`, [a1.id]);
+  const a2 = (await call('POST', `/api/t/lessons/${L2.id}/assign`, { classId: k.id, confirmed: true })).json.assignment;
+  const i2 = carry(L2.lesson);
+  assert.ok(i1 && i2 && L2.lesson.setup.lang === 'en', 'two carrying items; the second lesson in English');
+  // the mock writes both books' skills under one tag: the second lesson's gets its own
+  await s.sql.query(`update assignments set content = jsonb_set(content, '{items}', (select jsonb_agg(case when x->>'id' = $2 then jsonb_set(x, '{skill}', '"add_regroup"') else x end) from jsonb_array_elements(content->'items') x)) where id = $1`, [a2.id, i2.id]);
+  i2.skill = 'add_regroup';
+  for (let n = 0; n < 3; n++) await kid('POST', `/api/p/a/${a2.id}/answer`, { itemId: i2.id, answer: String(Number(i2.answer) - 10) });
+  const pid = room.pupils[0].id, vi = (await call('GET', `/api/t/pupils/${pid}?lang=vi`)).json;
+  // "Đang học": the lesson just assigned from the other book, not the sample book's part
+  assert.equal(vi.current?.sectionId, L2.lesson.refs[0].sectionId, `currently learning: ${vi.current?.title}`);
+  assert.equal(vi.current.assignmentId, a2.id);
+  // the practice card is about the newest repeated mistake
+  const practice = vi.advice.find((x: any) => x.kind === 'practice');
+  assert.equal(practice?.skill, i2.skill, 'the newest repeated mistake leads');
+  // mistakes code names follow the language on screen, whatever the lesson's language (Chi #52c)
+  const names = (v: any) => v.skills.map((x: any) => x.mistake).filter(Boolean).join(' | ');
+  assert.ok(vi.skills.some((x: any) => x.mistake) && !/Forgot|Wrong|calculation/.test(names(vi)), names(vi));
+  const en = (await call('GET', `/api/t/pupils/${pid}?lang=en`)).json;
+  assert.ok(!/Quên|Tính sai|hàng chục/.test(names(en)) && /Forgot to carry/.test(names(en)), names(en));
+  const sumVi = (await call('GET', `/api/t/summary?lang=vi`)).json.classes[0].mistakes.map((m: any) => m.what).join(' | ');
+  const sumEn = (await call('GET', `/api/t/summary?lang=en`)).json.classes[0].mistakes.map((m: any) => m.what).join(' | ');
+  assert.ok(/Quên nhớ 1/.test(sumVi) && !/Forgot|Wrong/.test(sumVi), sumVi);
+  assert.ok(/Forgot to carry/.test(sumEn) && !/Quên|Tính sai/.test(sumEn), sumEn);
+  // no language asked for: the account's (a demo account is Vietnamese), not the last lesson's
+  const sumDefault = (await call('GET', '/api/t/summary')).json.classes[0].mistakes.map((m: any) => m.what).join(' | ');
+  assert.equal(sumDefault, (await call('GET', '/api/t/me')).json.teacher?.lang === 'en' ? sumEn : sumVi);
 });

@@ -80,7 +80,7 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
   const [mist, setMist] = useState<{ what: string; skill: string }[]>([]);
   const [workOf, setWorkOf] = useState<string | null>(null);   // a pupil whose marked work is open (Chi #46)
   const load = () => api.classView(id).then(setV).catch(() => {});
-  useEffect(() => { api.summary({ classId: id }).then((r) => setMist(r.classes.find((x) => x.id === id)?.mistakes ?? [])).catch(() => {}); }, [id]);
+  useEffect(() => { api.summary({ classId: id, lang }).then((r) => setMist(r.classes.find((x) => x.id === id)?.mistakes ?? [])).catch(() => {}); }, [id]);
   useEffect(() => { void load(); }, [id]);
   if (!v) return null;
   const copy = async (s: string, k: string) => { if (await copyText(s)) { setCopied(k); setTimeout(() => setCopied(''), 1500); } };

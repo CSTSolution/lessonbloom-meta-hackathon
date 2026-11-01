@@ -47,7 +47,8 @@ export function Insights({ parent }: { parent: boolean }) {
   const [s, setS] = useState<Summary | null>(null), [lessons, setLessons] = useState<LessonRow[]>([]), [lessonId, setLessonId] = useState(q.get('lesson') || ''), [k, setK] = useState(q.get('class') || ''), [open, setOpen] = useState(q.get('class') ? 'one' : 'overview'); const [grid, setGrid] = useState(false);
   const [comments, setComments] = useState<{ pupilId: string; name: string; text: string }[] | null>(null), [busy, setBusy] = useState(false), [err, setErr] = useState('');
   useEffect(() => { api.lessons().then((r) => setLessons(r.lessons.filter((l) => l.given))).catch(() => {}); }, []);
-  useEffect(() => { api.summary(lessonId ? { lessonId } : {}).then((x) => { setS(x); setK((p) => p || x.classes[0]?.id || ''); }).catch(() => setS(null)); setComments(null); }, [lessonId]);
+  // the mistakes code names, in the language on screen (Chi #52c)
+  useEffect(() => { api.summary({ ...(lessonId ? { lessonId } : {}), lang } as { lessonId?: string }).then((x) => { setS(x); setK((p) => p || x.classes[0]?.id || ''); }).catch(() => setS(null)); setComments(null); }, [lessonId, lang]);
   if (!s) return null;
   const cls = s.classes.find((x) => x.id === k), pct = (n: number) => `${Math.round((100 * n) / Math.max(1, s.total.solid + s.total.practising + s.total.repeat))}%`;
   const section = (id: string, title: string, sub: string, badge: React.ReactNode, body: React.ReactNode) => (

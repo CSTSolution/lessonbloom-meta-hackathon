@@ -85,6 +85,52 @@ test('hints: one away from the answer is a counting slip, not the wrong sign (Ch
   assert.doesNotMatch(hintOf(it, '7', 'en'), /So close/);
 });
 
+test('hints: the second wrong try shows the method, built by code from the numbers (Chi #50)', async () => {
+  const { hintOf } = await import('../server/classes/check.ts');
+  const m = (a: number, op: string, b: number, template = 'mcq', extra = {}) => ({ id: 'x', subject: 'math', template, skill: 's', level: 'basic', prompt: '', explain: '', a, op, b, answer: String(op === '+' ? a + b : a - b), ...extra }) as Item;
+  // Chi: 9 + 6 → 14, then 16; the first try a nudge, the second the making-ten method with its last number hers to find
+  const nine = m(9, '+', 6);
+  assert.match(hintOf(nine, '14', 'vi', 0), /Gần đúng rồi/);
+  assert.equal(hintOf(nine, '16', 'vi', 1), 'Cộng qua 10: tách 6 = 1 + 5, 9 + 1 = 10, 10 + 5 = ?');
+  assert.equal(hintOf(nine, '16', 'en', 1), 'Make a ten: split 6 = 1 + 5, 9 + 1 = 10, 10 + 5 = ?');
+  assert.equal(hintOf(nine, '12', 'vi', 2), 'Cộng qua 10: tách 6 = 1 + 5, 9 + 1 = 10, 10 + 5 = 15.', 'the third try: all of it');
+  // column sums with carrying: the ones first, write, carry 1 to the tens
+  const col = m(36, '+', 27, 'column');
+  assert.equal(hintOf(col, '53', 'vi', 1), 'Cộng hàng đơn vị trước: 6 + 7 được 13, viết 3, nhớ 1 sang hàng chục. Rồi cộng tiếp hàng chục, nhớ 1.');
+  assert.match(hintOf(col, '53', 'en', 2), /^Add the ones first: 6 \+ 7 makes 13, write 3, carry 1 to the tens\. Tens: 3 \+ 2 makes 5, plus the 1 carried makes 6, write 6\.$/);
+  assert.match(hintOf(m(52, '-', 47, 'column'), '15', 'vi', 2), /2 không trừ được 7, lấy 12 − 7 được 5, viết 5, nhớ 1 sang hàng chục\. Hàng chục: 4 thêm 1 nhớ được 5, 5 − 5 được 0/);
+  assert.doesNotMatch(hintOf(m(305, '-', 128, 'column'), '187', 'en', 2), /-\d/, 'a 0 that gives a ten never goes below 0');
+  // chosen by the kind of mistake and the numbers
+  assert.match(hintOf(m(15, '-', 7), '9', 'vi', 1), /^Trừ qua 10: tách 7 = 5 \+ 2, 15 − 5 = 10, 10 − 2 = \?$/);
+  assert.match(hintOf(m(45, '+', 3), '42', 'en', 1), /^This one is an addition \(\+\)\. Add the ones first/, 'the wrong sign: said first');
+  assert.match(hintOf(m(7, '+', 5, 'fill', { blank: 'b', answer: '5' }), '6', 'vi', 1), /^Muốn tìm số hạng chưa biết.*12 − 7 = \?$/);
+  assert.match(hintOf({ ...m(6, '×', 4), answer: '24' } as Item, '20', 'en', 1), /^6 × 4 is 4 lots of 6: 6 \+ 6 \+ 6 \+ 6 = \?$/);
+  // the second try never gives the answer away
+  for (const it of [nine, col, m(28, '+', 5), m(15, '-', 7), m(30, '-', 4), m(254, '+', 172, 'column'), m(7, '+', 3), m(9, '-', 3)]) for (const l of ['vi', 'en'] as const) {
+    const h = hintOf(it, '0', l, 1);
+    assert.ok(h && !new RegExp(`(?<!\\d)${(it as any).answer}(?!\\d)`).test(h), `${(it as any).a} ${(it as any).op} ${(it as any).b}: ${h}`);
+  }
+});
+
+test('the answer route: a nudge on the first wrong try, the method on the second (Chi #50)', async () => {
+  const { hintOf } = await import('../server/classes/check.ts');
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'toan2');
+  const { id: lessonId, lesson } = await lessonFrom(call, areaId, 'Bài 21 cộng có nhớ');
+  const k = (await call('POST', '/api/t/classes', { name: '2C' })).json.class;
+  await call('POST', `/api/t/classes/${k.id}/pupils`, { names: 'An' });
+  const a = (await call('POST', `/api/t/lessons/${lessonId}/assign`, { classId: k.id, confirmed: true })).json.assignment;
+  const kid = s.client('198.51.100.63'), room = (await kid('GET', `/api/p/class/${k.code}`)).json;
+  await kid('POST', '/api/p/enter', { code: k.code, pupilId: room.pupils[0].id });
+  const it = lesson.items.find((i: any) => (i.op === '+' || i.op === '-') && i.template !== 'truefalse' && hintOf(i, '0', lesson.setup.lang, 1) !== hintOf(i, '0', lesson.setup.lang, 0));
+  assert.ok(it, 'an item with a method');
+  const one = (await kid('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: '0' })).json, two = (await kid('POST', `/api/p/a/${a.id}/answer`, { itemId: it.id, answer: '0' })).json;
+  assert.equal(one.explain, hintOf(it, '0', lesson.setup.lang, 0));
+  assert.equal(two.explain, hintOf(it, '0', lesson.setup.lang, 1));
+  assert.notEqual(one.explain, two.explain, `the second try shows the method: ${two.explain}`);
+});
+
 test('a repeat assignment warns first; Unassign takes it off the lists and keeps the answers (Chi #34)', async () => {
   const s = await testServer(), call = s.client();
   await call('POST', '/api/auth/demo');

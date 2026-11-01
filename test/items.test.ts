@@ -3,9 +3,9 @@
 // (or, for S, made impossible because code writes the question). Add a row for each new one.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { askedThing, buildEnglish, buildMath, checkItem, contextOf, rangeOf, regroups, scopeOf, type CheckContext, type RawEnglish, type RawMath } from '../server/lesson/items.ts';
+import { askedThing, buildEnglish, buildMath, checkItem, contextOf, numberWords, rangeOf, readSlips, regroups, scopeOf, type CheckContext, type RawEnglish, type RawMath } from '../server/lesson/items.ts';
 import { rangeLine } from '../server/lesson/writer.ts';
-import { forPupil } from '../server/classes/check.ts';
+import { forPupil, hintOf, isRight } from '../server/classes/check.ts';
 import type { Item } from '../server/lesson/types.ts';
 
 const vi2: CheckContext = { subject: 'math', grade: 2, lang: 'vi', source: '', skills: [
@@ -14,7 +14,7 @@ const vi2: CheckContext = { subject: 'math', grade: 2, lang: 'vi', source: '', s
 const en: CheckContext = { subject: 'english', grade: 4, lang: 'en', source: 'girl boy book hat rabbit Nam who lives next door is my friend the girl reads a book is Lan', skills: [
   { tag: 'nouns', name: 'Nouns', kind: 'vocabulary' }, { tag: 'comma', name: 'Cấu trúc mệnh đề có dấu phẩy', kind: 'comma_clause' }, { tag: 'listen', name: 'Listening', kind: 'listening' }] };
 const math = (r: Partial<RawMath>, ctx = vi2) => checkItem(buildMath({ template: 'mcq', skill: 'cong_co_nho', level: 'basic', a: 36, op: '+', b: 27, distractors: [53, 64], explain: 'Nhớ 1.', ...r } as RawMath, 'ex01', 'vi'), ctx).map((i) => i.code);
-const eng = (r: Partial<RawEnglish>) => checkItem(buildEnglish({ template: 'fill', skill: 'nouns', level: 'basic', prompt: 'Choose the missing word.', explain: 'A noun.', ...r } as RawEnglish, 'ex01'), en).map((i) => i.code);
+const eng = (r: Partial<RawEnglish>) => checkItem(buildEnglish({ template: 'fill', skill: 'nouns', level: 'basic', prompt: 'Choose the missing word.', explain: r.answer ? `"${r.answer}" fits here.` : 'A noun.', ...r } as RawEnglish, 'ex01'), en).map((i) => i.code);
 
 test("Chi's table: every real faulty item is caught", () => {
   // S: "Chọn kết quả đúng của phép tính sau:" with no calculation. Code writes the question now, so it always shows it:
@@ -31,9 +31,10 @@ test("Chi's table: every real faulty item is caught", () => {
   // Q: no comma, comma-clause skill; the sentence with its commas passes
   assert.ok(eng({ template: 'order', skill: 'comma', prompt: 'Put the words in order.', words: ['Lan', 'the', 'girl', 'who', 'reads', 'a', 'book', 'is'], answer: 'The girl who reads a book is Lan.' }).includes('Q'));
   assert.deepEqual(eng({ template: 'order', skill: 'comma', prompt: 'Put the words in order.', words: ['is', 'door,', 'Nam,', 'friend', 'who', 'my', 'lives', 'next'], answer: 'Nam, who lives next door, is my friend.' }), []);
-  // match: the pairs and ".:" in the prompt
-  const m = eng({ template: 'match', prompt: 'Match each word with its picture.: girl ↔ 👧, boy ↔ 👦', pairs: [{ word: 'girl', emoji: '👧' }, { word: 'boy', emoji: '👦' }, { word: 'book', emoji: '📕' }, { word: 'hat', emoji: '🎩' }] });
-  assert.ok(m.includes('K') && m.includes('punct'));
+  // match: the pairs and ".:" in the prompt. Code writes the matching instruction now (Chi #52), so it cannot happen:
+  const pairs = [{ word: 'girl', emoji: '👧' }, { word: 'boy', emoji: '👦' }, { word: 'book', emoji: '📕' }, { word: 'hat', emoji: '🎩' }];
+  assert.equal(buildEnglish({ template: 'match', skill: 'nouns', level: 'basic', prompt: 'Match each word with its picture.: girl ↔ 👧, boy ↔ 👦', pairs, explain: 'x' }, 'ex01').prompt, 'Match each word to its picture.');
+  assert.deepEqual(eng({ template: 'match', prompt: 'Match each word with its picture.: girl ↔ 👧, boy ↔ 👦', pairs }), []);
   // 52 – 28 with options 24 / 24 / 34
   assert.ok(math({ skill: 'tru_co_nho', a: 52, op: '-', b: 28, distractors: [24, 34] }).includes('dup'));
   // 45 + 67 in a grade 2 lesson
@@ -84,7 +85,7 @@ test('English: words from outside the lesson, gaps, options and language', () =>
 // Chi #31, English 3 Unit 6 Colours: 23 items, "0 written again", all 9 fill items had no single right answer.
 const unit6: CheckContext = { subject: 'english', grade: 3, lang: 'en', source: 'Unit 6: Colours. New words: red, blue, green, yellow, pink, orange. What colour is it? It is red. My favourite colour is yellow.', skills: [
   { tag: 'colour_words', name: 'Colour words', kind: 'vocabulary' }, { tag: 'what_colour', name: "Asking 'What colour is it?'", kind: 'sentence_pattern' }] };
-const colour = (r: Partial<RawEnglish>, ctx: CheckContext = unit6, id = 'ex01') => checkItem(buildEnglish({ template: 'fill', skill: 'colour_words', level: 'basic', prompt: 'Choose the missing word.', explain: 'A colour.', ...r } as RawEnglish, id), ctx).map((i) => i.code);
+const colour = (r: Partial<RawEnglish>, ctx: CheckContext = unit6, id = 'ex01') => checkItem(buildEnglish({ template: 'fill', skill: 'colour_words', level: 'basic', prompt: 'Choose the missing word.', explain: r.answer ? `"${r.answer}" fits here.` : 'A colour.', ...r } as RawEnglish, id), ctx).map((i) => i.code);
 
 test('English fill (Chi #31): the sentence makes exactly one option right', () => {
   assert.ok(colour({ sentence: 'It is ___.', options: ['red', 'blue', 'green'], answer: 'red' }).includes('clue'), 'no picture, no thing: any colour fits');
@@ -184,4 +185,93 @@ test('column items (Chi #47): "đặt tính rồi tính" with 3-digit numbers, c
   assert.ok(col({ a: 4, b: 5 }, vi2).includes('shape'), 'one-digit numbers need no columns');
   assert.ok(col({ a: 84, op: ':', b: 4 }, vi2).includes('shape'), 'no column division here');
   assert.deepEqual(forPupil(c), { id: 'ex10', template: 'column', prompt: 'Đặt tính rồi tính: 456 + 278', stack: { a: 456, op: '+', b: 278 } }, 'the pupil gets the numbers to stack, never the answer');
+});
+
+// Chi #52 (1 Nov), English: matching copied the book's "Read and play the game.", and "elbows" was shown as 💪
+const body: CheckContext = { subject: 'english', grade: 3, lang: 'en', source: 'Unit 4: My body. Read and play the game. arm arms elbow elbows ear ears feet knee nose leg hand You must only step on the stones. The floor is lava. stones floor grass', skills: [
+  { tag: 'body', name: 'Body parts', kind: 'vocabulary' }] };
+const bodyItem = (r: Partial<RawEnglish>) => checkItem(buildEnglish({ template: 'match', skill: 'body', level: 'basic', prompt: 'Read and play the game.', explain: 'Say each word.', ...r } as RawEnglish, 'ex01', 'en'), body).map((i) => i.code);
+
+test('Chi #52 (a): matching says "match" and every picture reads as its own word', () => {
+  const p = (prompt: string, lang?: 'vi' | 'en') => buildEnglish({ template: 'match', skill: 'body', level: 'basic', prompt, pairs: [{ word: 'ear', emoji: '👂' }, { word: 'nose', emoji: '👃' }, { word: 'leg', emoji: '🦵' }], explain: 'x' }, 'ex01', lang).prompt;
+  assert.equal(p('Read and play the game.'), 'Match each word to its picture.', "the book's game line is replaced");
+  assert.equal(p('Look at the game and play.', 'vi'), 'Nối mỗi từ với hình đúng.', "the lesson's language");
+  assert.equal(p('Đọc và chơi trò chơi.'), 'Nối mỗi từ với hình đúng.', 'no language given: the model\'s prompt tells it');
+  assert.deepEqual(bodyItem({ pairs: [{ word: 'ears', emoji: '👂' }, { word: 'nose', emoji: '👃' }, { word: 'feet', emoji: '🦶' }] }), [], 'plurals of a body part with its own emoji');
+  assert.ok(bodyItem({ pairs: [{ word: 'elbows', emoji: '💪' }, { word: 'nose', emoji: '👃' }, { word: 'ear', emoji: '👂' }] }).includes('picture'), '💪 reads as strong or arm');
+  assert.ok(bodyItem({ pairs: [{ word: 'elbow', emoji: '🦾' }, { word: 'nose', emoji: '👃' }, { word: 'ear', emoji: '👂' }] }).includes('picture'), 'an elbow has no emoji of its own');
+  assert.ok(bodyItem({ pairs: [{ word: 'knee', emoji: '🦵' }, { word: 'nose', emoji: '👃' }, { word: 'ear', emoji: '👂' }] }).includes('picture'), '🦵 is a leg');
+  assert.ok(bodyItem({ pairs: [{ word: 'hand', emoji: '👋🏽' }, { word: 'nose', emoji: '👃' }, { word: 'ear', emoji: '👂' }] }).includes('picture'), '👋 says hello, whatever the skin tone');
+  assert.deepEqual(bodyItem({ pairs: [{ word: 'arm', emoji: '💪' }, { word: 'hand', emoji: '✋' }, { word: 'ear', emoji: '👂' }] }), []);
+  // the other templates keep the model's instruction, but never the book's game line
+  const fill = { template: 'fill' as const, sentence: 'You must only step on the ___.', options: ['stones', 'floor', 'grass'], answer: 'stones', explain: 'The floor is lava, so you step only on the stones, not on the floor.' };
+  assert.ok(bodyItem({ ...fill, prompt: 'Read and play the game.' }).includes('shape'));
+  assert.deepEqual(bodyItem({ ...fill, prompt: 'Choose the missing word.' }), []);
+});
+
+test('Chi #52 (b): a fill item\'s explanation, the hint after a wrong try, is about the word in the gap', () => {
+  const fill = { template: 'fill' as const, prompt: 'Choose the missing word.', sentence: 'You must only step on the ___.', options: ['stones', 'floor', 'grass'], answer: 'stones' };
+  assert.ok(bodyItem({ ...fill, explain: 'We say must for a game rule.' }).includes('shape'), 'about "must", not the gap: no help to a child who picked "floor"');
+  const good = { ...fill, explain: 'The floor is lava, so you step only on the stones, not on the floor or the grass.' };
+  assert.deepEqual(bodyItem(good), []);
+  const hint = hintOf(buildEnglish({ skill: 'body', level: 'basic', ...good }, 'ex01', 'en'), 'floor', 'en');
+  assert.ok(hint.includes('not on the floor') && !hint.includes('stones'), `the hint follows the mistake without giving the answer: ${hint}`);
+  assert.deepEqual(bodyItem({ ...fill, sentence: 'You ___ step on the stones.', options: ['must', 'is', 'am'], answer: 'must', explain: 'A rule of the game: we use must.' }), [], 'a grammar word in the gap: the explanation names it');
+});
+
+// Chi #52 (d): Cambridge Maths 3, "Say, read and write numbers to 1000", got only 300 + 45 and 428 + 10
+const NUM1000 = 'Numbers to 1000\nSay, read and write numbers to 1000. 300 + 45 = 345. 428 + 10 = 438.';
+const cam: CheckContext = { subject: 'math', grade: 3, lang: 'en', source: NUM1000, scope: scopeOf(NUM1000), skills: [
+  { tag: 'read_write_numbers', name: 'Say, read and write numbers to 1000', kind: 'other' }, { tag: 'add_tens', name: 'Adding 10 or 100', kind: 'add_no_carry' }, { tag: 'missing', name: 'Write the missing number', kind: 'other' }] };
+const num = (r: Partial<RawMath>, lang: 'vi' | 'en' = 'en', id = 'ex01') => buildMath({ template: 'mcq', skill: 'read_write_numbers', level: 'basic', a: 321, op: '+', b: 0, explain: '', ...r } as RawMath, id, lang);
+
+test('Chi #52 (d): numbers in words are written by code', () => {
+  const en = (n: number) => numberWords(n, 'en'), vi = (n: number) => numberWords(n, 'vi');
+  assert.equal(en(321), 'three hundred and twenty-one');
+  assert.equal(en(305), 'three hundred and five');
+  assert.equal(en(640), 'six hundred and forty');
+  assert.equal(en(700), 'seven hundred');
+  assert.equal(en(15), 'fifteen');
+  assert.equal(en(1000), 'one thousand');
+  assert.equal(en(2005), 'two thousand and five');
+  assert.equal(en(4321), 'four thousand three hundred and twenty-one');
+  assert.equal(en(0), 'zero');
+  assert.equal(vi(321), 'ba trăm hai mươi mốt');
+  assert.equal(vi(305), 'ba trăm linh năm');
+  assert.equal(vi(115), 'một trăm mười lăm');
+  assert.equal(vi(211), 'hai trăm mười một', 'mười một, never mười mốt');
+  assert.equal(vi(425), 'bốn trăm hai mươi lăm');
+  assert.equal(vi(2005), 'hai nghìn không trăm linh năm');
+  assert.equal(vi(1050), 'một nghìn không trăm năm mươi');
+  assert.equal(numberWords(-1, 'en'), '');
+  assert.deepEqual(readSlips(321), [312, 30021, 231], 'digits swapped, written as heard');
+  assert.deepEqual(readSlips(305).slice(0, 2), [350, 3005]);
+});
+
+test('Chi #52 (d): a reading-and-writing-numbers skill gets numbers in words, never sums', () => {
+  const m = num({});
+  assert.equal(m.prompt, 'Which number is “three hundred and twenty-one”?');
+  assert.deepEqual([...m.options!].sort(), ['231', '30021', '312', '321']);
+  assert.ok(isRight(m, '321') && !isRight(m, '312'));
+  assert.equal(m.explain, '321 has 3 hundreds, 2 tens and 1 one: “three hundred and twenty-one”.');
+  assert.deepEqual(checkItem(m, cam), []);
+  const f = num({ template: 'fill', a: 305 });
+  assert.equal(f.prompt, 'Write this number in digits: three hundred and five');
+  assert.ok(isRight(f, '305') && !isRight(f, '3005'));
+  assert.deepEqual(checkItem(f, cam), []);
+  const tf = num({ template: 'truefalse', shown: 312 });
+  assert.equal(tf.prompt, 'True or false? 321 in words is “three hundred and twelve”.');
+  assert.ok(isRight(tf, 'false'));
+  assert.equal(num({ template: 'truefalse' }).answer, 'true');
+  assert.equal(num({ template: 'word', story: 'x' }).template, 'truefalse', 'a word-problem request on this skill becomes true or false');
+  assert.deepEqual(checkItem(num({ template: 'column', a: 640 }), cam), [], 'a column request becomes writing the number');
+  assert.equal(num({}, 'vi').prompt, 'Số nào đọc là “ba trăm hai mươi mốt”?');
+  assert.equal(num({ template: 'truefalse', shown: 231 }, 'vi').prompt, 'Đúng hay sai? Số 321 đọc là “hai trăm ba mươi mốt”.');
+  // the checks: sums on this skill, numbers in words on another, numbers too small for the section
+  assert.ok(checkItem(buildMath({ template: 'mcq', skill: 'read_write_numbers', level: 'basic', a: 300, op: '+', b: 45, distractors: [355, 335], explain: 'x' }, 'ex02', 'en'), cam).some((i) => i.code === 'Q'), '300 + 45 does not practise reading numbers');
+  assert.ok(checkItem(num({ skill: 'add_tens' }), cam).some((i) => i.code === 'Q'), 'numbers in words under an adding skill');
+  assert.ok(checkItem(num({ skill: 'missing' }), cam).some((i) => i.code === 'Q'), '"Write the missing number" is not about reading numbers');
+  assert.ok(checkItem(num({ a: 45 }), cam).some((i) => i.code === 'scope'), '45 belongs to an earlier chapter');
+  assert.ok(checkItem(num({ a: 4321 }), cam).some((i) => i.code === 'scope'), 'above 1000');
+  assert.ok(!checkItem(num({}), { ...cam, scope: scopeOf('Subtraction\n652 − 287') }).some((i) => i.code === 'scope'), 'a number in words is no addition, whatever the section\'s signs');
 });
