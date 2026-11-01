@@ -84,6 +84,18 @@ export function labelOf(kind: WorkKind, x?: Calc, typeName?: string): Words {
   if (kind === 'other' && typeName) return { vi: typeName, en: typeName };
   return LABEL[kind];
 }
+// How books name each kind, in both languages, so the work finds its part of the book: a sheet headed
+// "Đặt tính rồi tính" says nothing a search can use, its mistakes do (live test, 1 Nov: no part found)
+const FIND: Partial<Record<WorkKind, string>> = {
+  add_carry: 'phép cộng có nhớ, adding with regrouping (carrying)', add_no_carry: 'phép cộng không nhớ, adding without regrouping',
+  sub_borrow: 'phép trừ có nhớ, subtracting with regrouping (borrowing)', sub_no_borrow: 'phép trừ không nhớ, subtracting without regrouping',
+  compare: 'so sánh các số, comparing numbers', find_missing: 'tìm số còn thiếu, missing number', multiply: 'phép nhân, multiplication', divide: 'phép chia, division',
+};
+// What to look for in the book: the sheet's heading and its most frequent mistake
+export const findOf = (w: Pick<Work, 'topic' | 'types'>) => {
+  const k = w.types[0]?.kind, words = k && k !== 'other' ? FIND[k] : w.types[0]?.label.vi;
+  return [w.topic, words].filter(Boolean).join(' – ').slice(0, 300);
+};
 const PLACE: Record<number, Words> = { 10: { vi: 'chục', en: 'tens' }, 100: { vi: 'trăm', en: 'hundreds' }, 1000: { vi: 'nghìn', en: 'thousands' } };
 
 // The usual slip, when the child's answer shows it (Chi: "forgetting to carry 1")

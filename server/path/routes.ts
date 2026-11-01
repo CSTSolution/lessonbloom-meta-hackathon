@@ -211,7 +211,9 @@ export function pathRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget
     const pupils = await sql.query<{ id: string; name: string }>('select id, name from pupils where class_id = $1 order by created_at, name', [classId]);
     const answers = await sql.query<Answer & { pupil_id: string }>(`select w.pupil_id, w.item_id, w.skill, w.correct, w.answer, w.at, to_char(w.at at time zone 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') as day
       from answers w where w.assignment_id = any($1) order by w.at`, [assignments.map((a) => a.id)]);
-    const lang = (assignments[0]?.content.lang || 'vi') as 'vi' | 'en';
+    // the lessons' language; with none assigned yet (only marked work), the account's own (live test, 1 Nov:
+    // an English account was shown "Quên nhớ 1 sang hàng chục")
+    const lang = (assignments[0]?.content.lang || (await sql.one<{ lang: string }>('select t.lang from classes k join teachers t on t.id = k.teacher_id where k.id = $1', [classId]))?.lang || 'vi') as 'vi' | 'en';
     // the child's marked work (Chi #46) counts like practice done in the app: each question one answer, under
     // the lesson skill of the same kind (or its own), with the kind of mistake code found. Not in one lesson's view.
     if (!assignmentId) {

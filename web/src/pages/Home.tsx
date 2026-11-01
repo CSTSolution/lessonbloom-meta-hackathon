@@ -7,7 +7,7 @@ import { pl, setRole, useLang, useT } from '../i18n.ts';
 import { go, usePath } from '../router.ts';
 import { Classes } from './Classes.tsx';
 import { ChromeBanner } from './ChromeNote.tsx';
-import { Create, readDraft, readLast, STEPS } from './Create.tsx';
+import { Create, readDraft, readLast, setOwner, STEPS } from './Create.tsx';
 import { Criteria, Insights } from './Insights.tsx';
 import { Knowledge } from './Knowledge.tsx';
 import { LangToggle } from './LangToggle.tsx';
@@ -53,6 +53,7 @@ const SUBJ: Record<string, { vi: string; en: string }> = { math: { vi: 'Toán', 
 export function Home({ teacher, onChange, onSignOut }: { teacher: Teacher; onChange: (t: Teacher) => void; onSignOut: () => void }) {
   setRole(teacher.role);
   const t = useT(T), path = usePath();
+  setOwner(teacher.id);
   if (!teacher.role) return <SignupRole teacher={teacher} onDone={onChange} />;
   const parent = teacher.role === 'parent';
   const tabs = Object.keys(t.nav) as Tab[];

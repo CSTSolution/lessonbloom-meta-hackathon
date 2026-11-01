@@ -58,19 +58,22 @@ type Kind = 'one' | 'lesson' | 'work' | 'paste';
 
 // Step 1 is kept in this browser as she works (Chi #30): leaving to enter a code and coming back finds
 // it, and a part already found is not looked for (and paid for) again. Gone once the lesson is made.
-const DRAFT = 'lbm-draft';
+// Kept per account (live test, 1 Nov: a new account in the same browser was offered another's draft).
+let owner = '';
+export const setOwner = (id: string) => { owner = id; };
+const DRAFT = () => `lbm-draft:${owner}`;
 export interface Draft { areaId: string; sectionId: string; part?: string; kind: Kind; text: string; focus: string; match: Match | null; at: number; work?: Work | null; pupilId?: string }
 export const readDraft = (): Draft | null => {
-  try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null') as Draft | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; }
+  try { const d = JSON.parse(localStorage.getItem(DRAFT()) || 'null') as Draft | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; }
 };
 // The step she was on in each lesson, and which lesson she worked on last (Chi #43: Carry on opens that
 // step; the Lessons page offers the most recent unfinished work, a draft or a lesson not assigned yet).
 export interface LastLesson { id: string; title: string; step: number; at: number }
-const LAST = 'lbm-last-lesson';
+const LAST = () => `lbm-last-lesson:${owner}`;
 export const lessonStep = (id: string): number | null => { try { const n = Number(localStorage.getItem(`lbm-step-${id}`)); return n >= 3 && n <= 6 ? n : null; } catch { return null; } };
-export const keepStep = (id: string, title: string, step: number) => { try { localStorage.setItem(`lbm-step-${id}`, String(step)); localStorage.setItem(LAST, JSON.stringify({ id, title, step, at: Date.now() })); } catch { /* private window */ } };
-export const readLast = (): LastLesson | null => { try { const d = JSON.parse(localStorage.getItem(LAST) || 'null') as LastLesson | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; } };
-const writeDraft = (d: Draft | null) => { try { if (d) localStorage.setItem(DRAFT, JSON.stringify(d)); else localStorage.removeItem(DRAFT); } catch { /* private window: no draft */ } };
+export const keepStep = (id: string, title: string, step: number) => { try { localStorage.setItem(`lbm-step-${id}`, String(step)); localStorage.setItem(LAST(), JSON.stringify({ id, title, step, at: Date.now() })); } catch { /* private window */ } };
+export const readLast = (): LastLesson | null => { try { const d = JSON.parse(localStorage.getItem(LAST()) || 'null') as LastLesson | null; return d && Date.now() - d.at < 7 * 864e5 ? d : null; } catch { return null; } };
+const writeDraft = (d: Draft | null) => { try { if (d) localStorage.setItem(DRAFT(), JSON.stringify(d)); else localStorage.removeItem(DRAFT()); } catch { /* private window: no draft */ } };
 
 export function Create({ parent }: { parent: boolean }) {
   const t = useT(T), lang = useLang();
@@ -198,7 +201,8 @@ export function Create({ parent }: { parent: boolean }) {
         </div>}
         {match && !chosen && <div className="banner"><b>✓ {t.found(scopeText)}</b><details className="small"><summary>{match.title} · {t.quotes}</summary>{match.cited.map((c) => <blockquote key={c.id}>“{c.quote}” <span className="muted">· {t.page} {c.page}</span></blockquote>)}</details></div>}
         {chosen && <div className="banner">✓ {t.found(`${chosen.title} · ${scopeText}`)}</div>}
-        {missing && <div className="banner warn">{t.notFound}</div>}
+        {/* a part chosen by hand answers it (live test, 1 Nov: the warning stayed under "Found") */}
+        {missing && !sectionId && <div className="banner warn">{t.notFound}</div>}
         {err && <p className="note">{err}</p>}
         <div className="row"><span className="small muted grow">{scopeText && t.scope(scopeText)}</span>
           <button className="btn primary" disabled={!!busy || short || !(chosen || match)} onClick={toStep2}>{busy === 'intake' ? t.thinking : chosen ? t.nextPart : t.next}</button></div>

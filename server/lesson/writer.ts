@@ -9,7 +9,7 @@ import {
   audienceLine, maxWords, OCR_SCHEMA, REVIEW_SCHEMA, REVIEW_SYSTEM, OCR_SYSTEM, WORK_SCHEMA, WORK_SYSTEM, PLAN_SCHEMA, PLAN_SYSTEM, slideCount, SLIDES_SCHEMA, SLIDES_SYSTEM,
 } from './prompts.ts';
 import { ENG_KINDS, MATH_KINDS, type Card, type Item, type Level, type Rejected, type Setup, type Skill, type Slide } from './types.ts';
-import { forPrompt, typeWork, type Work } from './work.ts';
+import { findOf, forPrompt, typeWork, type Work } from './work.ts';
 
 export class NotLesson extends Error {}
 const clip = (s: unknown, n: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
@@ -61,7 +61,7 @@ export async function readWork(ai: AI, images: { data: Buffer; mime: string }[])
   const read = typeWork({ questions: r.questions }, { topic }), english = !read.questions.some((q) => q.calc) && (ENG_KINDS as readonly string[]).includes(String((r as { kind?: string }).kind));
   const work: Work = { ...read, subject: english ? 'english' : 'math' };
   if (!work.total || !work.questions.some((q) => q.mark !== 'none' || q.calc)) throw new WorkUnread();
-  return { request: topic || work.questions[0].q, focus: focusOf(work) || mistakes.join('; '), work };
+  return { request: findOf(work) || work.questions[0].q, focus: focusOf(work) || mistakes.join('; '), work };
 }
 // "Phép trừ có nhớ: 655 − 367 (con viết 322, đúng là 288); …", for the agent's note (no name in it)
 export function focusOf(w: Work): string {

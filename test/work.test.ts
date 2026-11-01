@@ -82,7 +82,10 @@ test('from the photo to her profile, her lesson, her page and the summary', asyn
   const rec = (await call('POST', `/api/t/pupils/${na.id}/work`, { work: r.work })).json.record;
   assert.equal(rec.child, 'Na'); assert.equal(rec.wrong, 4);
   assert.equal((await call('GET', `/api/t/pupils/${na.id}/work`)).json.records.length, 1);
-  // the summary counts it like practice in the app
+  // the summary counts it like practice in the app, in the account's language while no lesson is assigned
+  const en = (await call('GET', `/api/t/pupils/${na.id}`)).json;
+  assert.ok(en.skills.some((k: any) => k.name === 'Subtraction with borrowing' && k.mistake === 'Forgot the borrowed 1 in the tens'), JSON.stringify(en.skills));
+  await call('PUT', '/api/t/me', { lang: 'vi' });
   const d = (await call('GET', `/api/t/pupils/${na.id}`)).json;
   assert.ok(d.skills.some((k: any) => k.name === 'Phép trừ có nhớ' && k.of > 0 && k.mistake), JSON.stringify(d.skills));
   // a lesson from it, on the part about subtraction with borrowing
@@ -111,4 +114,19 @@ test('from the photo to her profile, her lesson, her page and the summary', asyn
   assert.match(today.greet.vi, /^Hôm trước con còn vướng phép trừ có nhớ/);
   const pl = (await phone('GET', `/api/p/a/${today.id}`)).json.lesson;
   assert.ok(pl.items[0].fromWork);
+});
+
+test('a sheet headed only "Đặt tính rồi tính" finds its part of the book by its mistakes, in a Vietnamese or English book (live test, 1 Nov)', async () => {
+  const { findOf } = await import('../server/lesson/work.ts');
+  const { candidates } = await import('../server/knowledge/search.ts');
+  const work = typeWork({ questions: [{ q: '36 + 27', child: '53', mark: 'wrong' }, { q: '45 + 38', child: '73', mark: 'wrong' }, { q: '52 + 14', child: '66', mark: 'right' }] }, { topic: 'Đặt tính rồi tính' });
+  const request = findOf(work);
+  assert.match(request, /^Đặt tính rồi tính – phép cộng có nhớ, adding with regrouping/);
+  const s = await testServer(), call = s.client();
+  await call('POST', '/api/auth/demo');
+  for (const [book, want] of [['maths2', /Lesson 21/], ['toan2', /Bài 21/]] as const) {
+    const { areaId } = await areaWithBook(call, book);
+    const top = (await candidates(s.sql, areaId, request))[0];
+    assert.match(top?.section ?? '', want, `${book}: ${top?.section}`);
+  }
 });
