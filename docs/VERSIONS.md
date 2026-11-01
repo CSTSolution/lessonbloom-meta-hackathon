@@ -3,6 +3,17 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261101.1213 (1 Nov, noon)
+
+- **Videos for English lessons only, for now** (Chi #49): the server's Vietnamese voice loads a model of
+  more than 1.4 GB, which ran the shared server out of memory twice. A Vietnamese lesson makes no video;
+  "Listen to each part" and the child's "Listen to the question" use the browser's own voice.
+  `LB_VI_VOICE=1` turns the server's Vietnamese voice back on.
+- **The child's page says when the connection is lost** ("Connection lost. Your answers so far are
+  saved." with Try again) instead of standing still; an answer not sent can be given again, and a lost
+  connection no longer sends the child to the join screen.
+- Pausing the read-aloud stops it.
+
 ## v1.0.20261101.1129 (1 Nov, late morning)
 
 Fixes from the live test of v1.0.20261101.1113:
