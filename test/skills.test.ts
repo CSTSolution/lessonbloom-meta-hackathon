@@ -193,3 +193,16 @@ test('chat (Chi #72): a change with no id is about the selected skill; with no c
   assert.deepEqual(q.ops, []);
   assert.match(q.reply, /Nothing was changed\.$/);
 });
+
+test('chat (live, 2 Nov): a rename with no name takes the name quoted in the reply; with no name at all it is dropped', async () => {
+  SKILLS.chatsPerMinute = 100;
+  const s = await testServer(), call = s.client('198.51.100.208');
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  const { areaId } = await areaWithBook(call, 'maths2');
+  await mapOf(call, areaId);
+  const q = (await call('POST', `/api/t/areas/${areaId}/skills/chat`, { text: 'quoted' })).json;
+  assert.deepEqual(q.ops.map((o: any) => [o.op, o.name]), [['rename', 'Colour words']]);
+  const n = (await call('POST', `/api/t/areas/${areaId}/skills/chat`, { text: 'nameless' })).json;
+  assert.deepEqual(n.ops, []);
+  assert.match(n.reply, /Nothing was changed\.$/);
+});

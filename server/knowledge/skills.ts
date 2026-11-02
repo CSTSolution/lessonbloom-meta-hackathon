@@ -296,7 +296,13 @@ export function skillRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budge
       // Chi #72: "I propose renaming…" came with no Apply. A change may name the skill instead of its id, or leave the id out
       // when she asked about the skill she had selected: both are mended here before the check below
       const byName = new Map(nodes.map((n) => [n.name.trim().toLowerCase(), n.id])), idOf = (x: unknown) => { const v = String(x ?? '').trim(); return known.has(v) ? v : byName.get(v.toLowerCase()) ?? v; };
-      const mended = (Array.isArray(r.ops) ? r.ops : []).map((o) => (!o || typeof o !== 'object' ? o : { ...o, ...(o.op !== 'add' && o.op !== 'merge' ? { id: o.id ? idOf(o.id) : skill?.id } : {}), ...(o.op === 'merge' && Array.isArray(o.ids) ? { ids: o.ids.map(idOf) } : {}) }));
+      // the new name may come under another key, or only in the reply ("I propose shortening it to 'Colour words'."):
+      // live, 2 Nov, a rename arrived with no name and Apply did nothing
+      const quoted = [...String(r.reply ?? '').matchAll(/["'“‘]([^"'”’]{2,80})["'”’]/g)].map((x) => x[1]).at(-1);
+      const nameOf = (o: Record<string, unknown>, one: boolean) => String(o.name ?? o.newName ?? o.new_name ?? o.to ?? (one && (o.op === 'rename' || o.op === 'add') ? quoted : '') ?? '').trim();
+      const raw = (Array.isArray(r.ops) ? r.ops : []).filter((o) => o && typeof o === 'object');
+      const mended = raw.map((o) => ({ ...o, name: nameOf(o as unknown as Record<string, unknown>, raw.length === 1) || undefined, ...(o.op !== 'add' && o.op !== 'merge' ? { id: o.id ? idOf(o.id) : skill?.id } : {}), ...(o.op === 'merge' && Array.isArray(o.ids) ? { ids: o.ids.map(idOf) } : {}) }))
+        .filter((o) => !['rename', 'add', 'merge'].includes(o.op) || clip(o.name, SKILLS.name).length >= 2);
       const ops = mended.filter((o) => (OPS as readonly string[]).includes(o?.op) && (o.op === 'add' ? partIds.has(String(o.part)) : o.op === 'merge' ? (o.ids ?? []).every((x) => known.has(String(x))) : known.has(String(o.id)))).slice(0, 10)
         .map((o): Op => ({ op: o.op, ...(o.id ? { id: String(o.id) } : {}), ...(o.ids ? { ids: o.ids.map(String) } : {}), ...(o.part ? { part: String(o.part) } : {}), ...(o.name ? { name: clip(o.name, SKILLS.name) } : {}), ...(o.kind ? { kind: String(o.kind) } : {}), ...(Array.isArray(o.pages) ? { pages: o.pages.map(Number).slice(0, 60) } : {}),
           was: (o.op === 'merge' ? o.ids ?? [] : o.id ? [o.id] : []).map((x) => named.get(String(x)) ?? '') }));
