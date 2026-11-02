@@ -215,7 +215,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 16px; padding: 10px 24px; background: var(--card); border-bottom: 1px solid var(--line); }
 .top .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
 .top .brand img { width: 22px; }
-.tabs { display: flex; gap: 4px; margin: 0 auto; flex-wrap: nowrap; justify-content: center; min-width: 0; overflow-x: auto; scrollbar-width: none; }   /* one line always (Chi #73, also with the jobs badge) */
+.tabs { display: flex; gap: 4px; margin: 0 auto; flex-wrap: nowrap; justify-content: flex-start; min-width: 0; overflow-x: auto; scrollbar-width: none; }   /* never centred while it overflows: that cut both ends ("ssons", Chi #73) */
 .tabs button { border: 0; background: none; padding: 6px 10px; border-radius: 8px; color: var(--ink-2); cursor: pointer; font-size: 14px; white-space: nowrap; flex: none; }
 .tabs button.on { background: var(--leaf-2); color: var(--leaf); font-weight: 600; }
 .me { display: flex; align-items: center; gap: 10px; position: relative; white-space: nowrap; }
@@ -235,6 +235,11 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .multi-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); max-height: 320px; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .cat { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--leaf-2); color: var(--leaf); align-self: start; } .cat.skill { background: var(--sun-2); color: #8a5200; }
 /* a laptop-width window: the five tabs stay on one line (Chi #24) */
+/* Chi #73 (1408 px with "Working on"): the name and the badge's words go first, then the menu takes its own row */
+.me-name { white-space: nowrap; } .jobs-short { display: none; }
+@media (max-width: 1560px) { .me-name { display: none; } .tabs button { padding: 6px 8px; } .top { gap: 12px; } }
+@media (max-width: 1480px) { .jobs-long { display: none; } .jobs-short { display: inline; } }
+@media (max-width: 1340px) { .top { flex-wrap: wrap; row-gap: 6px; } .me { margin-left: auto; } .tabs { order: 3; width: 100%; justify-content: center; } }
 @media (max-width: 1180px) { .top { gap: 10px; padding: 10px 14px; } .tabs { flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; } .me { flex: none; } .tabs button { padding: 6px 7px; font-size: 13px; white-space: nowrap; } .me-name { display: none; } .top .brand-name { display: none; } }
 /* the client's version next to the logo */
 .version { font-size: 11px; color: var(--ink-2); font-weight: 500; margin-left: 6px; white-space: nowrap; align-self: center; }

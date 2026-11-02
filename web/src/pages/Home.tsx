@@ -265,7 +265,7 @@ function JobsBox({ lang }: { lang: 'vi' | 'en' }) {
   if (!running && !waiting && !open) return null;
   return (
     <div style={{ position: 'relative' }}>
-      <button className="btn ghost small jobs-badge" onClick={() => setOpen(!open)} aria-expanded={open}>{t.badge(running, waiting)}</button>
+      <button className="btn ghost small jobs-badge" title={t.badge(running, waiting)} onClick={() => setOpen(!open)} aria-expanded={open}><span className="jobs-long">{t.badge(running, waiting)}</span><span className="jobs-short" aria-hidden="true">⏳ {running}{waiting ? ` +${waiting}` : ''}</span></button>
       {open && <div className="menu" style={{ minWidth: 280 }}>
         <span className="small muted">{t.one}</span>
         {!jobs.length && <span className="small">{t.none}</span>}

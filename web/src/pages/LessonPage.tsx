@@ -81,7 +81,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(4)} />}
       {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} parent={parent} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
-      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} items={l.items.length} video={l.video_status === 'ready' ? 'ready' : String(l.video_status || '').startsWith('working') ? 'making' : 'none'} /></div>}
+      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} items={l.items.length} video={videoFor(l, parent)} /></div>}
       {l.status === 'ready' && <LessonRating lessonId={l.id} />}{/* Chi #62: once per lesson */}
     </div>
   );
@@ -146,6 +146,15 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
     </>
   );
 }
+// what the assign box may say of the video (Chi #78): "being made" also when it is not started yet but will
+// be: a parent's starts on Assign, anyone's after the pictures (unless she asked for none, or the language has no voice)
+function videoFor(l: Lesson, parent: boolean): 'ready' | 'making' | 'none' {
+  const st = String(l.video_status || 'none');
+  if (st === 'ready') return 'ready';
+  if (st.startsWith('working')) return 'making';
+  return st === 'none' && l.voiced !== false && l.setup.make?.video !== false && (parent || l.pictures_pending) ? 'making' : 'none';
+}
+
 // the Video step until the video is there (Chi #53): being made, not made yet, or none (Vietnamese, Chi #49)
 const videoOpen = (l: Lesson, lang: string): Record<number, string> => {
   const st = String(l.video_status || 'none'), en = lang === 'en';
