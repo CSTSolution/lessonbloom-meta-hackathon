@@ -161,7 +161,7 @@ export function Create({ parent }: { parent: boolean }) {
   const guides = guideCards(lang, parent);
   const isPhoto = kind === 'photo' || kind === 'lesson' || kind === 'work';
   // another kind of material drops what the photos gave (Chi #63c: "Mistakes seen" of a photo stayed under One sentence)
-  const pickKind = (k: Kind) => { if (k === 'photo' && isPhoto) return; setKind(k); setGuess(null); if (k !== 'photo') { setWork(null); setFocus(''); setNoWork(false); } if (k === 'photo') void firstGuide('photos', guides.photos); };
+  const pickKind = (k: Kind) => { if (k === 'photo' && isPhoto) return; setKind(k); setGuess(null); if (k !== 'photo') { setWork(null); setFocus(''); setNoWork(false); lastImgs.current = []; } if (k === 'photo') void firstGuide('photos', guides.photos); };
   const find = () => run('find', async () => {
     setMissing(false);
     try { setMatch((await api.match(areaId, text)).match); } catch (e) { if (e instanceof ApiError && e.code === 'noMatch') setMissing(true); else throw e; }
