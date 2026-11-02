@@ -96,11 +96,13 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
   // "Only what you gave" (Chi #60): the part's passages on the pages her material was found on (places in the file),
   // and the part's range shown as those pages. A range outside the part, or with no text, keeps the whole part.
   type Part = NonNullable<Awaited<ReturnType<typeof sectionOf>>>;
+  // pages: the ticked pages (Son, 2 Nov: always asked, the matched pages ticked, she unticks what she does not want), or a range
   const narrowed = async (m: Part, pages: unknown): Promise<Part & { narrow?: boolean }> => {
     const p = pages as { from?: unknown; to?: unknown } | undefined, from = Math.round(Number(p?.from)), to = Math.round(Number(p?.to));
-    if (!(from >= 1 && to >= from)) return m;
+    const want = Array.isArray(pages) ? new Set(pages.slice(0, 400).map((x) => Math.round(Number(x))).filter((x) => x >= 1)) : from >= 1 && to >= from ? new Set(Array.from({ length: Math.min(400, to - from + 1) }, (_, k) => from + k)) : null;
+    if (!want?.size) return m;
     const file = new Map((await d.sql.query<{ id: string; page: number }>('select id, page from passages where section_id = $1', [m.section.id])).map((x) => [x.id, Number(x.page)]));
-    const keep = m.passages.filter((x) => { const f = file.get(x.id) ?? 0; return f >= from && f <= to; });
+    const keep = m.passages.filter((x) => want.has(file.get(x.id) ?? 0));
     if (!keep.length || keep.length === m.passages.length) return m;
     const fs = keep.map((x) => file.get(x.id)!), lo = Math.min(...fs), hi = Math.max(...fs);
     return { ...m, passages: keep, section: { ...m.section, pageFrom: lo, pageTo: hi, ...printedRange(await shownPages(d.sql, m.section.bookId), lo, hi) }, narrow: true };

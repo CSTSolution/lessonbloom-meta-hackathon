@@ -594,7 +594,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
       // from the best citation's page, the cited pages next to it (a stray citation further on does not stretch it)
       const pg = new Set(m.cited.map((x) => Number(x.page)).filter((x) => x >= m.section.pageFrom && x <= m.section.pageTo)), first = Number(m.cited[0]?.page) || 0;
       let lo = pg.has(first) ? first : 0, top = lo; while (lo && pg.has(lo - 1)) lo--; while (top && pg.has(top + 1)) top++;
-      const hi = lo ? Math.min(m.section.pageTo, top + 1) : 0;
+      const hi = lo ? top : 0;   // the cited pages only: she ticks more if she wants (Son, 2 Nov)
       const narrow = lo && (lo > m.section.pageFrom || hi < m.section.pageTo) ? { pageFrom: lo, pageTo: hi, ...printedRange(await shownPages(sql, m.section.bookId), lo, hi) } : null;
       return c.json({ match: { sectionId: m.section.id, title: m.section.title, book: m.section.book, bookId: m.section.bookId, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, printedFrom: m.section.printedFrom ?? null, printedTo: m.section.printedTo ?? null, cited: m.cited, narrow,
         citation: citation(m, t.lang), preview: sourceOf(m, 1500) } });

@@ -244,3 +244,9 @@ test('the child\'s greeting does not repeat a kind named after the exercise (liv
   assert.equal(greetOf(w)?.vi, 'Hôm trước con còn nhầm vài câu, hôm nay mình luyện lại đúng những câu đó nhé.');
   assert.match(greetOf(typeWork({ questions: [{ q: '52 - 28', child: '36', mark: 'wrong' }] }))!.vi, /phép trừ có nhớ/);
 });
+
+test('a sum with its unit after the blank ("329 cm + 183 cm = ___ cm") is worked out by code (Chi #63)', () => {
+  for (const q of ['329 cm + 183 cm = ___ cm', '329 cm + 183 cm = ? cm', '109 km + 219 km = …… km']) assert.ok(readCalc(q)?.unit, q);
+  const w = typeWork({ questions: [{ q: '329 cm + 183 cm = ___ cm', child: '999 cm', mark: 'wrong' }, { q: '109 km + 219 km = ___ km', child: '328', mark: 'right' }] });
+  assert.deepEqual(w.questions.map((q) => [q.right, q.kind, q.ok, q.unsure]), [['512 cm', 'add_carry', false, undefined], ['328 km', 'add_carry', true, undefined]]);
+});

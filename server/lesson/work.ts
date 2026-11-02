@@ -26,13 +26,15 @@ export const vnDay = (t = Date.now()) => new Date(t + 7 * 3600e3).toISOString().
 
 // --- reading a question ---
 const tidy = (s: string) => s.normalize('NFC').replace(/[−–—]/g, '-').replace(/÷/g, ':')
-  .replace(/(\d)\s*[x×*]\s*(?=\d)/g, '$1 × ').replace(/…|\.{2,}|_{2,}|□|○|◯|\[\s*\]|\(\s*\)/g, ' ? ').replace(/\s+/g, ' ').trim();
+  .replace(/(\d)\s*[x×*]\s*(?=\d)/g, '$1 × ').replace(/…+|\.{2,}|_{2,}|□|○|◯|\[\s*\]|\(\s*\)/g, ' ? ').replace(/\?(\s*\?)+/g, '?').replace(/\s+/g, ' ').trim();
 const N = '(\\d{1,7}|\\?)';
 const CALC = new RegExp(`^${N} ?([+\\-×:]) ?${N}(?: ?= ?${N}?)?$`);
 const CMP = /^(\d{1,7})(?: ?([+-]) ?(\d{1,7}))? ?\? ?(\d{1,7})$/;
 const num = (s: string) => (s === '?' ? undefined : Number(s));
 // "329 cm + 183 cm" is a sum too (Chi #54): one unit after the numbers is set aside and given back with the answer
 const UNIT = /(\d)\s*(cm|dm|mm|km|m|kg|g|ml|l|đồng|giờ|phút|ngày|tuổi|quyển|cái|con|bạn|quả)(?!\p{L})/giu;
+// the unit printed after the blank too: "329 cm + 183 cm = ___ cm" (Chi #63: it showed "?" on the English screens)
+const BLANK_UNIT = /\?\s*(cm|dm|mm|km|m|kg|g|ml|l|đồng|giờ|phút|ngày|tuổi|quyển|cái|con|bạn|quả)(?!\p{L})/giu;
 // the number in what she wrote ("486 quyển", "3,5") or in a right answer with its unit; in her working
 // ("64 - 28 = 46 (quả)", live test 1 Nov) the one after the last "="
 export const numIn = (s: string) => { const m = /\d+(?:[.,]\d+)?/.exec(s.includes('=') ? s.slice(s.lastIndexOf('=') + 1) : s); return m ? Number(m[0].replace(',', '.')) : NaN; };
@@ -41,7 +43,7 @@ export const numIn = (s: string) => { const m = /\d+(?:[.,]\d+)?/.exec(s.include
 // after the units are set aside, so "m" or "g" after a number stays a unit. "Tìm x:" before the sum is dropped.
 const LETTER = /(?<![\p{L}\d])[a-z](?![\p{L}\d])/gu, FIND_X = /^(?:tìm|find)\s+[a-z]\s*[:,.]?\s*/iu;
 export function readCalc(q: string): Calc | null {
-  const units = new Set<string>(), t0 = tidy(q).replace(FIND_X, '').replace(UNIT, (_, d: string, u: string) => { units.add(u.toLowerCase()); return d; }).replace(LETTER, '?');
+  const units = new Set<string>(), t0 = tidy(q).replace(FIND_X, '').replace(UNIT, (_, d: string, u: string) => { units.add(u.toLowerCase()); return d; }).replace(BLANK_UNIT, (_, u: string) => { units.add(u.toLowerCase()); return '?'; }).replace(LETTER, '?');
   const x = calcOf(t0);
   return x && units.size === 1 ? { ...x, unit: [...units][0] } : units.size > 1 ? null : x;
 }
