@@ -141,7 +141,9 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const source = ps.source;
     try {
       const setup = await d.as(t.id, async () => { await requireOnTask(d.ai, source); return intake(d.ai, source, t.lang); });
-      return c.json({ setup: { ...setup, subject: a.subject, grade: a.grade }, citation: citation(m, t.lang) });
+      // several parts: the title names them all ("Colours & My family"), not only the one the model leaned on (live, 2 Nov)
+      const title = ps.parts.length > 1 ? ps.parts.map((p) => p.section.title.replace(/^(unit|lesson|chapter|bài|chủ đề|chương)\s*[\divxlc.]+\s*[:.\-–]\s*/iu, '').trim()).join(' & ').slice(0, 120) : setup.title;
+      return c.json({ setup: { ...setup, title, subject: a.subject, grade: a.grade }, citation: citation(m, t.lang) });
     } catch (e) { return aiError(c, e); }
   });
 

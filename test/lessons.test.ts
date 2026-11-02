@@ -261,7 +261,7 @@ test('a lesson from several parts of one book (Son, 2 Nov): their ticked pages i
   // three parts chosen, pages ticked in two of them: the third is left out
   const pages = [p1.page_from, p3.page_from];
   const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionIds: [p3.id, p1.id, p2.id], pages })).json;
-  assert.ok(setup?.title, 'the setup comes from the ticked pages');
+  assert.equal(setup?.title, `${p1.title.replace(/^Lesson \d+:\s*/, '')} & ${p3.title.replace(/^Lesson \d+:\s*/, '')}`, 'the title names the parts with ticked pages');
   const r = await call('POST', '/api/t/lessons', { areaId, sectionIds: [p3.id, p1.id, p2.id], request: '', setup, pages });
   assert.equal(r.status, 200);
   const l = await s.sql.one<{ refs: any[]; source: string }>('select refs, source from lessons where id = $1', [r.json.id]);
