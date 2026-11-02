@@ -125,7 +125,7 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
 
   // A lesson always comes from one section of one knowledge area: that section is its only source.
   app.post('/api/t/lessons', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown }));
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown; skills?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown; skills?: unknown }));
     const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m0 = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
     if (!a || !m0) return fail(c, 'notFound', 404);
     const m = await narrowed(m0, b.pages), narrow = !!m.narrow;
@@ -155,7 +155,9 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
     const ai = forPrompt(setup);
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, ai.title, ...ai.objectives, ai.note || '', ...(ai.work?.questions || []).map((q) => `${q.q} ${q.child}`)].join('\n\n'))); } catch (e) { return aiError(c, e); }
-    const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en') }];
+    // the skills she chose it by (skills map, beta): only skills of this part, shown on the lesson as its category
+    const skills = Array.isArray(b.skills) && b.skills.length ? await d.sql.query<{ id: string; name: string }>('select id, name from skill_nodes where id = any($1) and area_id = $2 and section_id = $3 order by ord', [b.skills.slice(0, 20).map(String), a.id, m.section.id]) : [];
+    const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en'), ...(skills.length ? { skills } : {}) }];
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
     // a lesson holds its credits up front, pictures included (Son, 30 Oct); what it does not use comes back
     // when it is all done (pictures and video too). One job at a time per account: it waits in her line.

@@ -25,8 +25,8 @@ export class Lessons {
   get(teacherId: string, id: string) { return this.sql.one<Lesson>('select * from lessons where id = $1 and teacher_id = $2', [id, teacherId]); }
   list(teacherId: string) {
     // with where it was given: "assigned" while any assignment is open, "done" once all are past due, else a draft
-    return this.sql.query<Pick<Lesson, 'id' | 'status' | 'setup' | 'created_at'> & { slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }>(
-      `select l.id, l.status, l.setup, l.created_at, l.video_status = 'ready' as video, jsonb_array_length(l.slides) as slides, jsonb_array_length(l.items) as items, jsonb_array_length(l.cards) as cards,
+    return this.sql.query<Pick<Lesson, 'id' | 'status' | 'setup' | 'created_at'> & { ref: Record<string, unknown> | null; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }>(
+      `select l.id, l.status, l.setup, l.created_at, l.refs->0 as ref, l.video_status = 'ready' as video, jsonb_array_length(l.slides) as slides, jsonb_array_length(l.items) as items, jsonb_array_length(l.cards) as cards,
          (select x->>'example' from jsonb_array_elements(l.slides) x where coalesce(x->>'example', '') <> '' limit 1) as example,
          coalesce((select json_agg(distinct jsonb_build_object('id', k.id, 'name', k.name)) from assignments a join classes k on k.id = a.class_id where a.lesson_id = l.id and a.removed_at is null), '[]') as classes,
          exists (select 1 from assignments a where a.lesson_id = l.id and a.removed_at is null and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date)) as open,

@@ -188,6 +188,9 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
                   <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example ? <><span className="thumb-tag">{t.example}</span><span>{r.example}</span></> : r.setup.title.trim().charAt(0).toUpperCase()}</div>
                   {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}
                   <b className="small">{r.setup.title}</b>
+                  {/* what it covers (Son, 2 Nov): the book part and pages, and the skills it was chosen by */}
+                  {r.ref?.title && <span className="cat" title={r.ref[lang]}>📖 {r.ref.title}{/((?:p|tr)\.\s*[\d–, -]+)$/.exec(r.ref[lang] || '')?.[1] ? ` · ${/((?:p|tr)\.\s*[\d–, -]+)$/.exec(r.ref[lang] || '')![1]}` : ''}</span>}
+                  {r.ref?.skills?.length ? <span className="cat skill" title={r.ref.skills.map((k) => k.name).join(' · ')}>🧠 {r.ref.skills.map((k) => k.name).join(' · ')}</span> : null}
                   <span className="small muted">{r.status === 'ready' ? t.parts(r.slides, r.items, r.cards, r.video) : t.status[r.status as 'working' | 'error']}</span>
                   {g === 'draft' && r.status === 'ready' && <span className="btn small primary" style={{ alignSelf: 'start' }}>{t.carryOn}</span>}
                 </button>

@@ -39,7 +39,8 @@ export interface Item { id: string; subject: 'math' | 'english'; template: strin
 export interface Card { id: string; front: string; back: string; emoji?: string }
 export interface Step { at: string; vi: string; en: string }
 export interface Lesson { queue?: { place: number } | null; id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; voiced?: boolean; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
-export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
+export interface LessonRef { title: string; book?: string; pageFrom: number; pageTo: number; vi: string; en: string; skills?: { id: string; name: string }[] }
+export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; ref?: LessonRef | null; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number; source?: 'pdf' | 'text' | 'scan'; used?: number | null; returned?: number | null; page_one?: number | null; printed?: boolean }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
 export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number; printed_from?: number | null; printed_to?: number | null; printed?: (number | null)[] }
@@ -189,7 +190,7 @@ export const api = {
   uploadBook: (areaId: string, file: File, title: string, onProgress?: (share: number) => void) => upload<{ book: BookRow }>(`/t/areas/${areaId}/books?title=${encodeURIComponent(title)}`, file, onProgress),
   match: (areaId: string, request: string) => call<{ match: Match }>('POST', `/t/areas/${areaId}/match`, { request }),
   intake: (areaId: string, sectionId: string, pages?: number[]) => call<{ setup: Setup; citation: string }>('POST', '/t/intake', { areaId, sectionId, ...(pages ? { pages } : {}) }),
-  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup; pages?: number[] }) => call<{ id: string }>('POST', '/t/lessons', b).then((r) => { window.dispatchEvent(new Event('lbm-jobs')); return r; }),
+  create: (b: { areaId: string; sectionId: string; request: string; setup: Setup; pages?: number[]; skills?: string[] }) => call<{ id: string }>('POST', '/t/lessons', b).then((r) => { window.dispatchEvent(new Event('lbm-jobs')); return r; }),
   lessons: () => call<{ lessons: LessonRow[] }>('GET', '/t/lessons'),
   newPicture: (id: string, sid: string) => call<{ slide: Slide }>('POST', `/t/lessons/${id}/slides/${sid}/picture`),
   cutout: (id: string, sid: string, photo: string, name: string) => call<{ slide: Slide; matches: number }>('POST', `/t/lessons/${id}/slides/${sid}/cutout`, { photo, name }),
