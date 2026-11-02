@@ -551,30 +551,6 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     return c.json({ section: { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to, ...printedRange(shown, s.page_from, s.page_to) }, book: { id: bk?.id, title: bk?.title, source: bk?.source ?? 'pdf' }, pages, printed, original });
   });
 
-  // The knowledge map (Son, 30 Oct): her book → its parts → the lessons made from each part → the skills
-  // each lesson teaches (a skill taught in several lessons is one node), and where each lesson is assigned.
-  app.get('/api/t/areas/:id/map', async (c) => {
-    const t = c.get('teacher'), a = await areaOf(sql, t.id, c.req.param('id'));
-    if (!a) return fail(c, 'notFound', 404);
-    const sections = await sql.query<{ id: string; title: string; page_from: number; page_to: number; book_id: string }>(
-      `select s.id, s.title, s.page_from, s.page_to, s.book_id from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
-    const lessons = await sql.query<{ id: string; title: string; section: string; status: string; skills: { tag: string; name: string; kind: string }[]; classes: number }>(
-      `select l.id, l.setup->>'title' as title, l.refs->0->>'sectionId' as section, l.status, l.skills,
-          (select count(distinct x.class_id) from assignments x where x.lesson_id = l.id)::int as classes
-        from lessons l where l.teacher_id = $1 and l.area_id = $2 and l.status <> 'error' order by l.created_at`, [t.id, a.id]);
-    const books = await sql.query<{ id: string; title: string; pages: number }>('select id, title, pages from books where area_id = $1 order by created_at', [a.id]);
-    const skills = new Map<string, { id: string; name: string; kind: string; lessons: string[] }>();
-    for (const l of lessons) for (const k of l.skills ?? []) {
-      const key = String(k.name || k.tag).trim().toLowerCase(), x = skills.get(key) ?? { id: `k${skills.size + 1}`, name: k.name || k.tag, kind: k.kind, lessons: [] };
-      if (!x.lessons.includes(l.id)) x.lessons.push(l.id);
-      skills.set(key, x);
-    }
-    const shown = new Map(await Promise.all(books.map(async (b) => [b.id, await shownPages(sql, b.id)] as const)));
-    return c.json({ area: { id: a.id, name: a.name }, books, sections: sections.map((s) => { const f = shown.get(s.book_id); return { id: s.id, title: s.title, pageFrom: s.page_from, pageTo: s.page_to, bookId: s.book_id, ...(f ? printedRange(f, s.page_from, s.page_to) : {}) }; }),
-      lessons: lessons.map((l) => ({ id: l.id, title: l.title, section: l.section, status: l.status, classes: l.classes, skills: (l.skills ?? []).map((k) => skills.get(String(k.name || k.tag).trim().toLowerCase())!.id) })),
-      skills: [...skills.values()] });
-  });
-
   // What should this lesson teach? Her request (typed, read from a photo, or spoken) is matched to one
   // section of her books: hybrid search, Muse Spark re-rank, verified citations.
   app.post('/api/t/areas/:id/match', async (c: Context<Env>) => {
