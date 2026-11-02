@@ -3,6 +3,21 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261102.1144 (2 Nov, midday)
+
+Chi's review of 0935 (#65–#71):
+- **Flashcards (#65)**: "Again" says the card will come back; the count is cards done; a card sent back twice is
+  set aside "to go over", so the pile always ends; the end screen and the child's page say how many.
+- **Find the pairs (#66)**: kept as done and counted as a fourth step in "How far you've got".
+- **The same lesson twice (#67)**: each copy says when it was given (and the assigned list its book pages).
+- **Done lessons (#68, #69)**: a lesson everyone it was given to has finished moves to Done ("1/1 finished",
+  counted by child); a finished one is hidden from the list instead of unassigned; unassigning a started one says so.
+- **Word order (#70)**: used words fade, a tap on the sentence takes a word back, Check names the words not used;
+  each question says its kind ("Put the words in order", "Match the pairs", "True or false?").
+- **Matching (#71)**: the word side never carries its picture (also in lessons given before); the two columns are
+  never in one order.
+- A lesson from several parts is titled with all of them ("Colours & My family").
+
 ## v1.0.20261102.1116 (2 Nov, late morning)
 
 Son's requests of 2 Nov:
