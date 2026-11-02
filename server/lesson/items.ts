@@ -8,6 +8,10 @@
 // colour matched to a thing, not a swatch). An item with any issue never reaches anyone.
 import type { EnglishItem, Item, Lang, Level, MathItem, Op, Setup, Skill, Subject } from './types.ts';
 
+// a matching word never carries its picture (Chi #71: "down ⬇️" on the left gave the pair away)
+const PIC = /[\p{Extended_Pictographic}\uFE0F\u200D\u{1F3FB}-\u{1F3FF}]/gu;
+export const bare = (w: string) => w.replace(PIC, '').replace(/\s+/g, ' ').trim();
+
 export type Code = 'S' | 'K' | 'Q' | 'U' | 'scope' | 'range' | 'dup' | 'offlesson' | 'punct' | 'lang' | 'empty' | 'long' | 'shape' | 'clue' | 'picture';
 export interface Issue { code: Code; msg: string }
 export interface Scope { max?: number; ops?: Op[] }
@@ -212,7 +216,8 @@ export function buildEnglish(r: RawEnglish, id: string, lang?: Lang): EnglishIte
   const clean = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').trim();
   const it: EnglishItem = { id, subject: 'english', template: r.template, skill: clean(r.skill), level: r.level, prompt: clean(r.prompt), explain: clean(r.explain), answer: clean(r.answer) };
   if (r.template === 'match') it.prompt = MATCH_PROMPT[lang ?? (VI.test(it.prompt) ? 'vi' : 'en')];
-  if (r.template === 'match') { it.pairs = (r.pairs || []).map((p) => ({ word: clean(p.word), emoji: clean(p.emoji) })).slice(0, 5); it.answer = it.pairs.map((p) => `${p.word}=${p.emoji}`).join(','); }
+  // the word side is a word only (Chi #71: "down ⬇️" gave its picture away)
+  if (r.template === 'match') { it.pairs = (r.pairs || []).map((p) => ({ word: bare(clean(p.word)), emoji: clean(p.emoji) })).filter((p) => p.word).slice(0, 5); it.answer = it.pairs.map((p) => `${p.word}=${p.emoji}`).join(','); }
   if (r.template === 'fill') { it.sentence = clean(r.sentence); it.options = (r.options || []).map(clean).slice(0, 4); }
   if (r.template === 'listen') { it.say = clean(r.say); it.options = (r.options || []).map(clean).slice(0, 4); }
   if (r.template === 'order') it.words = (r.words || []).map(clean).filter(Boolean).slice(0, 12);

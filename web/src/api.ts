@@ -38,14 +38,14 @@ export interface Card { id: string; front: string; back: string; emoji?: string 
 export interface Step { at: string; vi: string; en: string }
 export interface Lesson { queue?: { place: number } | null; id: string; status: 'working' | 'ready' | 'error'; pictures_pending: boolean; refs: { bookId: string; title: string; vi: string; en: string; pageFrom: number }[]; setup: Setup; source: string; skills: Skill[]; slides: Slide[]; items: Item[]; cards: Card[]; steps: Step[]; agent: { note: string; changes: string[]; turns: number; finished: boolean } | null; rejected: { issues: string[]; codes?: string[] }[]; created_at: string; credits?: number; voiced?: boolean; video?: { url: string; seconds: number; chapters: { heading: string; start: number }[]; subtitles: boolean } | null; video_status?: string }
 export interface LessonRef { title: string; book?: string; pageFrom: number; pageTo: number; vi: string; en: string; skills?: { id: string; name: string }[] }
-export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; ref?: LessonRef | null; refs?: LessonRef[]; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
+export interface LessonRow { id: string; status: Lesson['status']; setup: Setup; created_at: string; ref?: LessonRef | null; refs?: LessonRef[]; done_by?: number; given_to?: number; slides: number; items: number; cards: number; video: boolean; example: string | null; classes: { id: string; name: string }[]; open: boolean; given: boolean }
 export interface BookRow { id: string; title: string; status: 'processing' | 'ready' | 'error'; pages: number; error: string | null; sections?: number; source?: 'pdf' | 'text' | 'scan'; used?: number | null; returned?: number | null; page_one?: number | null; printed?: boolean }
 export interface AreaRow { id: string; name: string; subject: 'math' | 'english'; grade: number; books: BookRow[] }
 export interface SectionRow { id: string; book_id: string; title: string; page_from: number; page_to: number; lessons?: number; printed_from?: number | null; printed_to?: number | null; printed?: (number | null)[] }
 export interface Match { sectionId: string; title: string; book: string; bookId: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null; narrow?: { pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null } | null; cited: { id: string; page: number; quote: string }[]; citation: string; preview: string }
 export interface ClassRow { id: string; name: string; code: string; kind?: 'class' | 'child'; grade?: number | null; pupils: number; joined: number; assignments: number }
 export interface PupilRow { id: string; name: string; link: string; url: string; joined_at: string | null; seen_at: string | null }
-export interface AssignedRow { id: string; lesson_id: string; title: string; due: string | null; created_at: string; items: number; done: number; started: number; seen?: number }
+export interface AssignedRow { id: string; lesson_id: string; title: string; due: string | null; created_at: string; items: number; done: number; started: number; seen?: number; answers?: number; refs?: { title: string; vi: string; en: string }[] }
 export interface ClassView { class: { id: string; name: string; code: string; url: string }; pupils: PupilRow[]; assignments: AssignedRow[] }
 export interface LessonAssignment { id: string; class_id: string; class_name: string; due: string | null; created_at: string; done: number; pupils: number }
 export type Label = 'solid' | 'practising' | 'repeat';
@@ -120,6 +120,7 @@ export const api = {
   assign: (lessonId: string, a: { classId: string; confirmed: boolean; due?: string; retry: boolean; hints: boolean; again?: boolean }) => call<{ assignment: { id: string; className: string } }>('POST', `/t/lessons/${lessonId}/assign`, a),
   // "Bỏ giao" (Chi #34): off the list; the lesson and the answers already given stay
   unassign: (id: string) => call<{ ok: true }>('DELETE', `/t/assignments/${id}`),
+  hideAssignment: (id: string) => call<{ ok: true }>('POST', `/t/assignments/${id}/hide`),
   lessonAssignments: (lessonId: string) => call<{ assignments: LessonAssignment[] }>('GET', `/t/lessons/${lessonId}/assignments`),
   setRole: (r: { role: 'teacher' | 'parent'; name: string; subject?: string; classes?: string[]; children?: { name: string; grade: number }[] }) => call<{ teacher: Teacher }>('POST', '/t/role', r),
   work: (images: { data: string; type: string }[]) => call<{ request: string; focus: string; work: Work }>('POST', '/t/notes/work', { images }),

@@ -16,7 +16,7 @@ const T = {
     kids: 'Học sinh', joined: 'Đã vào học', waiting: 'Chưa vào', addKids: '+ Thêm học sinh', kidsPh: 'Mỗi dòng một tên gọi, ví dụ:\nAn\nBình', save: 'Thêm',
     code: 'Mã lớp', onlyNames: 'Chỉ lưu tên gọi.', link: 'Đường dẫn vào lớp', print: 'In mã lớp', copy: 'Chép', copied: 'Đã chép', parentLink: 'Link riêng cho phụ huynh', remove: 'Xoá', rename: 'Đổi tên', del: 'Xoá lớp', delAsk: 'Xoá lớp này cùng bài đã giao và kết quả của các em?',
     empty: 'Cô tạo lớp đầu tiên, rồi thêm tên gọi các em.', noDue: 'Không hạn',
-    unassign: 'Bỏ giao', unassignAsk: (n: string) => `Bỏ bài này khỏi danh sách của lớp ${n}?\n\nBài giảng vẫn còn trong mục Bài giảng; kết quả các em đã làm vẫn có trong Tóm tắt.`,
+    unassign: 'Bỏ giao', unassignAsk: (n: string) => `Bỏ bài này khỏi danh sách của lớp ${n}?\n\nBài giảng vẫn còn trong mục Bài giảng; kết quả các em đã làm vẫn có trong Tóm tắt.`, unassignStarted: (n: string, d: number, k: number) => `${n} đã bắt đầu làm bài này (${d}/${k} làm xong). Bỏ giao thì bài biến khỏi màn hình của các em và không làm tiếp được.\n\nNhững câu đã làm vẫn có trong Tóm tắt. Bỏ giao?`, hide: 'Ẩn khỏi danh sách', hideAsk: 'Ẩn bài đã xong này khỏi danh sách?\n\nKết quả vẫn có trong Tóm tắt; bài giảng vẫn ở mục Bài giảng.', givenOn: (d: string) => `Giao ngày ${d}`,
   },
   en: {
     title: 'Your classes', lead: 'Pupils join with the class code; only first names are kept.', add: '+ Add class', namePh: 'Class name, e.g. 2A', create: 'Create', cancel: 'Cancel',
@@ -25,7 +25,7 @@ const T = {
     kids: 'Pupils', joined: 'Joined', waiting: 'Not yet', addKids: '+ Add pupils', kidsPh: 'One first name per line, e.g.:\nAn\nBinh', save: 'Add',
     code: 'Class code', onlyNames: 'First names only.', link: 'Link to join', print: 'Print class code', copy: 'Copy', copied: 'Copied', parentLink: 'Private link for parents', remove: 'Remove', rename: 'Rename', del: 'Delete class', delAsk: 'Delete this class with its assigned lessons and the pupils\' results?',
     empty: 'Create your first class, then add the pupils\' first names.', noDue: 'No due date',
-    unassign: 'Unassign', unassignAsk: (n: string) => `Remove this lesson from ${n}'s list?\n\nThe lesson stays in Lessons; what the pupils already did stays in the Summary.`,
+    unassign: 'Unassign', unassignAsk: (n: string) => `Remove this lesson from ${n}'s list?\n\nThe lesson stays in Lessons; what the pupils already did stays in the Summary.`, unassignStarted: (n: string, d: number, k: number) => `${n} already started this lesson (${d}/${k} finished). Unassigning takes it off their screen and they cannot carry on.\n\nWhat they already did stays in the Summary. Unassign?`, hide: 'Hide from the list', hideAsk: 'Hide this finished lesson from the list?\n\nThe results stay in the Summary; the lesson stays in Lessons.', givenOn: (d: string) => `Given ${d}`,
   },
 };
 
@@ -96,11 +96,13 @@ function ClassBody({ id, t, onChange, parent }: { id: string; t: (typeof T)['vi'
       {v.assignments.length ? (
         <table className="tbl stack-sm"><thead><tr><th>{lang === 'en' ? 'Lesson' : 'Bài giảng'}</th><th>{t.due}</th><th>{t.doneOf}</th><th>{lang === 'en' ? 'Status' : 'Trạng thái'}</th><th /></tr></thead><tbody>
           {v.assignments.map((a) => (
-            <tr key={a.id}><td>{a.title}</td><td>{a.due ? day(a.due, lang) : t.noDue}</td>
+            <tr key={a.id}><td>{a.title}<span className="small muted" style={{ display: 'block' }}>{t.givenOn(new Date(a.created_at).toLocaleString(lang === 'en' ? 'en-GB' : 'vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }))}{a.refs?.length ? ` · ${a.refs.map((r) => (lang === 'en' ? r.en : r.vi).replace(/^(From|Theo):\s*[^,]*,\s*/, '')).join('; ')}` : ''}</span></td><td>{a.due ? day(a.due, lang) : t.noDue}</td>
               <td><span className="meter"><i style={{ width: `${v.pupils.length ? (100 * a.done) / v.pupils.length : 0}%` }} /></span> {a.done}/{v.pupils.length}</td>
               <td>{(() => { const st = statusOf(a, v.pupils.length); return <span className={`tag ${st === 'expired' ? 'later' : st === 'done' ? 'done' : st === 'progress' ? 'current' : 'ai'}`}>{STATUS[lang][st]}</span>; })()}</td>
               <td><button className="link small" onClick={() => go(`/lesson/${a.lesson_id}`)}>{t.open}</button> · <button className="link small" onClick={() => go(`/insight?class=${id}&lesson=${a.lesson_id}`)}>{lang === 'en' ? 'Summary' : 'Xem tóm tắt'}</button>
-                {' · '}<button className="link small muted" onClick={async () => { if (await ask(t.unassignAsk(v.class.name), { ok: t.unassign, danger: true })) { await api.unassign(a.id); await load(); onChange(); } }}>{t.unassign}</button></td></tr>
+                {' · '}{statusOf(a, v.pupils.length) === 'done'
+                  ? <button className="link small muted" onClick={async () => { if (await ask(t.hideAsk, { ok: t.hide })) { await api.hideAssignment(a.id); await load(); onChange(); } }}>{t.hide}</button>
+                  : <button className="link small muted" onClick={async () => { if (await ask(a.answers || a.done ? t.unassignStarted(v.class.name, a.done, v.pupils.length) : t.unassignAsk(v.class.name), { ok: t.unassign, danger: true })) { await api.unassign(a.id); await load(); onChange(); } }}>{t.unassign}</button>}</td></tr>
           ))}
         </tbody></table>
       ) : <p className="small muted">{t.none}</p>}

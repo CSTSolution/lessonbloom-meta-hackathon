@@ -24,7 +24,8 @@ const S = {
     roundDone: (n: number) => `Con làm xong ${n} câu rồi!`, roundSub: 'Con nghỉ một chút, hoặc làm tiếp nhé.', more: (n: number) => `Làm tiếp ${n} câu`, toLesson: 'Về trang bài học',
     finish: 'Con làm xong rồi!', finishSub: 'Con đã cố gắng rất nhiều. Đây là gợi ý cho con:',
     sCardsTag: 'Ôn lại', sCards: 'Ôn thẻ nhớ', sCardsSub: 'Ôn lại một chút là con nhớ lâu hơn.', sPairsTag: 'Trò chơi', sPairs: 'Lật thẻ tìm cặp', sPairsSub: 'Ghép phép tính với kết quả.', sWatchTag: 'Xem lại', sWatch: 'Xem lại bài', sWatchSub: 'Xem lại cách làm trong bài.', go: 'Làm ngay',
-    cardsOf: (t: string) => `Thẻ nhớ · ${t}`, cardN: (i: number, n: number) => `thẻ ${i}/${n}`, flip: 'Chạm để lật thẻ', again: 'Ôn lại', known: 'Đã nhớ', cardsDone: 'Con ôn xong thẻ nhớ rồi!',
+    cardsOf: (t: string) => `Thẻ nhớ · ${t}`, cardN: (i: number, n: number) => `đã xong ${i}/${n} thẻ`, flip: 'Chạm để lật thẻ', again: 'Ôn lại', known: 'Đã nhớ', cardsDone: 'Con ôn xong thẻ nhớ rồi!', comeBack: 'Thẻ này sẽ quay lại sau nhé.', setAside: 'Mình để thẻ này sang "cần ôn", đi tiếp nhé.', toReview: (n: number) => `${n} thẻ cần ôn`, reviewList: 'Thẻ cần ôn lại:',
+    givenOn: (d: string) => `giao ngày ${d}`, pickOrder: 'Con xếp các chữ thành câu nhé', pickMatch: 'Con ghép cho đúng nhé', pickTF: 'Đúng hay sai?', pickType: 'Con điền đáp số nhé', missing: (w: string) => `Còn chữ chưa dùng: ${w}`, tapBack: 'Chạm vào chữ ở trên để bỏ xuống.',
     pairsTitle: 'Lật thẻ tìm cặp', pairsSub: 'Ghép thẻ với nghĩa hoặc kết quả', pairsN: (f: number, n: number) => `${f}/${n} cặp`, pairsHint: 'Chạm vào 2 thẻ để lật. Tìm hết các cặp nhé!', pairsDone: 'Con tìm đủ các cặp rồi!', playAgain: 'Chơi lại',
   },
   en: {
@@ -37,7 +38,8 @@ const S = {
     roundDone: (n: number) => `You did ${n} questions!`, roundSub: 'Take a little break, or carry on.', more: (n: number) => `Do ${n} more`, toLesson: 'Back to the lesson',
     finish: 'All done!', finishSub: 'You worked really hard. Here is what to do next:',
     sCardsTag: 'Go over', sCards: 'Go over the flashcards', sCardsSub: 'A quick look helps you remember.', sPairsTag: 'Game', sPairs: 'Find the pairs', sPairsSub: 'Match each card with its partner.', sWatchTag: 'Look again', sWatch: 'Look at the lesson again', sWatchSub: 'See how it is done once more.', go: 'Go',
-    cardsOf: (t: string) => `Flashcards · ${t}`, cardN: (i: number, n: number) => `card ${i}/${n}`, flip: 'Tap to turn the card over', again: 'Again', known: 'I know it', cardsDone: 'You went over all the cards!',
+    cardsOf: (t: string) => `Flashcards · ${t}`, cardN: (i: number, n: number) => `${i}/${n} cards done`, flip: 'Tap to turn the card over', again: 'Again', known: 'I know it', cardsDone: 'You went over all the cards!', comeBack: 'This card will come back later.', setAside: 'This card goes to "go over again". On you go!', toReview: (n: number) => `${n} to go over`, reviewList: 'Cards to go over again:',
+    givenOn: (d: string) => `given ${d}`, pickOrder: 'Put the words in order', pickMatch: 'Match the pairs', pickTF: 'True or false?', pickType: 'Type the answer', missing: (w: string) => `Not used yet: ${w}`, tapBack: 'Tap a word above to take it back.',
     pairsTitle: 'Find the pairs', pairsSub: 'Match each card with its partner', pairsN: (f: number, n: number) => `${f}/${n} pairs`, pairsHint: 'Tap 2 cards to turn them over. Find all the pairs!', pairsDone: 'You found all the pairs!', playAgain: 'Play again',
   },
 };
@@ -55,7 +57,7 @@ async function p<R>(method: string, path: string, body?: unknown): Promise<R> {
   if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi', j.errorEn || 'Error', r.status);
   return j as R;
 }
-interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; done: boolean; answered: number; greet?: { vi: string; en: string } | null }
+interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; pairs_seen?: boolean; cards_review?: number; given?: string; done: boolean; answered: number; greet?: { vi: string; en: string } | null }
 interface Today { pupil: { name: string }; class: { name: string }; lessons: TodayRow[]; reminder?: { vi: string; en: string } | null }
 interface PItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean; fromWork?: boolean; stack?: { a: number; op: string; b: number } }
 interface PLesson { id: string; title: string; lang: L; retry: boolean; hints: boolean; video: string | null; slides: { id: string; heading: string; bullets: string[]; example?: string; image?: string }[]; items: PItem[]; cards: { id: string; front: string; back: string; emoji?: string }[]; tried: Record<string, boolean> }
@@ -121,20 +123,21 @@ function PupilPage() {
       {today.reminder && <div className="p-note" role="note"><span className="p-bang">!</span><span><b>{t.remind}</b> {lang === 'en' ? today.reminder.en : today.reminder.vi}</span></div>}
       {!today.lessons.length && <p className="p-soft">{t.nothing}</p>}
       {today.lessons.map((l, n) => {
-        const parts = [l.video ? l.video_seen : l.slides > 0 ? l.slides_seen : null, l.cards > 0 ? l.cards_seen : null, l.items > 0 ? l.done : null].filter((x) => x !== null) as boolean[];
+        const parts = [l.video ? l.video_seen : l.slides > 0 ? l.slides_seen : null, l.cards > 0 ? l.cards_seen : null, l.items > 0 ? l.done : null, l.cards >= 3 ? !!l.pairs_seen : null].filter((x) => x !== null) as boolean[];
+        const twin = today.lessons.filter((x) => x.title === l.title).length > 1, when = twin && l.given ? ` · ${t.givenOn(new Date(l.given).toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }))}` : '';
         return (
           <section key={l.id} className="p-lesson">
             <span className="p-chip">{t.subject[l.subject] || l.subject}</span>
             {/* only the newest is today's (Chi #51b: five lessons all said "Bài hôm nay") */}
-            {n === 0 ? <h1>{t.todayIs(l.title)}</h1> : <h2>{t.other(l.title)}</h2>}
+            {n === 0 ? <h1>{t.todayIs(l.title)}{when}</h1> : <h2>{t.other(l.title)}{when}</h2>}
             {/* made from her own marked work (Chi #46): what she found tricky last time */}
             {l.greet && <p className="p-soft">{lang === 'en' ? l.greet.en : l.greet.vi}</p>}
             <div className="p-acts">
               {l.video ? <Act tone="blue" icon="play" title={t.video} sub={l.video_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/video`)} />
                 : l.slides > 0 && <Act tone="blue" icon="book" title={t.slides} sub={l.slides_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/slides`)} />}
-              {l.cards > 0 && <Act tone="green" icon="cards" title={t.cards} sub={`${t.nCards(l.cards)}${l.cards_seen ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/cards`)} />}
+              {l.cards > 0 && <Act tone="green" icon="cards" title={t.cards} sub={`${t.nCards(l.cards)}${l.cards_seen ? ` · ${t.doneMark}` : ''}${l.cards_seen && l.cards_review ? ` · ${t.toReview(l.cards_review)}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/cards`)} />}
               {l.items > 0 && <Act tone="orange" icon="pencil" title={t.practise} sub={`${t.nItems(l.items)}${l.done ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/practice`)} />}
-              {l.cards >= 3 && <Act tone="purple" icon="pairs" title={t.pairs} sub={t.nPairs(Math.min(PAIRS, l.cards))} onClick={() => go(`/hoc/a/${l.id}/match`)} />}
+              {l.cards >= 3 && <Act tone="purple" icon="pairs" title={t.pairs} sub={`${t.nPairs(Math.min(PAIRS, l.cards))}${l.pairs_seen ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/match`)} />}
             </div>
             {parts.length > 0 && <div className="p-progress"><span className="small"><b>{t.gotSoFar}</b></span><div className="p-seg">{parts.map((x, i) => <i key={i} className={x ? 'on' : ''} />)}</div></div>}
           </section>
@@ -181,9 +184,9 @@ function LessonPart({ id, part, t, onBack }: { id: string; part: Part; t: T; onB
   const [l, setL] = useState<PLesson | null>(null);
   useEffect(() => { p<{ lesson: PLesson }>('GET', `/a/${id}`).then((r) => setL(r.lesson)).catch(onBack); }, [id]);
   if (!l) return <div className="pupil" />;
-  const seen = (what: string) => { void p('POST', `/a/${id}/seen`, { what }); };
-  if (part === 'cards') return <Cards l={l} t={t} onBack={onBack} onEnd={() => { seen('cards'); onBack(); }} />;
-  if (part === 'match') return <Match l={l} t={t} onBack={onBack} />;
+  const seen = (what: string, review?: number) => { void p('POST', `/a/${id}/seen`, { what, ...(review != null ? { review } : {}) }); };
+  if (part === 'cards') return <Cards l={l} t={t} onBack={onBack} onEnd={(review) => { seen('cards', review); onBack(); }} />;
+  if (part === 'match') return <Match l={l} t={t} onBack={onBack} onAll={() => seen('pairs')} />;
   return (
     <Frame t={t} title={l.title} onBack={onBack}>
       {part === 'slides' && <Slides l={l} t={t} onEnd={() => { seen('slides'); onBack(); }} />}
@@ -212,19 +215,32 @@ function Slides({ l, t, onEnd }: { l: PLesson; t: T; onEnd: () => void }) {
   );
 }
 
-// "Lật thẻ" flashcards: tap to turn over; "Ôn lại" puts the card at the back of the pile, "Đã nhớ" takes it out.
-function Cards({ l, t, onBack, onEnd }: { l: PLesson; t: T; onBack: () => void; onEnd: () => void }) {
-  const [pile, setPile] = useState(() => l.cards.map((_, i) => i)), [flip, setFlip] = useState(false);
+// "Lật thẻ" flashcards: tap to turn over; "Đã nhớ" takes the card out. "Ôn lại" puts it at the back and says it will
+// come back (Chi #65: the count stood still and the pile never seemed to end); a card sent back twice is set aside
+// as "to go over" so the pile always ends, and the end screen names those cards.
+function Cards({ l, t, onBack, onEnd }: { l: PLesson; t: T; onBack: () => void; onEnd: (review: number) => void }) {
+  const [pile, setPile] = useState(() => l.cards.map((_, i) => i)), [flip, setFlip] = useState(false), [again, setAgain] = useState<Record<number, number>>({}), [aside, setAside] = useState<number[]>([]), [note, setNote] = useState('');
   const known = l.cards.length - pile.length, c = l.cards[pile[0]];
-  const step = (keep: boolean) => { setFlip(false); setPile(keep ? [...pile.slice(1), pile[0]] : pile.slice(1)); };
+  const step = (keep: boolean) => {
+    setFlip(false);
+    const k = pile[0];
+    if (!keep) { setNote(''); setPile(pile.slice(1)); return; }
+    const n = (again[k] ?? 0) + 1;
+    setAgain({ ...again, [k]: n });
+    if (n >= 2) { setAside([...aside, k]); setPile(pile.slice(1)); setNote(t.setAside); }
+    else { setPile([...pile.slice(1), k]); setNote(t.comeBack); }
+  };
   return (
-    <Frame tone="tone-cards" t={t} title={t.cardsOf(l.title)} sub={c ? t.cardN(known + 1, l.cards.length) : ''} onBack={onBack}>
+    <Frame tone="tone-cards" t={t} title={t.cardsOf(l.title)} sub={c ? t.cardN(known, l.cards.length) : ''} onBack={onBack}>
       {c ? <>
         <button className={`p-flash ${flip ? 'back' : ''}`} onClick={() => setFlip(!flip)}>
           {!flip ? <>{c.emoji && <span className="p-emo">{c.emoji}</span>}<b className="p-big-word">{c.front}</b><span className="p-soft small">{t.flip}</span></> : <b className="p-big-word ok">{c.back}</b>}
         </button>
         <div className="p-actions two"><button className="p-btn soft-orange" onClick={() => step(true)}>{t.again}</button><button className="p-btn ok" onClick={() => step(false)}>{t.known}</button></div>
-      </> : <div className="p-stack center" style={{ padding: 0 }}><span className="p-badge"><Icon name="star" size={40} /></span><h2>{t.cardsDone}</h2><button className="p-btn main" onClick={onEnd}>{t.done}</button></div>}
+        {note && <p className="p-soft small center" role="status">{note}</p>}
+      </> : <div className="p-stack center" style={{ padding: 0 }}><span className="p-badge"><Icon name="star" size={40} /></span><h2>{t.cardsDone}</h2>
+        {aside.length > 0 && <p className="p-soft">{t.reviewList} <b>{aside.map((k) => l.cards[k].front).join(', ')}</b></p>}
+        <button className="p-btn main" onClick={() => onEnd(aside.length)}>{t.done}</button></div>}
     </Frame>
   );
 }
@@ -235,10 +251,10 @@ function Practice({ l, t, onHome, to }: { l: PLesson; t: T; onHome: () => void; 
   const startAt = Object.keys(l.tried).length >= l.items.length ? l.items.length : firstOpen;
   const [i, setI] = useState(startAt), [roundStart, setRoundStart] = useState(startAt), [pause, setPause] = useState(false);
   const [given, setGiven] = useState(''), [res, setRes] = useState<{ correct: boolean | null; again: boolean; explain: string } | null>(null), [busy, setBusy] = useState(false);
-  const [order, setOrder] = useState<number[]>([]), [pairs, setPairs] = useState<Record<string, string>>({}), [pickL, setPickL] = useState('');
+  const [order, setOrder] = useState<number[]>([]), [pairs, setPairs] = useState<Record<string, string>>({}), [pickL, setPickL] = useState(''), [miss, setMiss] = useState('');
   const audio = useRef<HTMLAudioElement | null>(null);
   const it = l.items[i], roundEnd = Math.min(l.items.length, roundStart + ROUND), inRound = roundEnd - roundStart;
-  useEffect(() => { setGiven(''); setRes(null); setOrder([]); setPairs({}); setPickL(''); }, [i]);
+  useEffect(() => { setGiven(''); setRes(null); setOrder([]); setPairs({}); setPickL(''); setMiss(''); }, [i]);
 
   if (!it) return (
     <div className="p-stack center" style={{ padding: 0 }}>
@@ -283,7 +299,7 @@ function Practice({ l, t, onHome, to }: { l: PLesson; t: T; onHome: () => void; 
       <div className="p-seg blue" aria-label={t.qOf(i - roundStart + 1, inRound)}>{Array.from({ length: inRound }, (_, k) => <i key={k} className={roundStart + k < i || (roundStart + k === i && answered) ? 'on' : roundStart + k === i ? 'now' : ''} />)}</div>
       <div className="p-card q center">
         {it.fromWork && <span className="p-chip">{t.fromWork}</span>}
-        <span className="p-soft small">{split ? split[1] : t.pick} · {t.qOf(i - roundStart + 1, inRound)}</span>
+        <span className="p-soft small">{split ? split[1] : it.template === 'order' ? t.pickOrder : it.template === 'match' ? t.pickMatch : it.template === 'truefalse' ? t.pickTF : !it.options && (it.template === 'fill' || it.template === 'word' || it.template === 'column') ? t.pickType : t.pick} · {t.qOf(i - roundStart + 1, inRound)}</span>
         {/* "đặt tính rồi tính": the numbers one above the other, ones under ones (Chi #47) */}
         {it.stack ? <div className="p-col" role="img" aria-label={split ? split[2] : it.prompt}><span /><span>{it.stack.a}</span><span>{it.stack.op}</span><span>{it.stack.b}</span><i /></div>
           : <p className={split ? 'p-sum' : 'p-q'}>{split ? split[2] : it.prompt}</p>}
@@ -300,9 +316,11 @@ function Practice({ l, t, onHome, to }: { l: PLesson; t: T; onHome: () => void; 
       )}
       {it.template === 'order' && it.words && (
         <>
-          <div className="p-built">{order.map((k, j) => <span key={j} className="p-word on">{it.words![k]}</span>)}&nbsp;</div>
-          <div className="p-opts words">{it.words.map((w, k) => <button key={k} className="p-word" disabled={order.includes(k) || !!answered} onClick={() => setOrder([...order, k])}>{w}</button>)}</div>
-          {!answered && <div className="p-actions row2"><button className="p-btn" onClick={() => setOrder([])}>{t.clear}</button><button className="p-btn main" disabled={order.length !== it.words.length || busy} onClick={() => send(order.map((k) => it.words![k]).join(' '))}>{t.check}</button></div>}
+          <div className="p-built">{order.map((k, j) => <button key={j} className="p-word on" disabled={!!answered} onClick={() => { setOrder(order.filter((_, x) => x !== j)); setMiss(''); }}>{it.words![k]}</button>)}&nbsp;</div>
+          <div className="p-opts words">{it.words.map((w, k) => <button key={k} className={`p-word ${order.includes(k) ? 'used' : ''}`} disabled={order.includes(k) || !!answered} aria-hidden={order.includes(k)} onClick={() => { setOrder([...order, k]); setMiss(''); }}>{w}</button>)}</div>
+          {!answered && order.length > 0 && <p className="p-soft small center">{t.tapBack}</p>}
+          {miss && <p className="p-feedback" role="status"><b>{miss}</b></p>}
+          {!answered && <div className="p-actions row2"><button className="p-btn" onClick={() => { setOrder([]); setMiss(''); }}>{t.clear}</button><button className="p-btn main" disabled={!order.length || busy} onClick={() => { const left = it.words!.filter((_, k) => !order.includes(k)); if (left.length) setMiss(t.missing(left.join(', '))); else void send(order.map((k) => it.words![k]).join(' ')); }}>{t.check}</button></div>}
         </>
       )}
       {it.template === 'match' && it.left && it.right && (
@@ -343,7 +361,7 @@ function Video({ l, t, onEnd, onBack }: { l: PLesson; t: T; onEnd: () => void; o
 
 // "Lật thẻ tìm cặp": each flashcard becomes two face-down cards (its front and its back); turn two over,
 // a pair stays open. No timer, no score.
-function Match({ l, t, onBack }: { l: PLesson; t: T; onBack: () => void }) {
+function Match({ l, t, onBack, onAll }: { l: PLesson; t: T; onBack: () => void; onAll: () => void }) {
   const make = () => {
     const tiles = l.cards.slice(0, PAIRS).flatMap((c) => [{ k: c.id, text: c.front, emo: c.emoji }, { k: c.id, text: c.back, emo: '' }]);
     for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
@@ -356,7 +374,9 @@ function Match({ l, t, onBack }: { l: PLesson; t: T; onBack: () => void }) {
     setOpen(next);
     if (next.length === 2) setTimeout(() => { if (tiles[next[0]].k === tiles[next[1]].k) setFound((f) => [...f, tiles[next[0]].k]); setOpen([]); }, 800);
   };
-  const n = tiles.length / 2, all = found.length === n;
+  const n = tiles.length / 2, all = found.length === n, told = useRef(false);
+  // all pairs found: kept as done, like the flashcards (Chi #66), once
+  useEffect(() => { if (all && !told.current) { told.current = true; onAll(); } }, [all]);
   return (
     <Frame tone="tone-pairs" t={t} title={t.pairsTitle} sub={t.pairsSub} onBack={onBack}>
       <span className="p-chip">{t.pairsN(found.length, n)}</span>

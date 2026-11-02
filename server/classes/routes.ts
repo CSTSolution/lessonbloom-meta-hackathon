@@ -160,8 +160,10 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
         jsonb_array_length(a.content->'items')::int as items,
         (select count(*) from pupil_progress g where g.assignment_id = a.id and g.done_at is not null)::int as done,
         (select count(distinct pupil_id) from answers w where w.assignment_id = a.id)::int as started,
-        (select count(*) from pupil_progress g where g.assignment_id = a.id and (g.slides_at is not null or g.video_at is not null or g.cards_at is not null))::int as seen
-      from assignments a where a.class_id = $1 and a.removed_at is null order by a.created_at desc`, [k.id]);
+        (select count(*) from pupil_progress g where g.assignment_id = a.id and (g.slides_at is not null or g.video_at is not null or g.cards_at is not null or g.pairs_at is not null))::int as seen,
+        (select count(*) from answers w where w.assignment_id = a.id)::int as answers,
+        (select l.refs from lessons l where l.id = a.lesson_id) as refs
+      from assignments a where a.class_id = $1 and a.removed_at is null and a.hidden_at is null order by a.created_at desc`, [k.id]);
     return c.json({ class: { ...k, url: joinUrl(k.code) }, pupils, assignments });
   });
 
@@ -229,6 +231,13 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
 
   // "Bỏ giao" (Chi #34): only the assigner's own. Soft: the lesson stays in Lessons and the answers
   // already given stay in the summary; the child no longer sees it under "Today".
+  // a finished lesson leaves her list without being unassigned (Chi #68): the child's results stay in the Summary
+  app.post('/api/t/assignments/:id/hide', async (c) => {
+    const row = await sql.one('update assignments set hidden_at = now() where id = $1 and teacher_id = $2 and removed_at is null and hidden_at is null returning id', [c.req.param('id'), c.get('teacher').id]);
+    if (!row) return fail(c, 'notFound', 404);
+    return c.json({ ok: true });
+  });
+
   app.delete('/api/t/assignments/:id', async (c) => {
     const row = await sql.one('update assignments set removed_at = now() where id = $1 and teacher_id = $2 and removed_at is null returning id', [c.req.param('id'), c.get('teacher').id]);
     if (!row) return fail(c, 'notFound', 404);
@@ -286,6 +295,7 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
         jsonb_array_length(a.content->'slides')::int as slides, jsonb_array_length(a.content->'items')::int as items, jsonb_array_length(a.content->'cards')::int as cards,
         (select l.video_status = 'ready' from lessons l where l.id = a.lesson_id) as video,
         g.slides_at is not null as slides_seen, g.video_at is not null as video_seen, g.cards_at is not null as cards_seen, g.done_at is not null as done,
+        g.pairs_at is not null as pairs_seen, coalesce(g.cards_review, 0)::int as cards_review, a.created_at as given,
         (select count(distinct item_id) from answers w where w.assignment_id = a.id and w.pupil_id = $2)::int as answered
       from assignments a left join pupil_progress g on g.assignment_id = a.id and g.pupil_id = $2
       where a.class_id = $1 and a.removed_at is null and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
@@ -343,9 +353,11 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
   app.post('/api/p/a/:id/seen', async (c) => {
     const r = await assignmentOf(c);
     if (r.error) return r.error;
-    const what = (await c.req.json<{ what?: string }>().catch(() => ({} as { what?: string }))).what;
-    if (what !== 'slides' && what !== 'cards' && what !== 'video') return fail(c, 'bad');
+    const b = await c.req.json<{ what?: string; review?: unknown }>().catch(() => ({} as { what?: string; review?: unknown })), what = b.what;
+    if (what !== 'slides' && what !== 'cards' && what !== 'video' && what !== 'pairs') return fail(c, 'bad');
     await sql.query(`insert into pupil_progress (assignment_id, pupil_id, ${what}_at) values ($1, $2, now()) on conflict (assignment_id, pupil_id) do update set ${what}_at = coalesce(pupil_progress.${what}_at, now())`, [r.a.id, r.p.id]);
+    // the flashcards: how many she set aside to go over again (Chi #65), the latest time through
+    if (what === 'cards') await sql.query('update pupil_progress set cards_review = $3 where assignment_id = $1 and pupil_id = $2', [r.a.id, r.p.id, Math.max(0, Math.min(50, Math.round(Number(b.review) || 0)))]);
     return c.json({ ok: true });
   });
 

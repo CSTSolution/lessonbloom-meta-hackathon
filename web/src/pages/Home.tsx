@@ -30,7 +30,7 @@ const T = {
     nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/skills': 'Bản đồ kỹ năng', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
     teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string, step: string) => `Tiếp tục: ${what} · ${step}`, draftGo: 'Tiếp tục', allClasses: 'Tất cả các lớp', all: 'Tất cả',
-    groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, none: 'Chưa có bài', n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
+    groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, doneBy: (d: number, n: number) => `${d}/${n} đã làm xong`, none: 'Chưa có bài', n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
     status: { working: 'Đang soạn…', error: 'Chưa soạn được' }, example: 'Ví dụ', carryOn: 'Soạn tiếp', empty: 'Bài giảng đầu tiên: chọn sách trong Kho kiến thức, gõ một câu bài cần học, trợ lý soạn slide và bài tập rồi tự kiểm tra từng câu.',
     week: 'Tóm tắt tuần này', repeat: 'Dạng lỗi đang lặp lại', noRepeat: 'Chưa có dạng lỗi lặp lại.', seeSummary: 'Xem tóm tắt học tập',
     demo: 'Bản dùng thử', credits: (c: Credits) => `Lượt dùng: ${c.left}`, daily: (c: Credits) => `Hôm nay còn ${c.daily!.left}/${c.daily!.perDay} · số dư ${c.balance}`, until: (d: string) => `Thuê bao đến ${d}`,
@@ -41,7 +41,7 @@ const T = {
     nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/skills': 'Skills map', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
     teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string, step: string) => `Continue: ${what} · ${step}`, draftGo: 'Continue', allClasses: 'All classes', all: 'All',
-    groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, none: 'No lessons yet', n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
+    groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, doneBy: (d: number, n: number) => `${d}/${n} finished`, none: 'No lessons yet', n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),
     status: { working: 'Making…', error: 'Could not be made' }, example: 'Example', carryOn: 'Carry on', empty: 'Your first lesson: pick a book in Knowledge, type one sentence about what to learn; the agent writes slides and practice and checks every item.',
     week: 'This week', repeat: 'Mistakes that keep coming back', noRepeat: 'No repeated mistakes yet.', seeSummary: 'See the learning summary',
     demo: 'Demo', credits: (c: Credits) => `Credits: ${c.left}`, daily: (c: Credits) => `Today ${c.daily!.left}/${c.daily!.perDay} left · balance ${c.balance}`, until: (d: string) => `Subscribed until ${d}`,
@@ -162,7 +162,9 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
     ? { what: draft.text || draft.match?.title || draft.part || '', step: STEPS[lang][0], to: '/new' }
     : lastRow ? { what: lastRow.setup.title, step: STEPS[lang][last!.step - 1], to: `/lesson/${lastRow.id}` } : null;
   const shown = rows.filter((r) => !pick || r.classes.some((k) => k.id === pick));
-  const groups = { open: shown.filter((r) => r.open), draft: shown.filter((r) => !r.given), done: shown.filter((r) => r.given && !r.open) };
+  // Done: past its due date, or finished by everyone it was given to (Chi #69: done 1/1 still sat under Assigned)
+  const finished = (r: LessonRow) => !!r.given_to && (r.done_by ?? 0) >= r.given_to;
+  const groups = { open: shown.filter((r) => r.open && !finished(r)), draft: shown.filter((r) => !r.given), done: shown.filter((r) => r.given && (!r.open || finished(r))) };
   const subject = SUBJ[teacher.subject]?.[lang];
   return (
     <div className="page">
@@ -188,7 +190,7 @@ function Main({ teacher, t }: { teacher: Teacher; t: Dict }) {
               {open[g] && groups[g].length > 0 && <div className="lessons" style={{ paddingTop: 10 }}>{groups[g].map((r, i) => (
                 <button key={r.id} className="lesson-card" onClick={() => go(`/lesson/${r.id}`)}>
                   <div className={`thumb ${i % 2 ? 'alt' : ''}`}>{r.example ? <><span className="thumb-tag">{t.example}</span><span>{r.example}</span></> : r.setup.title.trim().charAt(0).toUpperCase()}</div>
-                  {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}</span>}
+                  {r.classes.length > 0 && <span className="small muted">{r.classes.map((k) => k.name).join(', ')}{r.given_to ? ` · ${t.doneBy(r.done_by ?? 0, r.given_to)}` : ''}</span>}
                   <b className="small">{r.setup.title}</b>
                   {/* what it covers (Son, 2 Nov): the book part and pages, and the skills it was chosen by */}
                   {(r.refs?.length ? r.refs : r.ref ? [r.ref] : []).map((x, k) => <span key={k} className="cat" title={x[lang]}>📖 {x.title}{/((?:p|tr)\.\s*[\d–, -]+)$/.exec(x[lang] || '')?.[1] ? ` · ${/((?:p|tr)\.\s*[\d–, -]+)$/.exec(x[lang] || '')![1]}` : ''}</span>)}

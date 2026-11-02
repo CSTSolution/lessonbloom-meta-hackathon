@@ -1,12 +1,13 @@
 // A pupil's answer, checked on the server against the answer code worked out (pupils never receive it),
 // and the item as a pupil may see it: no answer, no explanation, no words that are read aloud.
-import { numberWords } from '../lesson/items.ts';
+import { bare, numberWords } from '../lesson/items.ts';
 import type { Item } from '../lesson/types.ts';
 
 const norm = (s: unknown) => String(s ?? '').normalize('NFC').toLowerCase().replace(/[“”"'’.!?,;:]/g, ' ').replace(/\s+/g, ' ').trim();
 // a number in words, as text: case, spaces and hyphens do not count ("Three hundred and twenty-one")
 const say = (s: unknown) => norm(s).replace(/[-‐–]/g, ' ').replace(/\s+/g, ' ').trim();
-const pairsOf = (s: string) => new Set(String(s).split(',').map((p) => p.split('=').map(norm).join('=')).filter((p) => p.includes('=')));
+// pictures are taken off the word side (bare), also for lessons made before, so the child's "down=⬇️" still matches a stored "down ⬇️=⬇️" (Chi #71)
+const pairsOf = (s: string) => new Set(String(s).split(',').map((p) => { const [w = '', e = ''] = p.split('='); return `${norm(bare(w))}=${norm(e)}`; }).filter((p) => !p.startsWith('=') && !p.endsWith('=')));
 
 export function isRight(it: Item, given: unknown): boolean {
   const g = String(given ?? '').slice(0, 500);
@@ -188,7 +189,13 @@ export function forPupil(it: Item): PupilItem {
   }
   if (it.sentence) out.sentence = it.sentence;
   if (it.template === 'order' && it.words) out.words = it.words;
-  if (it.template === 'match' && it.pairs) { out.left = shuffle(it.pairs.map((p) => p.word), it.id + 'l'); out.right = shuffle(it.pairs.map((p) => p.emoji), it.id + 'r'); }
+  // both columns mixed, and never in the same order (Chi #71: three pairs side by side in one order)
+  if (it.template === 'match' && it.pairs) {
+    const left = shuffle(it.pairs.map((p) => p.word), it.id + 'l'), at = new Map(it.pairs.map((p) => [p.word, p.emoji]));
+    let right = shuffle(it.pairs.map((p) => p.emoji), it.id + 'r');
+    if (right.every((e, k) => at.get(left[k]) === e)) right = [...right.slice(1), right[0]];
+    out.left = left.map(bare); out.right = right;
+  }
   if (it.template === 'listen') out.listen = true;
   return out;
 }
