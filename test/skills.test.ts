@@ -165,3 +165,16 @@ test('comments on the map are kept, about the map or one skill', async () => {
   const notes = (await call('GET', `/api/t/areas/${areaId}/skills`)).json.notes;
   assert.deepEqual(notes.map((n: any) => [n.role, n.skill]), [['comment', null], ['comment', m.nodes[1].id]]);
 });
+
+test('a lesson chosen by skills keeps them (only skills of its part), and the lessons list shows its part and skills', async () => {
+  const s = await testServer(), call = s.client('198.51.100.206');
+  await call('POST', '/api/auth/demo');
+  const { areaId } = await areaWithBook(call, 'maths2');
+  const m = await mapOf(call, areaId), part = m.parts[1], mine = m.nodes.filter((n: any) => n.part === part.id), other = m.nodes.find((n: any) => n.part !== part.id);
+  const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionId: part.id })).json;
+  const r = await call('POST', '/api/t/lessons', { areaId, sectionId: part.id, request: `Skills: ${mine[0].name}`, setup, pages: mine[0].pages, skills: [mine[0].id, other.id] });
+  assert.equal(r.status, 200);
+  const row = (await call('GET', '/api/t/lessons')).json.lessons.find((l: any) => l.id === r.json.id);
+  assert.equal(row.ref.title, part.title);
+  assert.deepEqual(row.ref.skills, [{ id: mine[0].id, name: mine[0].name }], 'a skill of another part is not kept');
+});

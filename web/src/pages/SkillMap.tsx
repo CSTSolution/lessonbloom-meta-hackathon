@@ -10,6 +10,7 @@ import { openFeedback } from '../feedback.tsx';
 import { firstGuide, HelpDot, showGuide, type GuideCard } from '../guide.tsx';
 import { useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
+import { SourceView } from './Sources.tsx';
 
 const KIND = {
   vi: { vocabulary: 'Từ vựng', grammar: 'Ngữ pháp', sounds: 'Phát âm', reading: 'Đọc', writing: 'Viết', speaking: 'Nói', listening: 'Nghe', numbers: 'Số', calculation: 'Tính toán', measurement: 'Đo lường', shapes: 'Hình học', data: 'Dữ liệu', problems: 'Giải toán', other: 'Khác' },
@@ -32,6 +33,7 @@ const T = {
     g2: 'Tốn bao nhiêu lượt?', g2b: 'Lập bản đồ là tuỳ chọn. Trước khi lập, app cho biết số lượt ước tính và giữ trước số đó; xong thì chỉ trừ số đã dùng (không quá ước tính), phần còn lại được trả lại. Mỗi câu hỏi app về bản đồ dùng khoảng 1–2 lượt. Góp ý thì miễn phí.',
     g3: 'Beta: không bảo đảm', g3b: 'Đây là tính năng thử nghiệm, không có bảo đảm. Bản đồ do AI lập có thể thiếu, gộp hoặc gọi sai kỹ năng. Hãy kiểm tra trước khi dựa vào nó, nhờ app sửa, và góp ý cho chúng tôi để làm tốt hơn.',
     picker: 'Chọn trên bản đồ hoặc danh sách', tickHint: 'Bấm vào nút kỹ năng để tick hoặc bỏ tick.',
+    pageLead: 'Chọn một nguồn trong Kho kiến thức để xem hoặc lập bản đồ kỹ năng của nó.', noBooks: 'Bạn chưa có sách nào. Thêm sách ở Kho kiến thức trước.', toKnowledge: 'Mở Kho kiến thức',
     empty: 'Sách này chưa có bản đồ kỹ năng. Lập bản đồ là tuỳ chọn: bấm "Lập bản đồ kỹ năng" ở trên.', thinking: 'App đang trả lời…',
     pick: 'Chọn theo kỹ năng', pickLead: 'Tick các kỹ năng muốn dạy. Một bài soạn từ một phần sách, nên các kỹ năng tick cùng một phần; trang của chúng được tick ở dưới.', search: 'Tìm kỹ năng…', otherPart: 'Bạn đã chọn kỹ năng ở phần khác: chỉ giữ phần mới.', noMap: 'Sách này chưa có bản đồ kỹ năng. Lập bản đồ là tuỳ chọn, ở Kho kiến thức → Bản đồ kỹ năng.', openMap: 'Mở bản đồ kỹ năng',
   },
@@ -50,6 +52,7 @@ const T = {
     g2: 'What does it cost?', g2b: 'Building the map is optional. Before it starts, the app shows the estimated credits and holds them; when it is done you pay only what it used (never more than the estimate) and the rest comes back. Each question to the app about the map uses about 1–2 credits. Comments are free.',
     g3: 'Beta: no warranty', g3b: 'This is a beta feature with no warranty. A map made by AI can miss, merge or misname skills. Check it before you rely on it, ask the app to fix it, and send us feedback so we can make it better.',
     picker: 'Choose on the map or in a list', tickHint: 'Click a skill node to tick or untick it.',
+    pageLead: 'Pick a source from Knowledge to see or build its skills map.', noBooks: 'You have no books yet. Add one in Knowledge first.', toKnowledge: 'Open Knowledge',
     empty: 'This book has no skills map yet. It is optional: press "Build skills map" above.', thinking: 'The app is answering…',
     pick: 'Choose by skill', pickLead: 'Tick the skills to teach. A lesson comes from one part of the book, so the skills you tick are from one part; their pages are ticked below.', search: 'Find a skill…', otherPart: 'You picked a skill in another part: only the new part is kept.', noMap: 'This book has no skills map yet. Building one is optional, in Knowledge → Skills map.', openMap: 'Open the skills map',
   },
@@ -245,3 +248,20 @@ export function SkillPicker({ map, picked, onPick }: { map: SkillMap; picked: st
   );
 }
 export const SKILL_T = T;
+
+// The "Skills map · Beta" menu (Son, 2 Nov): her sources as choices, the chosen one's map, a part's pages on click
+export function SkillsPage() {
+  const t = useT(T), [areas, setAreas] = useState<{ id: string; name: string }[] | null>(null), [areaId, setAreaId] = useState(new URLSearchParams(location.search).get('area') || ''), [source, setSource] = useState('');
+  useEffect(() => { api.areas().then((r) => { const ready = r.areas.filter((a) => a.books.some((b) => b.status === 'ready')); setAreas(ready); setAreaId((x) => (x && ready.some((a) => a.id === x) ? x : ready[0]?.id || '')); }).catch(() => setAreas([])); }, []);
+  if (!areas) return null;
+  return (
+    <div className="page stack" style={{ gap: 12 }}>
+      <div><h1>{t.title} <span className="tag ai">{t.beta}</span></h1><p className="small muted">{t.pageLead}</p></div>
+      {!areas.length ? <div className="card stack"><p className="small">{t.noBooks}</p><button className="btn small" style={{ alignSelf: 'start' }} onClick={() => go('/knowledge')}>{t.toKnowledge}</button></div> : <>
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>{areas.map((a) => <button key={a.id} className={`pill ${a.id === areaId ? 'on' : ''}`} onClick={() => { setAreaId(a.id); setSource(''); }}>{a.name}</button>)}</div>
+        {source && <SourceView sectionId={source} onClose={() => setSource('')} />}
+        {areaId && <div className="card"><SkillMapView key={areaId} areaId={areaId} onSource={setSource} /></div>}
+      </>}
+    </div>
+  );
+}
