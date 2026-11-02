@@ -28,13 +28,13 @@ export function Stepper({ at, onStep, done = at - 1, parent = false, open = {} }
 
 const T = {
   vi: {
-    save: 'Lưu nháp và thoát', short: (left: number, need: number) => `Bạn có ${left} lượt, một bài cần ${need}. Nhập mã để có thêm lượt, rồi soạn tiếp ngay tại đây.`, shortDemo: 'Đăng nhập bằng email để nhập mã khuyến mãi.', promoPh: 'Mã khuyến mãi', apply: 'Dùng mã', promoOk: (n: number) => `Đã cộng ${n} lượt. Cô soạn tiếp nhé.`, usage: 'Xem lượt dùng', restored: 'Đã mở lại bài đang soạn dở.', discard: 'Bỏ nháp', h1: 'Chọn nguồn và tài liệu tạo bài', lead: 'Bài chỉ soạn trong nguồn cô chọn.', src: 'Nguồn kiến thức', srcLead: 'Chọn phần trong sách rồi tick trang, hoặc chọn kỹ năng trên bản đồ kỹ năng (Beta).', source: 'Nguồn', part: 'Phạm vi kiến thức', auto: 'Chọn một phần…', openKnowledge: 'Mở Kho kiến thức', by: 'Chọn theo', byPart: 'Phần và trang sách', bySkills: 'Bản đồ kỹ năng', skillsWord: 'Kỹ năng', orSkills: 'Hoặc chọn theo bản đồ kỹ năng', fromSkills: (n: string) => `Bài tập trung vào kỹ năng bạn tick: ${n}. Thêm một câu hoặc ảnh nếu muốn nhấn mạnh điều gì.`,
+    save: 'Lưu nháp và thoát', short: (left: number, need: number) => `Bạn có ${left} lượt, một bài cần ${need}. Nhập mã để có thêm lượt, rồi soạn tiếp ngay tại đây.`, shortDemo: 'Đăng nhập bằng email để nhập mã khuyến mãi.', promoPh: 'Mã khuyến mãi', apply: 'Dùng mã', promoOk: (n: number) => `Đã cộng ${n} lượt. Cô soạn tiếp nhé.`, usage: 'Xem lượt dùng', restored: 'Đã mở lại bài đang soạn dở.', discard: 'Bỏ nháp', h1: 'Chọn nguồn và tài liệu tạo bài', lead: 'Bài chỉ soạn trong nguồn cô chọn.', src: 'Nguồn kiến thức', srcLead: 'Chọn một hay nhiều phần trong sách rồi tick trang, hoặc chọn kỹ năng trên bản đồ kỹ năng (Beta).', source: 'Nguồn', part: 'Phạm vi kiến thức', auto: 'Chọn phần…', openKnowledge: 'Mở Kho kiến thức', by: 'Chọn theo', byPart: 'Phần và trang sách', bySkills: 'Bản đồ kỹ năng', skillsWord: 'Kỹ năng', orSkills: 'Hoặc chọn theo bản đồ kỹ năng', fromSkills: (n: string) => `Bài tập trung vào kỹ năng bạn tick: ${n}. Thêm một câu hoặc ảnh nếu muốn nhấn mạnh điều gì.`,
     mat: 'Tài liệu tạo bài', matLead: 'Một câu, ảnh bài giảng hoặc ảnh bài tập đã làm.', kinds: { one: 'Một câu mô tả', photo: 'Chụp / tải ảnh', paste: 'Dán văn bản' },
     photoLead: 'Chụp trang sách, giáo án, hoặc bài đã làm và đã chấm (tối đa 5 ảnh). App tự nhận ra rồi hỏi lại một câu. Không chụp mặt hay tên.', whatIs: 'Đây là gì?', asBook: 'Trang sách hoặc giáo án để dạy', asWorkP: 'Bài con đã làm, đã chấm', asWork: 'Bài em đã làm, đã chấm', guessed: 'máy đoán', notWork: 'App không đọc được ảnh này như bài đã chấm (không thấy dấu đúng/sai rõ). Chụp lại thẳng, đủ sáng sau khi chấm, hoặc giữ là trang sách.', rereading: 'Đang đọc lại ảnh…',
     help: 'Ảnh trang sách hay bài đã làm?', helpPart: 'Tự tìm hay chọn phần?', pickFirst: 'Chọn bài này của con nào, để lưu vào hồ sơ và soạn bài riêng cho con.', noChild: 'Chưa gắn với con nào: bài sẽ soạn chung và bài làm không được lưu vào hồ sơ.', noPupil: 'Chưa gắn với em nào: bài sẽ soạn chung và bài làm không được lưu vào hồ sơ.',
     what: 'Bài này cần học gì?', whatPh: 'Ví dụ: Phép cộng có nhớ trong phạm vi 100, tập trung vào nhớ 1 sang hàng chục.', pastePh: 'Dán đoạn văn bản (giáo án, đề bài…) vào đây.', say: '● Nói', stop: '■ Dừng', hearing: 'Đang nghe…',
     lessonPhoto: 'Chụp trang sách hoặc giáo án (tối đa 5 ảnh). Không chụp mặt người, tên hay thông tin cá nhân.', workPhoto: 'Chụp bài con đã làm (tối đa 5 ảnh). AI nhận ra dạng bài và chỗ sai, rồi tạo bài luyện cùng dạng trong phạm vi đã chọn. Không chụp tên hay mặt.', pick: '+ Chọn ảnh', reading: 'AI đang đọc ảnh…',
-    scopeQ: 'Soạn bài theo phạm vi nào?', scopeLead: 'App đã tick các trang khớp với tài liệu. Bỏ tick trang không cần, hoặc tick thêm.', scopeLeadAll: 'Mọi trang của phần này đã được tick. Bỏ tick trang không cần.', scopeLeadPick: 'Tick các trang bài cần dạy (ít nhất một trang).', scopeLeadSkills: 'Trang của các kỹ năng bạn chọn đã được tick. Bỏ tick hoặc tick thêm.', scopeAll: 'Chọn cả phần', scopeSome: (n: number, m: number) => `${n}/${m} trang · bài ngắn (tối đa 7 slide, 12 câu)`, scopeWhole: (m: number) => `Cả phần · ${m} trang (tối đa 10 slide, 20 câu)`, scopeNone: 'Tick ít nhất một trang.', pageOf: (p: string) => `tr. ${p}`,
+    scopeQ: 'Soạn bài theo phạm vi nào?', scopeLead: 'App đã tick các trang khớp với tài liệu. Bỏ tick trang không cần, hoặc tick thêm.', scopeLeadAll: 'Mọi trang của phần này đã được tick. Bỏ tick trang không cần.', scopeLeadPick: 'Tick các trang bài cần dạy (ít nhất một trang).', scopeLeadSkills: 'Trang của các kỹ năng bạn chọn đã được tick. Bỏ tick hoặc tick thêm.', tooMuch: (k: number) => `Khoảng ${k}.000 ký tự: quá nhiều cho một bài (tối đa khoảng 12.000, thường 5–8 trang). Bỏ tick bớt trang.`, allParts: (n: number) => `Tất cả ${n} phần`, selectAll: 'Chọn tất cả', scopeAll: 'Chọn cả phần', scopeSome: (n: number, m: number) => `${n}/${m} trang · bài ngắn (tối đa 7 slide, 12 câu)`, scopeWhole: (m: number) => `Cả phần · ${m} trang (tối đa 10 slide, 20 câu)`, scopeNone: 'Tick ít nhất một trang.', pageOf: (p: string) => `tr. ${p}`,
     find: 'Tìm trong nguồn', finding: 'Đang tìm…', found: (c: string) => `Phạm vi: ${c}. Bài chỉ dùng các trang này.`, quotes: 'Các đoạn AI đã dùng', mistakes: 'Chỗ con hay sai', notFound: 'Chưa có trong Kho kiến thức. Cô thêm tài liệu hoặc chọn phạm vi khác.',
     scope: (s: string) => `Phạm vi: ${s}`, next: 'Tiếp tục', noArea: 'Bạn chưa có sách nào. Bài giảng chỉ được soạn từ sách của bạn.', booksReading: 'Sách của bạn đang được đọc; đọc xong là soạn bài được. Trong lúc chờ, bạn có thể dùng sách mẫu.', sample: 'Dùng sách mẫu',
     upPdf: 'Tải sách (PDF)', upPhotos: 'Chụp / tải ảnh trang sách', sampleOf: 'Sách mẫu do đội LessonBloom tự viết:', samples: { maths2: 'Maths 2 (tiếng Anh)', english3: 'Tiếng Anh 3', toan2: 'Toán 2' }, noSource: 'Chưa có sách', addingSample: 'Đang thêm sách mẫu…',
@@ -46,13 +46,13 @@ const T = {
     whose: 'Bài này của em nào?', whoseP: 'Bài này của con nào?', whoseLeadP: 'Bài làm được lưu vào hồ sơ của con (không vào Kho kiến thức), và bài giảng được soạn riêng cho con.', noOne: 'Không chọn', whoseLead: 'Bài làm được lưu vào hồ sơ của em (không vào Kho kiến thức), và bài giảng được soạn riêng cho em.', fromRec: (d: string) => `Từ bài làm ngày ${d} trong hồ sơ.`, saving: 'Đang lưu bài làm…',
   },
   en: {
-    save: 'Save draft and leave', short: (left: number, need: number) => `You have ${left} credits; a lesson needs ${need}. Enter a code for more, then carry on right here.`, shortDemo: 'Sign in with your email to use a promo code.', promoPh: 'Promo code', apply: 'Apply', promoOk: (n: number) => `${n} credits added. Carry on.`, usage: 'See usage', restored: 'Your unfinished lesson was opened again.', discard: 'Discard draft', h1: 'Choose the source and the material', lead: 'The lesson is made only from the source you choose.', src: 'Source', srcLead: 'Choose the part of your book, then tick its pages; or choose skills on the skills map (Beta).', source: 'Source', part: 'Part', auto: 'Choose a part…', openKnowledge: 'Open Knowledge', by: 'Choose by', byPart: 'Part and pages', bySkills: 'Skills map', skillsWord: 'Skills', orSkills: 'Or choose by the skills map', fromSkills: (n: string) => `The lesson is about the skills you ticked: ${n}. Add a sentence or a photo to stress a point.`,
+    save: 'Save draft and leave', short: (left: number, need: number) => `You have ${left} credits; a lesson needs ${need}. Enter a code for more, then carry on right here.`, shortDemo: 'Sign in with your email to use a promo code.', promoPh: 'Promo code', apply: 'Apply', promoOk: (n: number) => `${n} credits added. Carry on.`, usage: 'See usage', restored: 'Your unfinished lesson was opened again.', discard: 'Discard draft', h1: 'Choose the source and the material', lead: 'The lesson is made only from the source you choose.', src: 'Source', srcLead: 'Choose one or more parts of your book, then tick their pages; or choose skills on the skills map (Beta).', source: 'Source', part: 'Part', auto: 'Choose parts…', openKnowledge: 'Open Knowledge', by: 'Choose by', byPart: 'Part and pages', bySkills: 'Skills map', skillsWord: 'Skills', orSkills: 'Or choose by the skills map', fromSkills: (n: string) => `The lesson is about the skills you ticked: ${n}. Add a sentence or a photo to stress a point.`,
     mat: 'Lesson material', matLead: 'A sentence, a photo of the lesson or of a finished exercise.', kinds: { one: 'One sentence', photo: 'Take / add photos', paste: 'Paste text' },
     photoLead: 'A book page, a lesson plan, or work that was done and marked (up to 5 photos). The app tells which it is, then asks you once. No faces or names.', whatIs: 'What is this?', asBook: 'A book page or lesson plan to teach from', asWorkP: "Your child's marked work", asWork: "A pupil's marked work", guessed: 'the app\'s guess', notWork: 'This photo could not be read as marked work (no clear right/wrong marks). Take it again straight on, in good light, after marking, or keep it as a book page.', rereading: 'Reading the photos again…',
     help: 'A book page or marked work?', helpPart: 'How do I choose?', pickFirst: 'Choose which child did this work, so it is kept in their profile and the lesson is made for them.', noChild: 'Not linked to a child: the lesson will be general and the work is not kept in a profile.', noPupil: 'Not linked to a pupil: the lesson will be general and the work is not kept in a profile.',
     what: 'What should this lesson teach?', whatPh: 'e.g. Unit 6: colours, the words red, blue and green.', pastePh: 'Paste text (a plan, an exercise…) here.', say: '● Speak', stop: '■ Stop', hearing: 'Listening…',
     lessonPhoto: 'Photograph the book page or your plan (up to 5 photos). No faces, names or personal details.', workPhoto: "Photograph the child's finished exercise (up to 5 photos). The AI finds its kind and the mistakes, then makes practice of the same kind in the chosen part. No names or faces.", pick: '+ Choose photos', reading: 'Reading the photos…',
-    scopeQ: 'Which pages should the lesson cover?', scopeLead: 'The app ticked the pages that match your material. Untick the ones you do not want, or tick more.', scopeLeadAll: 'Every page of this part is ticked. Untick the ones you do not want.', scopeLeadPick: 'Tick the pages the lesson should cover (at least one).', scopeLeadSkills: 'The pages of the skills you chose are ticked. Untick or tick more.', scopeAll: 'Tick the whole part', scopeSome: (n: number, m: number) => `${n} of ${m} pages · a short lesson (up to 7 slides, 12 questions)`, scopeWhole: (m: number) => `The whole part · ${m === 1 ? '1 page' : `${m} pages`} (up to 10 slides, 20 questions)`, scopeNone: 'Tick at least one page.', pageOf: (p: string) => `p. ${p}`,
+    scopeQ: 'Which pages should the lesson cover?', scopeLead: 'The app ticked the pages that match your material. Untick the ones you do not want, or tick more.', scopeLeadAll: 'Every page of this part is ticked. Untick the ones you do not want.', scopeLeadPick: 'Tick the pages the lesson should cover (at least one).', scopeLeadSkills: 'The pages of the skills you chose are ticked. Untick or tick more.', tooMuch: (k: number) => `About ${k},000 characters: too much for one lesson (at most about 12,000, usually 5–8 pages). Untick some pages.`, allParts: (n: number) => `All ${n} parts`, selectAll: 'Select all', scopeAll: 'Tick the whole part', scopeSome: (n: number, m: number) => `${n} of ${m} pages · a short lesson (up to 7 slides, 12 questions)`, scopeWhole: (m: number) => `The whole part · ${m === 1 ? '1 page' : `${m} pages`} (up to 10 slides, 20 questions)`, scopeNone: 'Tick at least one page.', pageOf: (p: string) => `p. ${p}`,
     find: 'Find in the source', finding: 'Searching…', found: (c: string) => `Scope: ${c}. The lesson uses only these pages.`, quotes: 'Passages the AI used', mistakes: 'Mistakes seen', notFound: 'Not in your knowledge area yet. Add material or choose another part.',
     scope: (s: string) => `Part: ${s}`, next: 'Continue', noArea: 'You have no books yet. Lessons are made only from your own books.', booksReading: 'Your book is being read; once it is done you can make a lesson. Meanwhile you can use a sample book.', sample: 'Use a sample book',
     upPdf: 'Upload a book (PDF)', upPhotos: 'Take or upload photos of pages', sampleOf: 'Sample books written by the LessonBloom team:', samples: { maths2: 'Maths 2', english3: 'English 3', toan2: 'Toán 2 (Vietnamese)' }, noSource: 'No book yet', addingSample: 'Adding the sample book…',
@@ -124,7 +124,7 @@ export function Create({ parent }: { parent: boolean }) {
   useEffect(() => { loadCr(); window.addEventListener('lbm-credits', loadCr); return () => window.removeEventListener('lbm-credits', loadCr); }, []);
   const short = !!cr && cr.left < cr.need, firstArea = useRef(true);
   // a draft with nothing in it yet (no part chosen, no sentence) is not kept (Chi #43)
-  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, part: sections.find((s) => s.id === sectionId)?.title, kind, text, focus, match, at: Date.now(), work, pupilId }); }, [areaId, sectionId, kind, text, focus, match, sections, work, pupilId]);
+  useEffect(() => { if (text.trim() || match || sectionId) writeDraft({ areaId, sectionId, part: partsTitle, kind, text, focus, match, at: Date.now(), work, pupilId }); }, [areaId, sectionId, kind, text, focus, match, sections, work, pupilId]);
   useEffect(() => { api.learners().then((r) => { const ls = r.learners.filter((x) => !parent || x.kind === 'child'); setLearners(ls); if (parent && ls.length === 1) setPupilId((p) => p || ls[0].id); }).catch(() => {}); }, []);
   // "Make a lesson from these mistakes" on the child's page: /create?work=<record>
   useEffect(() => { const rid = q.get('work'); if (rid) api.workRecord(rid).then((r) => { setKind('work'); setMoreMat(true); setWork(r.record); setPupilId(r.record.pupilId || ''); const req = r.request || r.record.topic || r.record.questions[0]?.q || ''; setText(req); setFocus(focusOf(r.record, lang)); bestFor(r.record, req); }).catch(() => {}); }, []);
@@ -163,41 +163,46 @@ export function Create({ parent }: { parent: boolean }) {
   const isPhoto = kind === 'photo' || kind === 'lesson' || kind === 'work';
   // another kind of material drops what the photos gave (Chi #63c: "Mistakes seen" of a photo stayed under One sentence)
   const pickKind = (k: Kind) => { if (k === 'photo' && isPhoto) return; setKind(k); setGuess(null); if (k !== 'photo') { setWork(null); setFocus(''); setNoWork(false); lastImgs.current = []; } if (k === 'photo') void firstGuide('photos', guides.photos); };
-  const chosen = sections.find((s) => s.id === sectionId), a = areas?.find((x) => x.id === areaId);
+  // her parts (Son, 2 Nov: several, or "select all", of one book): `sectionId` holds their ids, comma-joined, in book order
+  const ids = sectionId.split(',').filter(Boolean), chosenList = sections.filter((s) => ids.includes(s.id)), chosen = chosenList[0], a = areas?.find((x) => x.id === areaId);
+  const partsTitle = chosenList.map((s) => s.title).join(' + ');
+  const setParts = (xs: string[]) => { setSectionId(sections.filter((s) => xs.includes(s.id)).map((s) => s.id).join(',')); setMatch(null); setSetup(null); };
   // pages as printed in the book when known, as Knowledge shows them (Chi #53: "tr. 1–5" here, "Trang 10–14" there)
   // The scope, always asked (Son, 2 Nov): the part's pages, the ones her material matched ticked, she unticks what she does
   // not want. All ticked = the whole part; fewer = a short lesson on those pages only, her material its focus (Chi #60).
-  const partId = chosen?.id || match?.sectionId || '';
+  const partId = chosenList.map((s) => s.id).join(',');
   // or by the skills map (beta, Son 2 Nov): the skills she ticks give the part and the pages, and their names the focus
   const [by, setBy] = useState<'part' | 'skills'>(q.get('skills') ? 'skills' : 'part'), [smap, setSmap] = useState<SkillMap | null>(null), [picked, setPicked] = useState<string[]>(q.get('skills')?.split(',').filter(Boolean) ?? []);
   useEffect(() => { setSmap(null); if (areaId) api.skillMap(areaId).then(setSmap).catch(() => {}); }, [areaId]);
-  const pickedNodes = (smap?.nodes ?? []).filter((n) => picked.includes(n.id) && n.part === partId), skillPages = [...new Set(pickedNodes.flatMap((n) => n.pages))].sort((x, y) => x - y);
+  const pickedNodes = (smap?.nodes ?? []).filter((n) => picked.includes(n.id) && ids.includes(n.part)), skillPages = [...new Set(pickedNodes.flatMap((n) => n.pages))].sort((x, y) => x - y);
   const skillReq = pickedNodes.length ? `${t.skillsWord}: ${pickedNodes.map((n) => n.name).join('; ')}` : '';
-  const pick = (ids: string[]) => { setPicked(ids); const n = smap?.nodes.find((x) => x.id === ids[0]); if (n && n.part !== sectionId) { setSectionId(n.part); setMatch(null); } setSetup(null); };
-  const [partPages, setPartPages] = useState<{ page: number; label: string; head: string }[]>([]), [ticked, setTicked] = useState<number[]>([]);
+  // the skills' parts become her parts (the picker keeps them to one book)
+  const pick = (xs: string[]) => { setPicked(xs); setParts([...new Set((smap?.nodes ?? []).filter((n) => xs.includes(n.id)).map((n) => n.part))]); };
+  const [partPages, setPartPages] = useState<{ page: number; label: string; head: string; part: string; chars: number }[]>([]), [ticked, setTicked] = useState<number[]>([]);
   useEffect(() => {
     if (!partId) { setPartPages([]); setTicked([]); return; }
     let alive = true;
-    api.sectionSource(partId).then((src) => {
+    Promise.all(partId.split(',').map((id) => api.sectionSource(id))).then((srcs) => {
       if (!alive) return;
-      const ps = src.pages.map((p) => ({ page: p.page, label: String(p.printed ?? src.printed?.[p.page] ?? p.page), head: p.text.split('\n').map((x) => x.trim()).find((x) => x.length > 3)?.slice(0, 70) ?? '' }));
-      const n = match && !chosen ? match.narrow : null;
-      setPartPages(ps); setTicked(skillPages.length ? ps.map((p) => p.page).filter((p) => skillPages.includes(p)) : n ? ps.map((p) => p.page).filter((p) => p >= n.pageFrom && p <= n.pageTo) : []);
+      const ps = srcs.flatMap((src) => src.pages.map((p) => ({ page: p.page, part: src.section.title, chars: p.text.length + 20, label: String(p.printed ?? src.printed?.[p.page] ?? p.page), head: p.text.split('\n').map((x) => x.trim()).find((x) => x.length > 3)?.slice(0, 70) ?? '' })));
+      setPartPages(ps); setTicked(skillPages.length ? ps.map((p) => p.page).filter((p) => skillPages.includes(p)) : []);
     }).catch(() => { setPartPages([]); setTicked([]); });
     return () => { alive = false; };
   }, [partId, match, skillPages.join(',')]);
   const tick = (p: number, on: boolean) => { setTicked((xs) => (on ? [...new Set([...xs, p])].sort((x, y) => x - y) : xs.filter((x) => x !== p))); setSetup(null); };
   const pagesFor = ticked.length && ticked.length < partPages.length ? ticked : undefined;
   const shownPages = (ps: number[]) => { const ls = partPages.filter((p) => ps.includes(p.page)).map((p) => p.label); return ls.length > 2 ? `${ls[0]}–${ls[ls.length - 1]}` : ls.join(', '); };
-  const scopeText = !partId ? '' : `${chosen ? a?.name : match?.book} · ${t.page} ${pagesFor ? shownPages(pagesFor) : chosen ? pagesOf(chosen.page_from, chosen.page_to, chosen.printed_from, chosen.printed_to) : pagesOf(match!.pageFrom, match!.pageTo, match!.printedFrom, match!.printedTo)}`;
+  const scopeText = !partId ? '' : `${a?.name} · ${t.page} ${shownPages(ticked.length ? ticked : partPages.map((p) => p.page))}`;
+  // a lesson takes at most about 12,000 characters of the book (the server's LB_LESSON_TEXT): more is said here, before she goes on
+  const used = partPages.filter((p) => ticked.includes(p.page)).reduce((n, p) => n + p.chars, 0) + chosenList.reduce((n, s) => n + s.title.length, 0), tooMuch = used > 12000;
   const toStep2 = () => run('intake', async () => {
     // the work is saved to the child's profile first (Chi #46), as she corrected it; the lesson carries a copy
     let w = kind === 'work' ? work : null;
     if (w && pupilId) w = { ...(w.recordId && w.pupilId === pupilId ? (await api.updateWork(w.recordId, w)).record : (await api.saveWork(pupilId, w)).record) };
     if (w) setWork(w);
-    const s0 = (await api.intake(areaId, chosen?.id || match!.sectionId, pagesFor)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note, ...(w ? { work: w } : {}) };
+    const s0 = (await api.intake(areaId, ids, pagesFor)).setup, s = { ...s0, note: focus ? `${lang === 'en' ? 'Aim at these mistakes' : 'Tập trung vào lỗi'}: ${focus}` : s0.note, ...(w ? { work: w } : {}) };
     // a parent has no Questions step: the lesson is made straight from the setup the book gave
-    if (parent) { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || skillReq || chosen?.title || '', setup: s, pages: pagesFor, ...(pickedNodes.length ? { skills: pickedNodes.map((n) => n.id) } : {}) }); writeDraft(null); go(`/lesson/${id}`); return; }
+    if (parent) { const { id } = await api.create({ areaId, sectionIds: ids, request: text || skillReq || partsTitle, setup: s, pages: pagesFor, ...(pickedNodes.length ? { skills: pickedNodes.map((n) => n.id) } : {}) }); writeDraft(null); go(`/lesson/${id}`); return; }
     setSetup(s);
   });
   const set = <K extends keyof Setup>(k: K, v: Setup[K]) => setSetup((s) => (s ? { ...s, [k]: v } : s));
@@ -246,7 +251,7 @@ export function Create({ parent }: { parent: boolean }) {
           {noBook}
           <div className="grid2">
             <label className="field">{t.source}<select value={areaId} disabled={!areas.length} onChange={(e) => { setAreaId(e.target.value); setSectionId(''); setPicked([]); }}>{areas.length ? areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>) : <option value="">{t.noSource}</option>}</select></label>
-            {by === 'part' && <label className="field"><span className="row" style={{ gap: 6 }}>{t.part}<HelpDot label={t.helpPart} onClick={() => void showGuide('part', guides.part)} /></span><select value={sectionId} disabled={!areaId} onChange={(e) => { setSectionId(e.target.value); setMatch(null); setPicked([]); }}><option value="" disabled={!!sectionId}>{t.auto}</option>{sections.map((s) => <option key={s.id} value={s.id}>{s.title} · {t.page} {pagesOf(s.page_from, s.page_to, s.printed_from, s.printed_to)}</option>)}</select></label>}
+            {by === 'part' && <div className="field"><span className="row" style={{ gap: 6 }}>{t.part}<HelpDot label={t.helpPart} onClick={() => void showGuide('part', guides.part)} /></span><PartChecks sections={sections} ids={ids} disabled={!areaId} t={t} onChange={(xs) => { setParts(xs); setPicked([]); }} /></div>}
           </div>
           {areaId && <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} role="tablist" aria-label={t.by}><span className="small muted">{t.by}:</span>
             <button role="tab" aria-selected={by === 'part'} className={`pill ${by === 'part' ? 'on' : ''}`} onClick={() => setBy('part')}>{t.byPart}</button>
@@ -256,7 +261,7 @@ export function Create({ parent }: { parent: boolean }) {
         </div>
         {!matOpen && chosen && <div className="card stack">
           <b><span className="num">2</span> {t.mat}</b>
-          <span className="small muted"><b>{t.matOpt}</b> · {pickedNodes.length ? t.fromSkills(pickedNodes.map((n) => n.name).join('; ')) : t.fromPart(chosen.title)}</span>
+          <span className="small muted"><b>{t.matOpt}</b> · {pickedNodes.length ? t.fromSkills(pickedNodes.map((n) => n.name).join('; ')) : t.fromPart(partsTitle)}</span>
           <button className="btn small" style={{ alignSelf: 'start' }} onClick={() => setMoreMat(true)}>{t.addMat}</button>
         </div>}
         {matOpen && <div className="card stack">
@@ -284,12 +289,13 @@ export function Create({ parent }: { parent: boolean }) {
           <span className="small muted">{pickedNodes.length ? t.scopeLeadSkills : t.scopeLeadPick}</span>
           {by === 'part' && <button className="link small" style={{ alignSelf: 'start' }} onClick={() => { setBy('skills'); setTimeout(() => document.getElementById('skill-picker')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}>{t.orSkills} <span className="tag ai">Beta</span></button>}
           {pickedNodes.length > 0 && <span className="small"><b>{t.skillsWord}:</b> {pickedNodes.map((n) => n.name).join(' · ')}</span>}
-          {partPages.map((p) => <label key={p.page} className="check small"><input type="checkbox" checked={ticked.includes(p.page)} disabled={!!busy} onChange={(e) => tick(p.page, e.target.checked)} /> <span><b>{t.pageOf(p.label)}</b>{p.head && <span className="muted"> · {p.head}</span>}</span></label>)}
+          {partPages.map((p, k) => <div key={p.page} className="stack" style={{ gap: 2 }}>{chosenList.length > 1 && p.part !== partPages[k - 1]?.part && <b className="small" style={{ marginTop: k ? 6 : 0 }}>{p.part}</b>}<label className="check small"><input type="checkbox" checked={ticked.includes(p.page)} disabled={!!busy} onChange={(e) => tick(p.page, e.target.checked)} /> <span><b>{t.pageOf(p.label)}</b>{p.head && <span className="muted"> · {p.head}</span>}</span></label></div>)}
+          {tooMuch && <b className="small danger">{t.tooMuch(Math.round(used / 1000))}</b>}
           <span className="small">{!ticked.length ? <b className="danger">{t.scopeNone}</b> : pagesFor ? t.scopeSome(ticked.length, partPages.length) : t.scopeWhole(partPages.length)}</span></div>}
-        {chosen && ticked.length > 0 && <div className="banner">✓ {t.found(`${chosen.title} · ${scopeText}`)}</div>}
+        {chosen && ticked.length > 0 && <div className="banner">✓ {t.found(`${partsTitle} · ${scopeText}`)}</div>}
         {err && <p className="note">{err}</p>}
         <div className="row"><span className="small muted grow">{scopeText && t.scope(scopeText)}</span>
-          <button className="btn primary" disabled={!!busy || short || !(chosen || match) || (partPages.length > 0 && !ticked.length)} onClick={toStep2}>{busy === 'intake' ? t.thinking : chosen ? t.nextPart : t.next}</button></div>
+          <button className="btn primary" disabled={!!busy || short || !(chosen || match) || (partPages.length > 0 && !ticked.length) || tooMuch} onClick={toStep2}>{busy === 'intake' ? t.thinking : chosen ? t.nextPart : t.next}</button></div>
       </div>
     </div>
   );
@@ -320,7 +326,7 @@ export function Create({ parent }: { parent: boolean }) {
         {row('note', t.q.note, setup.note || t.none, <input value={setup.note || ''} maxLength={300} placeholder={t.notePh} onChange={(e) => set('note', e.target.value)} style={{ width: '100%' }} />, t.optional)}
         {shortBox}{err && <p className="note">{err}</p>}
         <div className="row"><button className="btn" onClick={() => setSetup(null)}>{t.back}</button><span className="grow" />
-          <button className="btn primary" disabled={!!busy || short || !setup.title.trim()} onClick={() => run('make', async () => { const { id } = await api.create({ areaId, sectionId: chosen?.id || match!.sectionId, request: text || skillReq || chosen?.title || '', setup: { ...setup, objectives: setup.objectives.filter(Boolean) }, pages: pagesFor, ...(pickedNodes.length ? { skills: pickedNodes.map((n) => n.id) } : {}) }); writeDraft(null); go(`/lesson/${id}`); })}>{t.create}</button></div>
+          <button className="btn primary" disabled={!!busy || short || !setup.title.trim()} onClick={() => run('make', async () => { const { id } = await api.create({ areaId, sectionIds: ids, request: text || skillReq || partsTitle, setup: { ...setup, objectives: setup.objectives.filter(Boolean) }, pages: pagesFor, ...(pickedNodes.length ? { skills: pickedNodes.map((n) => n.id) } : {}) }); writeDraft(null); go(`/lesson/${id}`); })}>{t.create}</button></div>
       </div>
     </div>
   );
@@ -329,4 +335,23 @@ export function Create({ parent }: { parent: boolean }) {
 // the mistakes, for the agent's note (no name): "Phép trừ có nhớ: 655 - 367 (viết 322, đúng là 288)"
 function focusOf(w: Work, lang: 'vi' | 'en'): string {
   return w.types.slice(0, 4).map((t) => { const q = w.questions.find((x) => !x.ok && x.label.en === t.label.en); return q ? (lang === 'en' ? `${t.label.en}: ${q.q} (wrote ${q.child || '…'}, right ${q.right || '?'})` : `${t.label.vi}: ${q.q} (viết ${q.child || '…'}, đúng là ${q.right || '?'})`) : t.label[lang]; }).join('; ').slice(0, 260);
+}
+
+// The parts of her book as a multi-check (Son, 2 Nov), "Select all" first. One book at a time: ticking a part of
+// another book starts again there (a lesson's pages are one book's pages).
+function PartChecks({ sections, ids, disabled, t, onChange }: { sections: SectionRow[]; ids: string[]; disabled: boolean; t: (typeof T)['en']; onChange: (ids: string[]) => void }) {
+  const [open, setOpen] = useState(false), box = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (!open) return; const f = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener('mousedown', f); return () => document.removeEventListener('mousedown', f); }, [open]);
+  const chosen = sections.filter((s) => ids.includes(s.id)), book = chosen[0]?.book_id ?? sections[0]?.book_id, mine = sections.filter((s) => s.book_id === book), all = mine.length > 0 && mine.every((s) => ids.includes(s.id));
+  const toggle = (s: SectionRow, on: boolean) => onChange(on ? [...chosen.filter((x) => x.book_id === s.book_id).map((x) => x.id), s.id] : ids.filter((x) => x !== s.id));
+  return (
+    <div className="multi" ref={box}>
+      <button type="button" className="multi-btn" disabled={disabled} aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className="grow ellipsis">{!chosen.length ? t.auto : all && mine.length > 1 ? t.allParts(mine.length) : chosen.map((s) => s.title).join(' + ')}</span><span aria-hidden="true">▾</span></button>
+      {open && <div className="multi-list" role="group" aria-label={t.part}>
+        <label className="check small"><input type="checkbox" checked={all} onChange={(e) => onChange(e.target.checked ? mine.map((s) => s.id) : [])} /> <b>{t.selectAll}</b></label>
+        {sections.map((s) => <label key={s.id} className="check small"><input type="checkbox" checked={ids.includes(s.id)} onChange={(e) => toggle(s, e.target.checked)} /> <span>{s.title} <span className="muted">· {t.page} {pagesOf(s.page_from, s.page_to, s.printed_from, s.printed_to)}</span></span></label>)}
+      </div>}
+    </div>
+  );
 }

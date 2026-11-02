@@ -36,6 +36,7 @@ export const MSG = {
   aiBlocked: { vi: 'LessonBloom chỉ soạn bài giảng và bài luyện tập từ ghi chú bài học. Cô kiểm tra lại nội dung nhé.', en: 'LessonBloom only makes lessons and practice from lesson notes. Please check the text.' },
   videoEnglish: { vi: 'Hiện LessonBloom chỉ làm video cho bài tiếng Anh. Bài tiếng Việt có slide, bài tập và nghe thử bằng giọng của trình duyệt.', en: 'Videos are made for English lessons only for now. Vietnamese lessons have slides, practice and read-aloud in the browser\'s own voice.' },
   voiceOff: { vi: 'Giọng đọc tiếng Việt của máy chủ đang tạm tắt.', en: 'The server\'s Vietnamese voice is off for now.' },
+  tooMuch: { vi: 'Quá nhiều cho một bài: một bài dùng tối đa khoảng 12.000 ký tự của sách (thường 5–8 trang). Cô bỏ tick bớt trang nhé.', en: 'Too much for one lesson: a lesson uses at most about 12,000 characters of the book (usually 5–8 pages). Untick some pages.' },
   later: { vi: 'Cô đã gửi nhiều yêu cầu liền. Cô thử lại sau ít phút nhé.', en: 'That was a lot of requests in a row. Please try again in a few minutes.' },
   aiBusy: { vi: 'AI đang bận, cô thử lại sau ít phút nhé.', en: 'The AI is busy. Please try again in a few minutes.' },
   cutoutName: { vi: 'Cô gõ tên đồ vật cần cắt, ngắn gọn (ví dụ: quả táo, đồng xu, chậu cây).', en: 'Type the name of the thing to cut out, briefly (for example: apples, coins, plant pot).' },

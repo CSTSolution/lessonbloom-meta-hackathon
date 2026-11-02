@@ -123,7 +123,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     const a = await areaOf(sql, c.get('teacher').id, c.req.param('id'));
     if (!a) return fail(c, 'notFound', 404);
     const sections = await sql.query<{ id: string; book_id: string; page_from: number; page_to: number }>(`select s.id, s.book_id, s.title, s.page_from, s.page_to,
-        (select count(*) from lessons l where l.refs->0->>'sectionId' = s.id)::int as lessons
+        (select count(*) from lessons l where exists (select 1 from jsonb_array_elements(l.refs) r where r->>'sectionId' = s.id))::int as lessons
       from sections s join books b on b.id = s.book_id where b.area_id = $1 and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
     const books = await sql.query<{ id: string }>(`select id, title, status, pages, error, source, page_one,
         exists (select 1 from passages p where p.book_id = books.id and p.printed is not null) as printed from books where area_id = $1 order by created_at`, [a.id]);

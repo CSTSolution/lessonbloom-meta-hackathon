@@ -34,7 +34,7 @@ const MAX_CLASSES = 30, MAX_PUPILS = 60;
 // What an assignment keeps of the lesson: what pupils see, frozen at the moment it was assigned.
 interface Content { title: string; subject: string; lang: 'vi' | 'en'; ref: string; slides: Slide[]; items: Item[]; cards: Card[]; greet?: { vi: string; en: string } | null }
 const snapshot = (l: Lesson): Content => ({
-  title: l.setup.title, subject: l.setup.subject, lang: l.setup.lang, ref: (l.refs?.[0] as { vi?: string } | undefined)?.vi ?? '',
+  title: l.setup.title, subject: l.setup.subject, lang: l.setup.lang, ref: (l.refs as { vi?: string }[] | undefined ?? []).map((r) => r.vi).filter(Boolean).join('; '),
   slides: l.slides, items: l.items, cards: l.cards,
   // made from the child's work (Chi #46): the child's page greets her with what she found tricky
   ...(l.setup.work ? { greet: greetOf(l.setup.work) } : {}),

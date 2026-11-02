@@ -97,38 +97,61 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
   // and the part's range shown as those pages. A range outside the part, or with no text, keeps the whole part.
   type Part = NonNullable<Awaited<ReturnType<typeof sectionOf>>>;
   // pages: the ticked pages (Son, 2 Nov: always asked, the matched pages ticked, she unticks what she does not want), or a range
-  const narrowed = async (m: Part, pages: unknown): Promise<Part & { narrow?: boolean }> => {
+  // drop: a part with none of its pages ticked is left out (several parts chosen) rather than kept whole
+  const narrowed = async (m: Part, pages: unknown, drop = false): Promise<Part & { narrow?: boolean }> => {
     const p = pages as { from?: unknown; to?: unknown } | undefined, from = Math.round(Number(p?.from)), to = Math.round(Number(p?.to));
     const want = Array.isArray(pages) ? new Set(pages.slice(0, 400).map((x) => Math.round(Number(x))).filter((x) => x >= 1)) : from >= 1 && to >= from ? new Set(Array.from({ length: Math.min(400, to - from + 1) }, (_, k) => from + k)) : null;
     if (!want?.size) return m;
     const file = new Map((await d.sql.query<{ id: string; page: number }>('select id, page from passages where section_id = $1', [m.section.id])).map((x) => [x.id, Number(x.page)]));
     const keep = m.passages.filter((x) => want.has(file.get(x.id) ?? 0));
-    if (!keep.length || keep.length === m.passages.length) return m;
+    if (!keep.length) return drop ? { ...m, passages: [] } : m;
+    if (keep.length === m.passages.length) return m;
     const fs = keep.map((x) => file.get(x.id)!), lo = Math.min(...fs), hi = Math.max(...fs);
     return { ...m, passages: keep, section: { ...m.section, pageFrom: lo, pageTo: hi, ...printedRange(await shownPages(d.sql, m.section.bookId), lo, hi) }, narrow: true };
   };
 
+  // Several parts of one book (Son, 2 Nov: parts as a multi-check with "select all"): each narrowed to her ticked
+  // pages (a part with none ticked is left out), in book order; one source and one citation for the lesson, one
+  // ref per part. A lesson takes at most config.guard.lessonText characters of the book: more is refused, never cut short.
+  const partsOf = async (teacherId: string, areaId: string, b: { sectionId?: unknown; sectionIds?: unknown; pages?: unknown }) => {
+    const ids = [...new Set((Array.isArray(b.sectionIds) ? b.sectionIds : [b.sectionId]).map((x) => String(x ?? '')).filter(Boolean))].slice(0, 80);
+    const ms = await Promise.all(ids.map((id) => sectionOf(d.sql, teacherId, areaId, id)));
+    if (!ids.length || ms.some((m) => !m)) return null;
+    const all = (ms as Part[]).sort((x, y) => x.section.pageFrom - y.section.pageFrom);
+    if (new Set(all.map((m) => m.section.bookId)).size > 1) return null;   // one book: the ticked pages are its file pages
+    const each = await Promise.all(all.map((m) => narrowed(m, b.pages, all.length > 1))), parts = each.filter((m) => m.passages.length);
+    if (!parts.length) return null;
+    const lo = Math.min(...parts.map((p) => p.section.pageFrom)), hi = Math.max(...parts.map((p) => p.section.pageTo));
+    const one: Part = parts.length === 1 ? parts[0] : { section: { ...parts[0].section, title: parts.map((p) => p.section.title).join(' + '), pageFrom: lo, pageTo: hi,
+      ...printedRange(await shownPages(d.sql, parts[0].section.bookId), lo, hi) }, passages: parts.flatMap((p) => p.passages) };
+    const chars = parts.reduce((n, p) => n + p.section.title.length + p.passages.reduce((k, x) => k + x.text.length + 10, 0), 0);
+    return { parts, one, narrow: parts.length < all.length || parts.some((p) => p.narrow), tooMuch: chars > config.guard.lessonText, source: parts.map((p) => sourceOf(p, config.guard.lessonText)).join('\n\n') };
+  };
+
   // The setup, pre-filled from the matched section of her book (subject and grade come from the area).
   app.post('/api/t/intake', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; pages?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; pages?: unknown }));
-    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m0 = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || '')), m = m0 && await narrowed(m0, b.pages);
-    if (!a || !m) return fail(c, 'notFound', 404);
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; sectionIds?: unknown; pages?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; sectionIds?: unknown; pages?: unknown }));
+    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), ps = a && await partsOf(t.id, a.id, b);
+    if (!a || !ps) return fail(c, 'notFound', 404);
+    if (ps.tooMuch) return fail(c, 'tooMuch', 413);
+    const m = ps.one;
     // too few credits for the lesson itself: this step spends nothing either (Chi #30)
     if ((await spare(d.sql, t.id)).left < config.guard.lessonCredits) return fail(c, 'credits', 429);
     const g = await gate(c); if (g) return g;
-    const source = sourceOf(m);
+    const source = ps.source;
     try {
       const setup = await d.as(t.id, async () => { await requireOnTask(d.ai, source); return intake(d.ai, source, t.lang); });
       return c.json({ setup: { ...setup, subject: a.subject, grade: a.grade }, citation: citation(m, t.lang) });
     } catch (e) { return aiError(c, e); }
   });
 
-  // A lesson always comes from one section of one knowledge area: that section is its only source.
+  // A lesson comes from the parts she chose of one book (one or several): their ticked pages are its only source.
   app.post('/api/t/lessons', async (c) => {
-    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown; skills?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; request?: string; setup?: unknown; pages?: unknown; skills?: unknown }));
-    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), m0 = a && await sectionOf(d.sql, t.id, a.id, String(b.sectionId || ''));
-    if (!a || !m0) return fail(c, 'notFound', 404);
-    const m = await narrowed(m0, b.pages), narrow = !!m.narrow;
+    const t = c.get('teacher'), b = await c.req.json<{ areaId?: string; sectionId?: string; sectionIds?: unknown; request?: string; setup?: unknown; pages?: unknown; skills?: unknown }>().catch(() => ({} as { areaId?: string; sectionId?: string; sectionIds?: unknown; request?: string; setup?: unknown; pages?: unknown; skills?: unknown }));
+    const a = await areaOf(d.sql, t.id, String(b.areaId || '')), ps = a && await partsOf(t.id, a.id, b);
+    if (!a || !ps) return fail(c, 'notFound', 404);
+    if (ps.tooMuch) return fail(c, 'tooMuch', 413);
+    const m = ps.one, narrow = ps.narrow;
     const setup0 = cleanSetup(b.setup), request = String(b.request ?? '').trim().slice(0, 2000);
     if (!setup0) return fail(c, 'setup');
     // her request steers the lesson inside the section (Chi: only what the material points to); the section stays the only
@@ -151,13 +174,14 @@ export function lessonRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budg
     const cr = await spare(d.sql, t.id);
     // short only because credit is held for work still running: say so (it comes back when that is done)
     if (cr.left < config.guard.lessonCredits) return fail(c, cr.promised && cr.left + cr.promised >= config.guard.lessonCredits ? 'creditsHeld' : 'credits', 429);
-    const source = sourceOf(m);
+    const source = ps.source;
     // everything that reaches a prompt is classified: the section, her request, title, objectives, wishes
     const ai = forPrompt(setup);
     try { await d.as(t.id, () => requireOnTask(d.ai, [source, request, ai.title, ...ai.objectives, ai.note || '', ...(ai.work?.questions || []).map((q) => `${q.q} ${q.child}`)].join('\n\n'))); } catch (e) { return aiError(c, e); }
-    // the skills she chose it by (skills map, beta): only skills of this part, shown on the lesson as its category
-    const skills = Array.isArray(b.skills) && b.skills.length ? await d.sql.query<{ id: string; name: string }>('select id, name from skill_nodes where id = any($1) and area_id = $2 and section_id = $3 order by ord', [b.skills.slice(0, 20).map(String), a.id, m.section.id]) : [];
-    const refs = [{ areaId: a.id, sectionId: m.section.id, bookId: m.section.bookId, book: m.section.book, title: m.section.title, pageFrom: m.section.pageFrom, pageTo: m.section.pageTo, vi: citation(m, 'vi'), en: citation(m, 'en'), ...(skills.length ? { skills } : {}) }];
+    // the skills she chose it by (skills map, beta): only skills of its parts, shown on the lesson as its category
+    const skills = Array.isArray(b.skills) && b.skills.length ? await d.sql.query<{ id: string; name: string }>('select id, name from skill_nodes where id = any($1) and area_id = $2 and section_id = any($3) order by ord', [b.skills.slice(0, 40).map(String), a.id, ps.parts.map((p) => p.section.id)]) : [];
+    // one ref per part (refs[0] is the first part: the learning path places the lesson by it); skills on the first
+    const refs = ps.parts.map((p, k) => ({ areaId: a.id, sectionId: p.section.id, bookId: p.section.bookId, book: p.section.book, title: p.section.title, pageFrom: p.section.pageFrom, pageTo: p.section.pageTo, vi: citation(p, 'vi'), en: citation(p, 'en'), ...(k === 0 && skills.length ? { skills } : {}) }));
     const id = await lessons.create(t.id, setup, source, { areaId: a.id, request, refs });
     // a lesson holds its credits up front, pictures included (Son, 30 Oct); what it does not use comes back
     // when it is all done (pictures and video too). One job at a time per account: it waits in her line.

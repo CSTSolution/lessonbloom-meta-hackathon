@@ -226,6 +226,8 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .source-text { white-space: pre-wrap; font: inherit; font-size: 13px; margin: 4px 0 0; max-height: 520px; overflow: auto; background: var(--paper); border-radius: 6px; padding: 8px 10px; }
 .map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
 .map-node { cursor: pointer; }
+.multi { position: relative; } .multi-btn { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; font-size: 16px; font-weight: 400; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; cursor: pointer; }
+.multi-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); max-height: 320px; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .cat { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--leaf-2); color: var(--leaf); align-self: start; } .cat.skill { background: var(--sun-2); color: #8a5200; }
 /* a laptop-width window: the five tabs stay on one line (Chi #24) */
 @media (max-width: 1180px) { .top { gap: 10px; padding: 10px 14px; } .tabs { flex-wrap: nowrap; min-width: 0; overflow-x: auto; scrollbar-width: none; } .me { flex: none; } .tabs button { padding: 6px 7px; font-size: 13px; white-space: nowrap; } .me-name { display: none; } .top .brand-name { display: none; } }

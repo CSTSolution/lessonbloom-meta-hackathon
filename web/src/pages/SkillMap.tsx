@@ -35,7 +35,7 @@ const T = {
     picker: 'Chọn trên bản đồ hoặc danh sách', tickHint: 'Bấm vào nút kỹ năng để tick hoặc bỏ tick.',
     pageLead: 'Chọn một nguồn trong Kho kiến thức để xem hoặc lập bản đồ kỹ năng của nó.', noBooks: 'Bạn chưa có sách nào. Thêm sách ở Kho kiến thức trước.', toKnowledge: 'Mở Kho kiến thức',
     empty: 'Sách này chưa có bản đồ kỹ năng. Lập bản đồ là tuỳ chọn: bấm "Lập bản đồ kỹ năng" ở trên.', thinking: 'App đang trả lời…',
-    pick: 'Chọn theo kỹ năng', pickLead: 'Tick các kỹ năng muốn dạy. Một bài soạn từ một phần sách, nên các kỹ năng tick cùng một phần; trang của chúng được tick ở dưới.', search: 'Tìm kỹ năng…', otherPart: 'Bạn đã chọn kỹ năng ở phần khác: chỉ giữ phần mới.', noMap: 'Sách này chưa có bản đồ kỹ năng. Lập bản đồ là tuỳ chọn, ở Kho kiến thức → Bản đồ kỹ năng.', openMap: 'Mở bản đồ kỹ năng',
+    pick: 'Chọn theo kỹ năng', pickLead: 'Tick các kỹ năng muốn dạy, ở một hay nhiều phần của sách; trang của chúng được tick ở dưới.', search: 'Tìm kỹ năng…', otherPart: 'Bạn đã chọn kỹ năng ở sách khác: chỉ giữ sách mới (một bài soạn từ một sách).', noMap: 'Sách này chưa có bản đồ kỹ năng. Lập bản đồ là tuỳ chọn, ở Kho kiến thức → Bản đồ kỹ năng.', openMap: 'Mở bản đồ kỹ năng',
   },
   en: {
     title: 'Skills map', beta: 'Beta', lead: 'Optional: the AI reads your book and breaks each part into the skills it teaches, each tied to its part and pages. Check it, ask the app to fix it, or leave a comment for our team. Building the map and asking the app use your credits; comments are free.',
@@ -54,7 +54,7 @@ const T = {
     picker: 'Choose on the map or in a list', tickHint: 'Click a skill node to tick or untick it.',
     pageLead: 'Pick a source from Knowledge to see or build its skills map.', noBooks: 'You have no books yet. Add one in Knowledge first.', toKnowledge: 'Open Knowledge',
     empty: 'This book has no skills map yet. It is optional: press "Build skills map" above.', thinking: 'The app is answering…',
-    pick: 'Choose by skill', pickLead: 'Tick the skills to teach. A lesson comes from one part of the book, so the skills you tick are from one part; their pages are ticked below.', search: 'Find a skill…', otherPart: 'You picked a skill in another part: only the new part is kept.', noMap: 'This book has no skills map yet. Building one is optional, in Knowledge → Skills map.', openMap: 'Open the skills map',
+    pick: 'Choose by skill', pickLead: 'Tick the skills to teach, from one or more parts of the book; their pages are ticked below.', search: 'Find a skill…', otherPart: 'You picked a skill in another book: only that book is kept (a lesson comes from one book).', noMap: 'This book has no skills map yet. Building one is optional, in Knowledge → Skills map.', openMap: 'Open the skills map',
   },
 };
 
@@ -216,8 +216,8 @@ export function NeuronMap({ map: m, sel = '', picked, onNode, onPart }: { map: S
   );
 }
 
-// On the lesson page: the skills of one book as ticks. Ticking a skill in another part starts again in
-// that part (a lesson comes from one part); the parent is told which part and pages that gives.
+// On the lesson page: the skills of one book as ticks, from any of its parts. Ticking a skill in another book
+// starts again there (a lesson comes from one book); the parent is told which parts and pages that gives.
 export function SkillPicker({ map, picked, onPick }: { map: SkillMap; picked: string[]; onPick: (ids: string[]) => void }) {
   const t = useT(T), lang = useLang(), [find, setFind] = useState(''), [moved, setMoved] = useState(false), [view, setView] = useState<'map' | 'list'>('map');
   const node = new Map(map.nodes.map((n) => [n.id, n])), partOf = picked.length ? node.get(picked[0])?.part : '';
@@ -225,7 +225,8 @@ export function SkillPicker({ map, picked, onPick }: { map: SkillMap; picked: st
   const tick = (id: string, on: boolean) => {
     const n = node.get(id)!;
     if (!on) { onPick(picked.filter((x) => x !== id)); return; }
-    if (partOf && n.part !== partOf) { setMoved(true); onPick([id]); return; }
+    const bookOf = (pid?: string) => map.parts.find((p) => p.id === pid)?.bookId;
+    if (partOf && bookOf(n.part) !== bookOf(partOf)) { setMoved(true); onPick([id]); return; }
     setMoved(false); onPick([...picked, id]);
   };
   if (!map.nodes.length) return <div className="stack" style={{ gap: 6 }}><BetaHead small /><p className="small muted">{t.noMap}</p><button className="btn small" style={{ alignSelf: 'start' }} onClick={() => go('/knowledge')}>{t.openMap}</button></div>;

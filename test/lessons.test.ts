@@ -251,3 +251,36 @@ test('"Only what you gave" makes a short lesson from the pages found; the whole 
   assert.ok(/\[tr\. 3\]/.test(l3.source) && !/\[tr\. 4\]/.test(l3.source) && /\[tr\. 5\]/.test(l3.source), 'the unticked page is left out');
   assert.ok(l2.slides.length <= 10 && l2.items.length <= 20, `${l2.slides.length} slides, ${l2.items.length} items`);
 });
+
+test('a lesson from several parts of one book (Son, 2 Nov): their ticked pages in book order, one ref each; too much is refused', async () => {
+  const s = await testServer(), call = s.client('198.51.100.191');
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  const { areaId } = await areaWithBook(call, 'maths2');
+  const secs = (await call('GET', `/api/t/areas/${areaId}`)).json.sections.filter((x: any) => x.title !== '—');
+  const [p1, p2, p3] = secs;
+  // three parts chosen, pages ticked in two of them: the third is left out
+  const pages = [p1.page_from, p3.page_from];
+  const { setup } = (await call('POST', '/api/t/intake', { areaId, sectionIds: [p3.id, p1.id, p2.id], pages })).json;
+  assert.ok(setup?.title, 'the setup comes from the ticked pages');
+  const r = await call('POST', '/api/t/lessons', { areaId, sectionIds: [p3.id, p1.id, p2.id], request: '', setup, pages });
+  assert.equal(r.status, 200);
+  const l = await s.sql.one<{ refs: any[]; source: string }>('select refs, source from lessons where id = $1', [r.json.id]);
+  assert.deepEqual(l!.refs.map((x) => x.sectionId), [p1.id, p3.id], 'one ref per part with ticked pages, in book order');
+  assert.ok(l!.source.indexOf(p1.title) < l!.source.indexOf(p3.title) && !l!.source.includes(p2.title), 'both parts in the source, the unticked one not');
+  const row = (await call('GET', '/api/t/lessons')).json.lessons.find((x: any) => x.id === r.json.id);
+  assert.equal(row.refs.length, 2);
+  const area = (await call('GET', `/api/t/areas/${areaId}`)).json.sections;
+  assert.equal(area.find((x: any) => x.id === p3.id).lessons, 1, '"Used in" counts every part of the lesson');
+  // more than a lesson takes: refused with a clear message, nothing spent
+  const { config } = await import('../server/config.ts'), was = config.guard.lessonText;
+  config.guard.lessonText = 300;
+  try {
+    const big = await call('POST', '/api/t/lessons', { areaId, sectionIds: secs.map((x: any) => x.id), request: '', setup });
+    assert.equal(big.status, 413);
+    assert.equal(big.json.code, 'tooMuch');
+  } finally { config.guard.lessonText = was; }
+  // parts of two books in one lesson: refused (the ticked pages are one book's pages)
+  const other = (await areaWithBook(call, 'english3')).areaId;
+  const o1 = (await call('GET', `/api/t/areas/${other}`)).json.sections[0];
+  assert.equal((await call('POST', '/api/t/intake', { areaId, sectionIds: [p1.id, o1.id] })).status, 404);
+});
