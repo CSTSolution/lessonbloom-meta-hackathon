@@ -151,7 +151,7 @@ export function SkillMapView({ areaId, onSource }: { areaId: string; onSource: (
   );
 }
 
-const NeuronArt = () => (
+export const NeuronArt = () => (
   <svg viewBox="0 0 160 110" role="img" aria-label="skills map"><path d="M30 30 H120" stroke="var(--leaf)" strokeOpacity=".2" strokeWidth="5" />
     {[30, 120].map((x) => <g key={x}><circle cx={x} cy="30" r="12" fill="var(--leaf)" />{[56, 76, 96].map((y) => <g key={y}><path d={`M${x},42 Q${x},${y} ${x + 14},${y}`} fill="none" stroke="var(--leaf)" strokeOpacity=".4" /><circle cx={x + 20} cy={y} r="6" fill="var(--leaf-2)" stroke="var(--leaf)" strokeWidth="2" /></g>)}</g>)}
     <path d="M134,96 C110,96 60,56 44,56" fill="none" stroke="var(--sun)" strokeWidth="2" /></svg>
