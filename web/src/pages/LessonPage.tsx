@@ -65,7 +65,8 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
   }, [id, tick]);
   if (gone) return <NotFound what="lesson" />;
   if (!l) return null;
-  const ref = l.refs?.[0], refText = ref ? (lang === 'en' ? ref.en : ref.vi) : '';
+  // a lesson from several parts (Son, 2 Nov) names them all: "From: Maths 2, Lesson 21 + Lesson 23, p. 3" (each slide puts its own page)
+  const ref = l.refs?.[0], refText = ref ? (l.refs.length > 1 ? (lang === 'en' ? ref.en : ref.vi).replace(ref.title, l.refs.map((r) => r.title).join(' + ')) : (lang === 'en' ? ref.en : ref.vi)) : '';
   return (
     <div className="page">
       <Stepper parent={parent} at={l.status === 'ready' ? step : 3} done={l.status === 'ready' ? seen : 2} onStep={l.status === 'ready' ? setStep : undefined} open={l.status === 'ready' ? videoOpen(l, lang) : {}} />
