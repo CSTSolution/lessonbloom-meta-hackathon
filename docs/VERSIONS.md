@@ -3,6 +3,21 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261102.1659 (2 Nov, evening)
+
+Chi's last list before the contest (#72–#79):
+- **Questions (#77, #74)**: a fill-in whose sentence already holds the answer ("It is a fish. It is a ___.") is written
+  again with a clue; the same question with the same answer twice is a duplicate; each item keeps to its own skill.
+- **Video while it is made (#78)**: the "I have read and checked" box names only what exists; the child sees "Video
+  coming soon" until it is ready, then it shows by itself.
+- **The child's screen (#76)**: one lesson for today, the others folded into "Lessons given" and "Lessons done";
+  hidden lessons leave the child's screen too.
+- **Slides (#79)**: "Look at the lesson" for the child (page by page, read aloud in the video's voice, counted in
+  the progress); Previous / Next and the arrow keys for the adult.
+- **Skills map (#72, #75, #73)**: a change with no skill named applies to the selected skill, and the app says when
+  nothing was changed; a one-line legend, hover names on the "learn first" lines, clickable "Builds on"; the menu
+  label is "Skills".
+
 ## v1.0.20261102.1144 (2 Nov, midday)
 
 Chi's review of 0935 (#65–#71):
