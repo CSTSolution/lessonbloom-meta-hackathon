@@ -25,7 +25,7 @@ const S = {
     finish: 'Con làm xong rồi!', finishSub: 'Con đã cố gắng rất nhiều. Đây là gợi ý cho con:',
     sCardsTag: 'Ôn lại', sCards: 'Ôn thẻ nhớ', sCardsSub: 'Ôn lại một chút là con nhớ lâu hơn.', sPairsTag: 'Trò chơi', sPairs: 'Lật thẻ tìm cặp', sPairsSub: 'Ghép phép tính với kết quả.', sWatchTag: 'Xem lại', sWatch: 'Xem lại bài', sWatchSub: 'Xem lại cách làm trong bài.', go: 'Làm ngay',
     cardsOf: (t: string) => `Thẻ nhớ · ${t}`, cardN: (i: number, n: number) => `đã xong ${i}/${n} thẻ`, flip: 'Chạm để lật thẻ', again: 'Ôn lại', known: 'Đã nhớ', cardsDone: 'Con ôn xong thẻ nhớ rồi!', comeBack: 'Thẻ này sẽ quay lại sau nhé.', setAside: 'Mình để thẻ này sang "cần ôn", đi tiếp nhé.', toReview: (n: number) => `${n} thẻ cần ôn`, reviewList: 'Thẻ cần ôn lại:',
-    givenOn: (d: string) => `giao ngày ${d}`, pickOrder: 'Con xếp các chữ thành câu nhé', pickMatch: 'Con ghép cho đúng nhé', pickTF: 'Đúng hay sai?', pickType: 'Con điền đáp số nhé', missing: (w: string) => `Còn chữ chưa dùng: ${w}`, tapBack: 'Chạm vào chữ ở trên để bỏ xuống.',
+    givenOn: (d: string) => `giao ngày ${d}`, videoSoon: 'Video sắp có', givenList: (n: number) => `Bài đã giao (${n})`, doneList: (n: number) => `Bài đã xong (${n})`, allDone: 'Con làm xong hết các bài rồi! Giỏi quá.', steps: (d: number, n: number) => `${d}/${n} bước`, readSlide: 'Đọc', slideOf: (i: number, n: number) => `Trang ${i}/${n}`, pickOrder: 'Con xếp các chữ thành câu nhé', pickMatch: 'Con ghép cho đúng nhé', pickTF: 'Đúng hay sai?', pickType: 'Con điền đáp số nhé', missing: (w: string) => `Còn chữ chưa dùng: ${w}`, tapBack: 'Chạm vào chữ ở trên để bỏ xuống.',
     pairsTitle: 'Lật thẻ tìm cặp', pairsSub: 'Ghép thẻ với nghĩa hoặc kết quả', pairsN: (f: number, n: number) => `${f}/${n} cặp`, pairsHint: 'Chạm vào 2 thẻ để lật. Tìm hết các cặp nhé!', pairsDone: 'Con tìm đủ các cặp rồi!', playAgain: 'Chơi lại',
   },
   en: {
@@ -39,7 +39,7 @@ const S = {
     finish: 'All done!', finishSub: 'You worked really hard. Here is what to do next:',
     sCardsTag: 'Go over', sCards: 'Go over the flashcards', sCardsSub: 'A quick look helps you remember.', sPairsTag: 'Game', sPairs: 'Find the pairs', sPairsSub: 'Match each card with its partner.', sWatchTag: 'Look again', sWatch: 'Look at the lesson again', sWatchSub: 'See how it is done once more.', go: 'Go',
     cardsOf: (t: string) => `Flashcards · ${t}`, cardN: (i: number, n: number) => `${i}/${n} cards done`, flip: 'Tap to turn the card over', again: 'Again', known: 'I know it', cardsDone: 'You went over all the cards!', comeBack: 'This card will come back later.', setAside: 'This card goes to "go over again". On you go!', toReview: (n: number) => `${n} to go over`, reviewList: 'Cards to go over again:',
-    givenOn: (d: string) => `given ${d}`, pickOrder: 'Put the words in order', pickMatch: 'Match the pairs', pickTF: 'True or false?', pickType: 'Type the answer', missing: (w: string) => `Not used yet: ${w}`, tapBack: 'Tap a word above to take it back.',
+    givenOn: (d: string) => `given ${d}`, videoSoon: 'Video coming soon', givenList: (n: number) => `Lessons given (${n})`, doneList: (n: number) => `Lessons done (${n})`, allDone: 'You did all your lessons! Well done.', steps: (d: number, n: number) => `${d}/${n} steps`, readSlide: 'Read it', slideOf: (i: number, n: number) => `Page ${i}/${n}`, pickOrder: 'Put the words in order', pickMatch: 'Match the pairs', pickTF: 'True or false?', pickType: 'Type the answer', missing: (w: string) => `Not used yet: ${w}`, tapBack: 'Tap a word above to take it back.',
     pairsTitle: 'Find the pairs', pairsSub: 'Match each card with its partner', pairsN: (f: number, n: number) => `${f}/${n} pairs`, pairsHint: 'Tap 2 cards to turn them over. Find all the pairs!', pairsDone: 'You found all the pairs!', playAgain: 'Play again',
   },
 };
@@ -57,7 +57,7 @@ async function p<R>(method: string, path: string, body?: unknown): Promise<R> {
   if (!r.ok) throw new ApiError(j.code || 'server', j.error || 'Lỗi', j.errorEn || 'Error', r.status);
   return j as R;
 }
-interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; pairs_seen?: boolean; cards_review?: number; given?: string; done: boolean; answered: number; greet?: { vi: string; en: string } | null }
+interface TodayRow { id: string; title: string; subject: string; lang: L; slides: number; items: number; cards: number; video: boolean; video_seen: boolean; slides_seen: boolean; cards_seen: boolean; pairs_seen?: boolean; cards_review?: number; given?: string; video_making?: boolean; done: boolean; answered: number; greet?: { vi: string; en: string } | null }
 interface Today { pupil: { name: string }; class: { name: string }; lessons: TodayRow[]; reminder?: { vi: string; en: string } | null }
 interface PItem { id: string; template: string; prompt: string; options?: string[]; sentence?: string; words?: string[]; left?: string[]; right?: string[]; unit?: string; listen?: boolean; fromWork?: boolean; stack?: { a: number; op: string; b: number } }
 interface PLesson { id: string; title: string; lang: L; retry: boolean; hints: boolean; video: string | null; slides: { id: string; heading: string; bullets: string[]; example?: string; image?: string }[]; items: PItem[]; cards: { id: string; front: string; back: string; emoji?: string }[]; tried: Record<string, boolean> }
@@ -106,7 +106,7 @@ function Offline() {
 export function Pupil() { return <><PupilPage /><Offline /></>; }
 function PupilPage() {
   const path = usePath(), lang = useLang() as L, t = S[lang];
-  const [today, setToday] = useState<Today | null | undefined>(undefined);
+  const [today, setToday] = useState<Today | null | undefined>(undefined), [show, setShow] = useState(''), [fold, setFold] = useState({ open: false, done: false });
   // a child's phone opens in the language of the lessons given (Chi #24), unless it was switched by hand
   const load = () => p<Today>('GET', '/today').then((d) => { const l = d?.lessons?.[0]?.lang; if (l && !langChosen() && l !== lang) setLang(l); setToday(d); }).catch((e) => { if (e instanceof ApiError && e.status >= 400 && e.status < 500) setToday(null); else setToday((x) => x ?? null); });
   useEffect(() => {
@@ -122,34 +122,53 @@ function PupilPage() {
     <Frame t={t} title={<span className="p-soft">{t.hello(today.pupil.name, today.class.name)}</span>}>
       {today.reminder && <div className="p-note" role="note"><span className="p-bang">!</span><span><b>{t.remind}</b> {lang === 'en' ? today.reminder.en : today.reminder.vi}</span></div>}
       {!today.lessons.length && <p className="p-soft">{t.nothing}</p>}
-      {today.lessons.map((l, n) => {
-        const parts = [l.video ? l.video_seen : l.slides > 0 ? l.slides_seen : null, l.cards > 0 ? l.cards_seen : null, l.items > 0 ? l.done : null, l.cards >= 3 ? !!l.pairs_seen : null].filter((x) => x !== null) as boolean[];
-        const twin = today.lessons.filter((x) => x.title === l.title).length > 1, when = twin && l.given ? ` · ${t.givenOn(new Date(l.given).toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }))}` : '';
-        return (
-          <section key={l.id} className="p-lesson">
-            <span className="p-chip">{t.subject[l.subject] || l.subject}</span>
-            {/* only the newest is today's (Chi #51b: five lessons all said "Bài hôm nay") */}
-            {n === 0 ? <h1>{t.todayIs(l.title)}{when}</h1> : <h2>{t.other(l.title)}{when}</h2>}
-            {/* made from her own marked work (Chi #46): what she found tricky last time */}
-            {l.greet && <p className="p-soft">{lang === 'en' ? l.greet.en : l.greet.vi}</p>}
-            <div className="p-acts">
-              {l.video ? <Act tone="blue" icon="play" title={t.video} sub={l.video_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/video`)} />
-                : l.slides > 0 && <Act tone="blue" icon="book" title={t.slides} sub={l.slides_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/slides`)} />}
-              {l.cards > 0 && <Act tone="green" icon="cards" title={t.cards} sub={`${t.nCards(l.cards)}${l.cards_seen ? ` · ${t.doneMark}` : ''}${l.cards_seen && l.cards_review ? ` · ${t.toReview(l.cards_review)}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/cards`)} />}
-              {l.items > 0 && <Act tone="orange" icon="pencil" title={t.practise} sub={`${t.nItems(l.items)}${l.done ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/practice`)} />}
-              {l.cards >= 3 && <Act tone="purple" icon="pairs" title={t.pairs} sub={`${t.nPairs(Math.min(PAIRS, l.cards))}${l.pairs_seen ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/match`)} />}
-            </div>
-            {parts.length > 0 && <div className="p-progress"><span className="small"><b>{t.gotSoFar}</b></span><div className="p-seg">{parts.map((x, i) => <i key={i} className={x ? 'on' : ''} />)}</div></div>}
-          </section>
-        );
-      })}
+      {/* one lesson for today, the rest in two folded lists (Chi #76: four "Another lesson" blocks, done ones too) */}
+      {(() => {
+        const open = today.lessons.filter((l) => !l.done), fin = today.lessons.filter((l) => l.done), first = open[0];
+        const day = (d?: string) => (d ? new Date(d).toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN', { day: 'numeric', month: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }) : '');
+        const partsOf = (l: TodayRow) => [l.slides > 0 ? l.slides_seen : null, l.video ? l.video_seen : null, l.cards > 0 ? l.cards_seen : null, l.items > 0 ? l.done : null, l.cards >= 3 ? !!l.pairs_seen : null].filter((x) => x !== null) as boolean[];
+        const block = (l: TodayRow) => {
+          const parts = partsOf(l);
+          return (
+            <>
+              {l.greet && <p className="p-soft">{lang === 'en' ? l.greet.en : l.greet.vi}</p>}
+              <div className="p-acts">
+                {/* "Xem bài" for every lesson (Chi #79); the video beside it once made, "coming soon" while it is (Chi #78) */}
+                {l.slides > 0 && <Act tone="blue" icon="book" title={t.slides} sub={l.slides_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/slides`)} />}
+                {l.video ? <Act tone="blue" icon="play" title={t.video} sub={l.video_seen ? t.seen : ''} onClick={() => go(`/hoc/a/${l.id}/video`)} />
+                  : l.video_making && <Act tone="blue" icon="play" title={t.video} sub={t.videoSoon} disabled onClick={() => {}} />}
+                {l.cards > 0 && <Act tone="green" icon="cards" title={t.cards} sub={`${t.nCards(l.cards)}${l.cards_seen ? ` · ${t.doneMark}` : ''}${l.cards_seen && l.cards_review ? ` · ${t.toReview(l.cards_review)}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/cards`)} />}
+                {l.items > 0 && <Act tone="orange" icon="pencil" title={t.practise} sub={`${t.nItems(l.items)}${l.done ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/practice`)} />}
+                {l.cards >= 3 && <Act tone="purple" icon="pairs" title={t.pairs} sub={`${t.nPairs(Math.min(PAIRS, l.cards))}${l.pairs_seen ? ` · ${t.doneMark}` : ''}`} onClick={() => go(`/hoc/a/${l.id}/match`)} />}
+              </div>
+              {parts.length > 0 && <div className="p-progress"><span className="small"><b>{t.gotSoFar}</b></span><div className="p-seg">{parts.map((x, i) => <i key={i} className={x ? 'on' : ''} />)}</div></div>}
+            </>
+          );
+        };
+        const row = (l: TodayRow) => { const ps = partsOf(l); return (
+          <div key={l.id}>
+            <button className="p-row" aria-expanded={show === l.id} onClick={() => setShow(show === l.id ? '' : l.id)}><b>{l.title}</b><span className="small p-soft">{t.steps(ps.filter(Boolean).length, ps.length)} · {t.givenOn(day(l.given))}</span></button>
+            {show === l.id && <div className="p-lesson">{block(l)}</div>}
+          </div>); };
+        const folded = (k: 'open' | 'done', title: string, list: TodayRow[]) => list.length > 0 && (
+          <section className="p-fold-box">
+            <button className="p-fold" aria-expanded={fold[k]} onClick={() => setFold((f) => ({ ...f, [k]: !f[k] }))}><span>{title}</span><span aria-hidden="true">{fold[k] ? '▾' : '▸'}</span></button>
+            {fold[k] && list.map(row)}
+          </section>);
+        return <>
+          {first && <section className="p-lesson"><span className="p-chip">{t.subject[first.subject] || first.subject}</span><h1>{t.todayIs(first.title)}</h1>{block(first)}</section>}
+          {!first && fin.length > 0 && <p className="p-soft">{t.allDone}</p>}
+          {folded('open', t.givenList(open.length - 1), open.slice(1))}
+          {folded('done', t.doneList(fin.length), fin)}
+        </>;
+      })()}
       <button className="p-link" onClick={async () => { await p('POST', '/leave').catch(() => {}); setToday(null); go('/hoc'); }}>{t.leave}</button>
     </Frame>
   );
 }
 
-function Act({ tone, icon, title, sub, onClick }: { tone: string; icon: string; title: string; sub: string; onClick: () => void }) {
-  return <button className={`p-act ${tone}`} onClick={onClick}><span className="p-ico"><Icon name={icon} /></span><b>{title}</b>{sub && <span className="small">{sub}</span>}</button>;
+function Act({ tone, icon, title, sub, onClick, disabled }: { tone: string; icon: string; title: string; sub: string; onClick: () => void; disabled?: boolean }) {
+  return <button className={`p-act ${tone}`} disabled={disabled} onClick={onClick}><span className="p-ico"><Icon name={icon} /></span><b>{title}</b>{sub && <span className="small">{sub}</span>}</button>;
 }
 
 function Join({ code: start, onIn, t }: { code: string; onIn: () => void; t: T }) {
@@ -197,7 +216,14 @@ function LessonPart({ id, part, t, onBack }: { id: string; part: Part; t: T; onB
 }
 
 function Slides({ l, t, onEnd }: { l: PLesson; t: T; onEnd: () => void }) {
-  const [i, setI] = useState(0), s = l.slides[i];
+  const [i, setI] = useState(0), s = l.slides[i], audio = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => { audio.current?.pause(); stopSay(); }, [i]);
+  // read in the voice the video uses; the phone's own voice while that one is off
+  const say = () => {
+    audio.current?.pause(); stopSay();
+    const a = new Audio(`/api/p/a/${l.id}/slide/${s.id}/say`); audio.current = a;
+    void a.play().catch(() => browserSay(readable([s.heading, ...s.bullets, s.example || ''].join('. '), l.lang), l.lang));
+  };
   return (
     <>
       <div className="p-card">
@@ -205,7 +231,9 @@ function Slides({ l, t, onEnd }: { l: PLesson; t: T; onEnd: () => void }) {
         <h2>{s.heading}</h2>
         {s.bullets.length > 0 && <ul>{s.bullets.map((b, j) => <li key={j}>{b}</li>)}</ul>}
         {s.example && <div className="p-ex">{s.example}</div>}
+        <button className="p-pill" onClick={say}><Icon name="sound" size={16} /> {t.readSlide}</button>
       </div>
+      <p className="p-soft small center">{t.slideOf(i + 1, l.slides.length)}</p>
       <div className="p-seg blue">{l.slides.map((x, j) => <i key={x.id} className={j <= i ? 'on' : ''} />)}</div>
       <div className="p-actions row2">
         <button className="p-btn" disabled={i === 0} onClick={() => setI(i - 1)} aria-label={t.back}><Icon name="back" /></button>

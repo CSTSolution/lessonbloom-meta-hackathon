@@ -178,3 +178,18 @@ test('a lesson chosen by skills keeps them (only skills of its part), and the le
   assert.equal(row.ref.title, part.title);
   assert.deepEqual(row.ref.skills, [{ id: mine[0].id, name: mine[0].name }], 'a skill of another part is not kept');
 });
+
+test('chat (Chi #72): a change with no id is about the selected skill; with no change the answer says nothing was changed', async () => {
+  SKILLS.chatsPerMinute = 100;
+  const s = await testServer(), call = s.client('198.51.100.207');
+  await call('POST', '/api/auth/demo', { lang: 'en' });
+  const { areaId } = await areaWithBook(call, 'maths2');
+  const m = await mapOf(call, areaId), pick = m.nodes[2];
+  const r = (await call('POST', `/api/t/areas/${areaId}/skills/chat`, { text: 'rename it, no id', skillId: pick.id })).json;
+  assert.deepEqual(r.ops.map((o: any) => [o.op, o.id]), [['rename', pick.id]], 'the selected skill');
+  await call('POST', `/api/t/areas/${areaId}/skills/notes/${r.id}`, { accept: true });
+  assert.equal((await call('GET', `/api/t/areas/${areaId}/skills`)).json.nodes.find((n: any) => n.id === pick.id).name, 'Picked skill');
+  const q = (await call('POST', `/api/t/areas/${areaId}/skills/chat`, { text: 'just talk' })).json;
+  assert.deepEqual(q.ops, []);
+  assert.match(q.reply, /Nothing was changed\.$/);
+});

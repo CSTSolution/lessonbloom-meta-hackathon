@@ -375,6 +375,9 @@ function englishRules(e: EnglishItem, ctx: CheckContext, out: Issue[]) {
     if (!inOptions(e.options)) out.push({ code: 'shape', msg: 'the answer must be exactly one of the options' });
     if (words(e.answer).some((w) => !lesson.has(w))) out.push({ code: 'offlesson', msg: `"${e.answer}" is not a word from the lesson` });
     fillClue(e, out);
+    // Chi #77: "It is a fish. It is a ___." (fish): the answer, or its plural or -ing form, already in the sentence teaches nothing
+    const stem = (w: string) => w.replace(/(ing|es|s)$/, ''), given = new Set([...words(String(e.sentence ?? '').replace(/_{2,}/g, ' ')), ...words(e.prompt)].map(stem));
+    if (words(e.answer).some((w) => !FUNCTION_WORDS.has(w) && w.length > 2 && given.has(stem(w)))) out.push({ code: 'K', msg: `the answer "${e.answer}" is already in the sentence; give a clue instead (what it does, where it lives, its colour: "It lives in water. It is a ___.")` });
     // Chi #52: "You must only step on the ___." picked "floor", hint "We say must for a game rule.". The explanation
     // is the hint after a wrong try (with the answer hidden), so it must be about the word in the gap
     const aw = words(e.answer).filter((w) => !FUNCTION_WORDS.has(w)), ew: string[] = [...words(e.explain)];
@@ -426,6 +429,10 @@ export function checkItem(e: Item, ctx: CheckContext): Issue[] {
   // Chi #31: the good and advanced levels were copies of the basic one; a harder level of a skill asks something new
   // (English for now: the maths mock still writes the same word problem at every level)
   if (e.subject === 'english' && e.level !== 'basic' && (ctx.items || []).some((o) => o.id !== e.id && o.level === 'basic' && o.skill === e.skill && sameQuestion(o, e))) out.push({ code: 'dup', msg: `the same question as a basic item; a ${e.level} item must be different and a step harder` });
+  // Chi #74a: the same question with the same answer twice (only a wrong option differed), whatever the level or skill;
+  // the later one goes
+  const all = ctx.items || [], at = all.findIndex((o) => o.id === e.id);
+  if (e.subject === 'english' && all.some((o, k) => o.id !== e.id && (at < 0 || k < at) && sameQuestion(o, e) && String(o.answer).toLowerCase() === String(e.answer).toLowerCase())) out.push({ code: 'dup', msg: 'the same question and answer as another item; ask something different' });
   return out.filter((x, i) => out.findIndex((y) => y.code === x.code && y.msg === x.msg) === i);
 }
 

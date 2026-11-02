@@ -207,7 +207,9 @@ test("Chi #54: a child's English sheet: her own wrong items again, built by code
   const source = 'Unit 3: Colours\nThe sky is blue. The grass is green. A banana is yellow. The sun is yellow. The apple is red. My name is Mai. I have a cat. What colour is it?';
   const setup = { subject: 'english', grade: 3, title: 'Colours', objectives: [], minutes: 25, lang: 'en', forParent: true, work: { ...w, base: 'Colours' } } as Setup;
   const skills = [{ tag: 'colours', name: 'Colours', kind: 'vocabulary' as const }];
-  const book = Array.from({ length: 6 }, (_, i) => ({ id: `ex${i + 1}`, subject: 'english' as const, template: 'listen' as const, skill: 'colours', level: 'basic' as const, prompt: 'Listen and choose the right word.', say: 'blue', options: ['blue', 'red', 'green'], explain: 'x', answer: 'blue' }));
+  // six different book items (six copies of one would be duplicates, Chi #74a)
+  const W = ['blue', 'red', 'green', 'yellow', 'banana', 'apple'];
+  const book = Array.from({ length: 6 }, (_, i) => ({ id: `ex${i + 1}`, subject: 'english' as const, template: 'listen' as const, skill: 'colours', level: 'basic' as const, prompt: 'Listen and choose the right word.', say: W[i], options: [W[i], W[(i + 1) % 6], W[(i + 2) % 6]], explain: 'x', answer: W[i] }));
   const r = applyWork(setup, source, { skills, slides: [{ id: 'sl01', kind: 'title', heading: 'Colours', bullets: [], notes: '', source: '', narration: '', imagePrompt: '' }], items: book });
   const mine = r.items.filter((i) => i.fromWork) as any[];
   assert.ok(r.items.slice(0, mine.length).every((i) => i.fromWork), 'her items come first');

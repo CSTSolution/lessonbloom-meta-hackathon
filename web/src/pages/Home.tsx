@@ -27,7 +27,7 @@ import { FeedbackButton } from '../feedback.tsx';
 
 const T = {
   vi: {
-    nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/skills': 'Bản đồ kỹ năng', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
+    nav: { '/': 'Bài giảng', '/knowledge': 'Kho kiến thức', '/skills': 'Kỹ năng', '/path': 'Lộ trình học', '/classes': 'Lớp học', '/insight': 'Tóm tắt học tập' }, kids: 'Con của tôi',
     helloT: (n: string) => `Chào ${n || 'cô'}!`, helloP: (n: string) => `Chào ${n || 'bạn'}!`, lead: 'Tải tài liệu, có ngay slide, video và bài tập.', leadP: 'Tải tài liệu, có ngay bài học cho con.',
     teaches: 'Cô dạy', kidsOf: 'Con học', change: 'Đổi trong Hồ sơ', grade: (g: number) => `Lớp ${g}`, make: '+ Tạo bài giảng mới', draft: (what: string, step: string) => `Tiếp tục: ${what} · ${step}`, draftGo: 'Tiếp tục', allClasses: 'Tất cả các lớp', all: 'Tất cả',
     groups: { open: 'Đang giao', draft: 'Bản nháp · chưa giao', done: 'Đã xong' }, doneBy: (d: number, n: number) => `${d}/${n} đã làm xong`, none: 'Chưa có bài', n: (n: number) => `${n} bài`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slide', v && 'Video', i && `${i} bài tập`, c && 'Thẻ nhớ'].filter(Boolean).join(' · '),
@@ -38,7 +38,7 @@ const T = {
     notifications: 'Thông báo', profile: 'Hồ sơ', reminders: 'Cài đặt lời nhắc', criteria: 'Tiêu chí tóm tắt', signOut: 'Đăng xuất', role: { teacher: 'Giáo viên', parent: 'Phụ huynh' },
   },
   en: {
-    nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/skills': 'Skills map', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
+    nav: { '/': 'Lessons', '/knowledge': 'Knowledge', '/skills': 'Skills', '/path': 'Learning path', '/classes': 'Classes', '/insight': 'Learning summary' }, kids: 'My children',
     helloT: (n: string) => `Hello, ${n || 'teacher'}!`, helloP: (n: string) => `Hello, ${n || 'there'}!`, lead: 'Upload material; get slides, video and practice.', leadP: 'Upload material; get lessons for your children.',
     teaches: 'You teach', kidsOf: 'Your children', change: 'Change in Profile', grade: (g: number) => `Grade ${g}`, make: '+ New lesson', draft: (what: string, step: string) => `Continue: ${what} · ${step}`, draftGo: 'Continue', allClasses: 'All classes', all: 'All',
     groups: { open: 'Assigned', draft: 'Drafts · not assigned yet', done: 'Done' }, doneBy: (d: number, n: number) => `${d}/${n} finished`, none: 'No lessons yet', n: (n: number) => `${pl(n, 'lesson')}`, parts: (s: number, i: number, c: number, v: boolean) => [s && 'Slides', v && 'Video', i && `${pl(i, 'item')}`, c && 'Flashcards'].filter(Boolean).join(' · '),

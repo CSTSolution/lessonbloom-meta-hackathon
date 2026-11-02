@@ -19,7 +19,7 @@ const aiOut = (l: Lesson) => l.rejected.filter((r) => r.codes?.some((c) => c.sta
 const T = {
   vi: {
     working: 'Trợ lý đang soạn bài…', queued: (n: number) => `Đang chờ (thứ ${n}): bài sẽ được soạn khi xong việc đang làm. Mỗi tài khoản làm một việc một lúc.`, left: (m: number) => (m > 1 ? `Còn khoảng ${m} phút` : 'Sắp xong'), failed: 'Chưa soạn được bài này.', note: 'Ghi chú của trợ lý', changes: 'Đã sửa', cost: (n: number) => `Bài này dùng ${n} lượt dùng.`, pdf: 'Xuất PDF', printItems: 'In phiếu bài tập',
-    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', drawing: 'Đang vẽ hình minh hoạ…',
+    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, prev: 'Trước', nextSlide: 'Sau', says: 'Lời giảng cho cô', saysP: 'Gợi ý học cùng con', src: 'Nguồn', toVideo: 'Tiếp: tạo video', drawing: 'Đang vẽ hình minh hoạ…',
     rewrite: 'Viết lại slide này', simpler: 'Đơn giản hơn', addSlide: 'Thêm slide', topicPh: 'Slide mới nói về… (không bắt buộc)', add: 'Thêm',
     makeVideo: 'Tạo video (~3 phút)', remake: 'Tạo lại video', making: (n: string) => `Đang tạo video… ${n}`, download: 'Tải video (MP4)', subsOn: 'Phụ đề bật', speed: 'Tốc độ', slow: 'Chậm (lớp 1, 2)', normal: 'Vừa', fast: 'Nhanh', voices: ['Nữ · miền Bắc'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'Chưa tạo được video. Cô thử lại nhé.', enOnly: 'Hiện chỉ làm video cho bài tiếng Anh. Bài tiếng Việt: bấm ▶ để nghe thử bằng giọng của trình duyệt; bài tập và link của con vẫn đọc câu hỏi.', preview: 'Nghe thử từng đoạn',
     redoneWhy: 'Tạo lại vì', edit: 'Sửa', qText: 'Câu hỏi', save: 'Lưu', cancel: 'Huỷ', similar: 'Tạo câu tương tự', addTpl: '+ Thêm mẫu', tplKind: 'Dạng câu', skill: 'Dạng bài', level: 'Mức', create: 'Tạo 2 câu', working2: 'Đang viết…', story: 'Đề bài', unit: 'Đơn vị', wrongs: 'Đáp án sai (cách nhau bằng dấu phẩy)', shown: 'Kết quả ghi trong câu', opts: 'Lựa chọn (cách nhau bằng dấu phẩy)', ans: 'Đáp án', sentence: 'Câu có chỗ trống ___', sayIt: 'Từ được đọc to', words: 'Các từ (cách nhau bằng dấu phẩy)', codeAns: 'Đáp án do code tính.',
@@ -31,7 +31,7 @@ const T = {
   },
   en: {
     working: 'The agent is making your lesson…', queued: (n: number) => `Waiting (number ${n} in your line): the lesson is made once the job before it is done. Each account runs one job at a time.`, left: (m: number) => (m > 1 ? `About ${pl(m, 'minute')} left` : 'Nearly done'), failed: 'This lesson could not be made.', note: "The agent's note", changes: 'Changes', cost: (n: number) => `This lesson used ${pl(n, 'credit')}.`, pdf: 'Export PDF', printItems: 'Print worksheet',
-    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', drawing: 'Drawing the picture…',
+    slideN: (i: number, n: number) => `Slide ${i} / ${n}`, prev: 'Previous', nextSlide: 'Next', says: 'What you say', saysP: 'Tips for learning together', src: 'Source', toVideo: 'Next: video', drawing: 'Drawing the picture…',
     rewrite: 'Rewrite this slide', simpler: 'Make it simpler', addSlide: 'Add a slide', topicPh: 'The new slide is about… (optional)', add: 'Add',
     makeVideo: 'Make the video (~3 min)', remake: 'Make it again', making: (n: string) => `Making the video… ${n}`, download: 'Download video (MP4)', subsOn: 'Subtitles on', speed: 'Speed', slow: 'Slow (grades 1–2)', normal: 'Normal', fast: 'Fast', voices: ['Female · Northern Vietnamese'], voicesEn: ['Female (US)', 'Female (UK)', 'Male (US)'], videoErr: 'The video could not be made. Please try again.', enOnly: 'Videos are made for English lessons only for now. Vietnamese lessons: press ▶ to hear each part in the browser\'s own voice; practice and the child\'s link still read the questions aloud.', preview: 'Listen to each part',
     redoneWhy: 'Written again because', edit: 'Edit', qText: 'Question', save: 'Save', cancel: 'Cancel', similar: 'Make a similar item', addTpl: '+ Add a template', tplKind: 'Item type', skill: 'Skill', level: 'Level', create: 'Make 2 items', working2: 'Writing…', story: 'Problem', unit: 'Unit', wrongs: 'Wrong options (comma-separated)', shown: 'Result written in the statement', opts: 'Options (comma-separated)', ans: 'Answer', sentence: 'Sentence with a gap ___', sayIt: 'Word read aloud', words: 'Words (comma-separated)', codeAns: 'The answer is worked out by code.',
@@ -81,7 +81,7 @@ export function LessonPage({ id, parent }: { id: string; parent: boolean }) {
       {l.status === 'ready' && step === 3 && <Slides l={l} t={t} parent={parent} refText={refText} onSlide={(ns) => setL({ ...l, slides: l.slides.map((x) => (x.id === ns.id ? ns : x)) })} onSlides={(slides) => setL({ ...l, slides })} onNext={() => setStep(4)} />}
       {l.status === 'ready' && step === 4 && <Video l={l} t={t} onNext={() => setStep(5)} onStarted={() => setTick((x) => x + 1)} />}
       {l.status === 'ready' && step === 5 && <Practice l={l} t={t} parent={parent} refText={refText} onChange={(items) => setL({ ...l, items })} onNext={() => setStep(6)} />}
-      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} items={l.items.length} /></div>}
+      {l.status === 'ready' && step === 6 && <div style={{ maxWidth: 640, margin: '0 auto' }}><Assign lessonId={l.id} parent={parent} checked={l.items.length + l.rejected.length} redone={l.rejected.length - aiOut(l)} removed={aiOut(l)} pupilId={l.setup.work?.pupilId} items={l.items.length} video={l.video_status === 'ready' ? 'ready' : String(l.video_status || '').startsWith('working') ? 'making' : 'none'} /></div>}
       {l.status === 'ready' && <LessonRating lessonId={l.id} />}{/* Chi #62: once per lesson */}
     </div>
   );
@@ -91,7 +91,12 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
   const lang = useLang(), [i, setI] = useState(0), s = l.slides[i];
   const [busy, setBusy] = useState(false), [cut, setCut] = useState<{ file: File | null; name: string } | null>(null), [msg, setMsg] = useState(''), [adding, setAdding] = useState<string | null>(null), [what, setWhat] = useState('');
   const run = async (fn: () => Promise<void>, label = 'x') => { setWhat(label); setBusy(true); setMsg(''); try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? (lang === 'en' ? e.en : e.vi) : String(e)); } finally { setBusy(false); } };
-  useEffect(() => { setCut(null); setMsg(''); }, [i]);
+  useEffect(() => { setCut(null); setMsg(''); document.querySelector('.slide-list .on')?.scrollIntoView({ block: 'nearest' }); }, [i]);
+  // ← → go through the slides (Chi #79a: with no buttons she thought there was only one), not while typing
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => { if ((e.target as HTMLElement)?.closest('input, textarea, select, [contenteditable]')) return; if (e.key === 'ArrowRight') setI((x) => Math.min(l.slides.length - 1, x + 1)); if (e.key === 'ArrowLeft') setI((x) => Math.max(0, x - 1)); };
+    window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
+  }, [l.slides.length]);
   if (!s) return null;
   // the code check's mark (Chi, 31 Oct): a slide written again automatically, or one still to check
   const flagOf = (x: Slide) => (x as Slide & { flag?: { fixed: boolean; vi: string; en: string } }).flag;
@@ -104,7 +109,7 @@ function Slides({ l, t, parent, refText, onSlide, onSlides, onNext }: { l: Lesso
         <div className="slide-list">{l.slides.map((x, j) => <button key={x.id} className={j === i ? 'on' : ''} onClick={() => setI(j)}>{j + 1}&nbsp; {x.heading}{flagOf(x) && <span title={flagWords(flagOf(x)!)} aria-label={flagWords(flagOf(x)!)} style={{ color: '#8a5200' }}>&nbsp;●</span>}</button>)}</div>
         <div className="stack">
           <div className="slide-big">
-            <div className="row"><h2 className="grow">{s.heading}</h2><span className="tag next">{t.slideN(i + 1, l.slides.length)}</span></div>
+            <div className="row"><h2 className="grow">{s.heading}</h2><button className="btn small" disabled={i === 0} aria-label={t.prev} onClick={() => setI(i - 1)}>◀ {t.prev}</button><span className="tag next">{t.slideN(i + 1, l.slides.length)}</span><button className="btn small" disabled={i >= l.slides.length - 1} aria-label={t.nextSlide} onClick={() => setI(i + 1)}>{t.nextSlide} ▶</button></div>
             {flag && <p className="banner warn small" role="note" style={{ marginTop: 8 }}><b>{flagWords(flag)}.</b> {lang === 'en' ? 'Read this slide before you assign the lesson.' : 'Xem lại slide này trước khi giao bài.'}</p>}
             <div className="row" style={{ alignItems: 'flex-start', marginTop: 12, gap: 18 }}>
               {s.example && <div className="ex" style={{ background: 'var(--leaf-2)', borderRadius: 10, padding: '10px 16px' }}>{s.example}</div>}

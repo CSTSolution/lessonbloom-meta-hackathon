@@ -293,10 +293,16 @@ export function skillRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budge
       });
       const known = new Set(nodes.map((n) => n.id)), partIds = new Set(parts.map((p) => p.id));
       const named = new Map(nodes.map((n) => [n.id, n.name]));
-      const ops = (Array.isArray(r.ops) ? r.ops : []).filter((o) => (OPS as readonly string[]).includes(o?.op) && (o.op === 'add' ? partIds.has(String(o.part)) : o.op === 'merge' ? (o.ids ?? []).every((x) => known.has(String(x))) : known.has(String(o.id)))).slice(0, 10)
+      // Chi #72: "I propose renaming…" came with no Apply. A change may name the skill instead of its id, or leave the id out
+      // when she asked about the skill she had selected: both are mended here before the check below
+      const byName = new Map(nodes.map((n) => [n.name.trim().toLowerCase(), n.id])), idOf = (x: unknown) => { const v = String(x ?? '').trim(); return known.has(v) ? v : byName.get(v.toLowerCase()) ?? v; };
+      const mended = (Array.isArray(r.ops) ? r.ops : []).map((o) => (!o || typeof o !== 'object' ? o : { ...o, ...(o.op !== 'add' && o.op !== 'merge' ? { id: o.id ? idOf(o.id) : skill?.id } : {}), ...(o.op === 'merge' && Array.isArray(o.ids) ? { ids: o.ids.map(idOf) } : {}) }));
+      const ops = mended.filter((o) => (OPS as readonly string[]).includes(o?.op) && (o.op === 'add' ? partIds.has(String(o.part)) : o.op === 'merge' ? (o.ids ?? []).every((x) => known.has(String(x))) : known.has(String(o.id)))).slice(0, 10)
         .map((o): Op => ({ op: o.op, ...(o.id ? { id: String(o.id) } : {}), ...(o.ids ? { ids: o.ids.map(String) } : {}), ...(o.part ? { part: String(o.part) } : {}), ...(o.name ? { name: clip(o.name, SKILLS.name) } : {}), ...(o.kind ? { kind: String(o.kind) } : {}), ...(Array.isArray(o.pages) ? { pages: o.pages.map(Number).slice(0, 60) } : {}),
           was: (o.op === 'merge' ? o.ids ?? [] : o.id ? [o.id] : []).map((x) => named.get(String(x)) ?? '') }));
-      const reply = clip(r.reply, 800) || (t.lang === 'en' ? 'Done.' : 'Xong.');
+      // no change to show: say so plainly, so a "propose" in the answer is never mistaken for a change (Chi #72)
+      const said = clip(r.reply, 760), none = t.lang === 'en' ? 'Nothing was changed.' : 'Mình chưa đổi gì.';
+      const reply = ops.length ? said || (t.lang === 'en' ? 'Here is the change.' : 'Đây là thay đổi.') : `${said}${said ? ' ' : ''}${none}`;
       const [q, ans] = [newId(12), newId(12)];
       await sql.query(`insert into skill_notes (id, area_id, teacher_id, skill_id, role, text) values ($1, $2, $3, $4, 'user', $5)`, [q, a.id, t.id, skill?.id ?? null, text]);
       await sql.query(`insert into skill_notes (id, area_id, teacher_id, skill_id, role, text, ops, status, created_at) values ($1, $2, $3, $4, 'app', $5, $6::jsonb, $7, now() + interval '1 millisecond')`, [ans, a.id, t.id, skill?.id ?? null, reply, ops.length ? JSON.stringify(ops) : null, ops.length ? 'proposed' : null]);

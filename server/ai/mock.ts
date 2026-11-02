@@ -17,6 +17,8 @@ export class MockProvider implements AI {
     ['skilllinks', (r) => { const ids = (r.fixture as { ids: string[] }).ids; return { links: ids.slice(1).map((id, k) => ({ id, after: [ids[k]] })) }; }],
     ['skillchat', (r) => {
       const f = r.fixture as { text: string; ids: string[]; parts: string[] };
+      if (/no id/i.test(f.text)) return { reply: 'I propose renaming this skill.', ops: [{ op: 'rename', name: 'Picked skill' }] };
+      if (/just talk/i.test(f.text)) return { reply: 'I propose renaming this skill.', ops: [] };
       if (/rename/i.test(f.text)) return { reply: 'Renamed.', ops: [{ op: 'rename', id: f.ids[0], name: 'Renamed skill' }] };
       if (/merge/i.test(f.text)) return { reply: 'Merged.', ops: [{ op: 'merge', ids: [f.ids[0], f.ids[1]], name: 'Merged skill' }] };
       if (/remove/i.test(f.text)) return { reply: 'Removed.', ops: [{ op: 'remove', id: f.ids[0] }, { op: 'remove', id: 'not-a-skill' }] };

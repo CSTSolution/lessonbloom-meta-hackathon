@@ -4,6 +4,7 @@
 //             answers checked here (the answers never reach the phone)
 // Pupils' names never go to a model: nothing on the pupils' side calls one (narration is local).
 import { createHash, randomBytes } from 'node:crypto';
+import { spoken as slideSpoken } from '../lesson/video.ts';
 import type { Context, Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import QRCode from 'qrcode';
@@ -296,9 +297,10 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
         (select l.video_status = 'ready' from lessons l where l.id = a.lesson_id) as video,
         g.slides_at is not null as slides_seen, g.video_at is not null as video_seen, g.cards_at is not null as cards_seen, g.done_at is not null as done,
         g.pairs_at is not null as pairs_seen, coalesce(g.cards_review, 0)::int as cards_review, a.created_at as given,
+        coalesce((select l.video_status like 'working%' from lessons l where l.id = a.lesson_id), false) as video_making,
         (select count(distinct item_id) from answers w where w.assignment_id = a.id and w.pupil_id = $2)::int as answered
       from assignments a left join pupil_progress g on g.assignment_id = a.id and g.pupil_id = $2
-      where a.class_id = $1 and a.removed_at is null and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
+      where a.class_id = $1 and a.removed_at is null and a.hidden_at is null and (a.due is null or a.due >= (now() at time zone 'Asia/Ho_Chi_Minh')::date - 1) order by a.created_at desc limit 20`, [p.class_id, p.id]);
     return c.json({ pupil: { name: p.name }, class: { name: p.class_name }, lessons: rows, reminder: d.reminder ? await d.reminder(p.class_id, p.id).catch(() => null) : null });
   });
 
@@ -363,6 +365,24 @@ export function classRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; files?: Files
 
   // "Nghe và chọn": the words are spoken by the server's local voice, never written on the phone.
   const said = new Map<string, Buffer>();
+  // "Xem bài" (Chi #79): a slide read aloud in the voice the video uses; the phone reads it itself while that voice is off
+  app.get('/api/p/a/:id/slide/:sid/say', async (c) => {
+    const r = await assignmentOf(c);
+    if (r.error) return r.error;
+    const s = (r.a.content.slides ?? []).find((x) => x.id === c.req.param('sid')), lang = r.a.content.lang === 'en' ? 'en' : 'vi';
+    const text = s ? slideSpoken(s, lang) : '';
+    if (!text) return fail(c, 'notFound', 404);
+    const key = hash(`${lang}:${text}`);
+    let wav = said.get(key);
+    if (!wav) {
+      if (!speaks(lang)) return fail(c, 'voiceOff', 503);
+      try { wav = await d.ai.speak({ text, lang }); } catch { return fail(c, 'aiBusy', 503); }
+      if (said.size > 500) said.clear();
+      said.set(key, wav);
+    }
+    return c.body(new Uint8Array(wav), 200, { 'content-type': 'audio/wav', 'cache-control': 'private, max-age=86400' });
+  });
+
   app.get('/api/p/a/:id/say/:item', async (c) => {
     const r = await assignmentOf(c);
     if (r.error) return r.error;

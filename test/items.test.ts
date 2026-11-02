@@ -119,7 +119,10 @@ test('levels (Chi #31): a good or advanced item never repeats a basic one', () =
   assert.deepEqual(colour({ level: 'good', sentence: 'The banana is ___.', options: ['red', 'yellow', 'blue'], answer: 'yellow' }, withLesson, 'ex05'), []);
   assert.deepEqual(colour({ level: 'basic', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex01'), [], 'the basic item itself passes');
   assert.ok(!colour({ level: 'advanced', template: 'listen', say: 'blue', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex06').includes('dup'), 'another template is another question');
-  assert.ok(!colour({ level: 'good', skill: 'what_colour', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue' }, withLesson, 'ex07').includes('dup'), 'levels belong to one skill');
+  // the level rule is per skill; the same question and answer under another skill is still the same question for
+  // the child (Chi #74a: two "You must only step on the ___." in a row)
+  const other = checkItem(buildEnglish({ template: 'fill', skill: 'what_colour', level: 'good', prompt: 'Choose the missing word.', sentence: 'The sky is ___.', options: ['blue', 'red', 'green'], answer: 'blue', explain: 'The sky is blue.' }, 'ex07'), withLesson);
+  assert.ok(other.some((x) => x.code === 'dup' && /same question and answer/.test(x.msg)) && !other.some((x) => /basic item/.test(x.msg)), 'levels belong to one skill; a copy is still a copy');
 });
 
 // Chi #47 (31 Oct): "Cộng, trừ trong phạm vi 1000" (Toán 2 tập 2, pp. 58-77) got 100 − 28, 48 + 37, 83 − 36, 59 + 24…

@@ -28,6 +28,7 @@ const T = {
     about: (n: string) => `Về: ${n}`, place: 'Gõ câu hỏi, yêu cầu sửa hoặc góp ý…', send: 'Hỏi app', comment: 'Gửi góp ý', sent: 'Đã gửi góp ý cho đội ngũ. Cảm ơn bạn!', you: 'Bạn', app: 'App', yourComment: 'Góp ý của bạn',
     apply: 'Áp dụng', dismiss: 'Bỏ qua', applied: 'Đã áp dụng', dismissed: 'Đã bỏ qua', appliedN: (a: number, s: number) => `Đã áp dụng ${a} thay đổi${s ? `, ${s} thay đổi không còn hợp nên bỏ qua` : ''}.`,
     op: { rename: (a: string, b: string) => `Đổi tên “${a}” → “${b}”`, add: (n: string, p: string) => `Thêm “${n}” vào ${p}`, remove: (n: string) => `Bỏ “${n}” (trang của nó chuyển sang kỹ năng gần nhất)`, merge: (xs: string, n: string) => `Gộp ${xs} thành “${n}”`, pages: (n: string, p: string) => `Trang của “${n}”: ${p}`, kind: (n: string, k: string) => `“${n}” là ${k}` },
+    leadsTo: 'cần trước', legendLabel: 'Chú giải', legendLang: 'kỹ năng tiếng Anh', legendMaths: 'kỹ năng toán', legendBuilds: 'cần học trước (rê chuột để xem)',
     help: 'Bản đồ kỹ năng là gì?', noWarranty: 'Bản thử nghiệm (Beta), không bảo đảm: bản đồ do AI lập nên có thể thiếu hoặc gọi sai kỹ năng. Bạn kiểm tra trước khi dùng; bài giảng vẫn chỉ soạn từ trang sách của bạn.', feedback: 'Góp ý',
     g1: 'Bản đồ kỹ năng (Beta)', g1b: 'AI đọc từng phần của sách và liệt kê các kỹ năng phần đó dạy. Mỗi kỹ năng là một nút gắn với phần và trang sách; đường nối cho biết kỹ năng nào dựa trên kỹ năng nào. Khi soạn bài, bạn có thể chọn theo kỹ năng thay vì theo trang.',
     g2: 'Tốn bao nhiêu lượt?', g2b: 'Lập bản đồ là tuỳ chọn. Trước khi lập, app cho biết số lượt ước tính và giữ trước số đó; xong thì chỉ trừ số đã dùng (không quá ước tính), phần còn lại được trả lại. Mỗi câu hỏi app về bản đồ dùng khoảng 1–2 lượt. Góp ý thì miễn phí.',
@@ -47,6 +48,7 @@ const T = {
     about: (n: string) => `About: ${n}`, place: 'Type a question, a fix or a comment…', send: 'Ask the app', comment: 'Send as comment', sent: 'Your comment was sent to the team. Thank you!', you: 'You', app: 'App', yourComment: 'Your comment',
     apply: 'Apply', dismiss: 'Dismiss', applied: 'Applied', dismissed: 'Dismissed', appliedN: (a: number, s: number) => `${a} ${a === 1 ? 'change' : 'changes'} applied${s ? `; ${s} no longer fit and were skipped` : ''}.`,
     op: { rename: (a: string, b: string) => `Rename “${a}” → “${b}”`, add: (n: string, p: string) => `Add “${n}” to ${p}`, remove: (n: string) => `Remove “${n}” (its pages go to the nearest skill)`, merge: (xs: string, n: string) => `Merge ${xs} into “${n}”`, pages: (n: string, p: string) => `Pages of “${n}”: ${p}`, kind: (n: string, k: string) => `“${n}” is ${k}` },
+    leadsTo: 'comes before', legendLabel: 'Legend', legendLang: 'language skill', legendMaths: 'maths skill', legendBuilds: 'learn first (hover to see)',
     help: 'What is the skills map?', noWarranty: 'Beta, no warranty: the map is made by AI and may miss or misname skills. Check it before you rely on it; lessons are still made only from your book\'s pages.', feedback: 'Feedback',
     g1: 'Skills map (Beta)', g1b: 'The AI reads each part of your book and lists the skills it teaches. Each skill is a node tied to its part and pages; the lines show which skill builds on which. When you make a lesson, you can choose by skill instead of by page.',
     g2: 'What does it cost?', g2b: 'Building the map is optional. Before it starts, the app shows the estimated credits and holds them; when it is done you pay only what it used (never more than the estimate) and the rest comes back. Each question to the app about the map uses about 1–2 credits. Comments are free.',
@@ -111,13 +113,14 @@ export function SkillMapView({ areaId, onSource }: { areaId: string; onSource: (
           <div className="row"><b className="grow">{s.name}</b><span className="tag">{KIND[lang][s.kind] ?? s.kind}</span><button className="link small muted" aria-label={t.close} onClick={() => setSel('')}>✕</button></div>
           {s.about && <span className="small">{s.about}</span>}
           <span className="small"><b>{t.part}:</b> {part.get(s.part)?.title} · {t.pages(pageRanges(s.pages, s.printed))}</span>
-          {s.after.length > 0 && <span className="small"><b>{t.buildsOn}:</b> {s.after.map((x) => node.get(x)?.name).filter(Boolean).join(' · ')}</span>}
-          {m.nodes.some((n) => n.after.includes(s.id)) && <span className="small"><b>{t.usedBy}:</b> {m.nodes.filter((n) => n.after.includes(s.id)).map((n) => n.name).join(' · ')}</span>}
+          {s.after.length > 0 && <span className="small"><b>{t.buildsOn}:</b> {s.after.filter((x) => node.get(x)).map((x, k) => <span key={x}>{k ? ' · ' : ''}<button className="link small" onClick={() => setSel(x)}>{node.get(x)!.name}</button></span>)}</span>}
+          {m.nodes.some((n) => n.after.includes(s.id)) && <span className="small"><b>{t.usedBy}:</b> {m.nodes.filter((n) => n.after.includes(s.id)).map((n, k) => <span key={n.id}>{k ? ' · ' : ''}<button className="link small" onClick={() => setSel(n.id)}>{n.name}</button></span>)}</span>}
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <button className="btn small" onClick={() => onSource(s.part)}>{t.open}</button>
             <button className="btn small primary" onClick={() => go(`/new?area=${areaId}&section=${s.part}&skills=${s.id}`)}>{t.make}</button>
           </div>
         </div>}
+        {view === 'map' && <div className="map-legend small muted" aria-label={t.legendLabel}><span><i className="dot lang" /> {t.legendLang}</span><span><i className="dot maths" /> {t.legendMaths}</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1,9 C8,9 14,1 21,1" fill="none" stroke="var(--sun)" strokeWidth="2" /></svg> {t.legendBuilds}</span></div>}
         {view === 'map' ? <NeuronMap map={m} sel={sel} onNode={(id) => setSel(id === sel ? '' : id)} onPart={onSource} />
         : <div className="stack" style={{ gap: 8 }}>{m.parts.map((p, i) => <div key={p.id} className="card stack" style={{ gap: 4 }}>
             <div className="row"><b className="small grow">{i + 1}. {p.title}</b><button className="link small" onClick={() => onSource(p.id)}>{t.pages(pageRanges(Array.from({ length: p.pageTo - p.pageFrom + 1 }, (_, k) => p.pageFrom + k)))}</button></div>
@@ -195,7 +198,7 @@ export function NeuronMap({ map: m, sel = '', picked, onNode, onPart }: { map: S
         {m.nodes.map((n) => { const h = hub.get(n.part), p = at.get(n.id); return h && p ? <path key={`p${n.id}`} d={`M${h.x},${h.y + 18} Q${h.x},${p.y} ${p.x - 9},${p.y}`} fill="none" stroke="var(--leaf)" strokeOpacity={lit(n.id) ? 0.35 : 0.1} strokeWidth="1.5" /> : null; })}
         {m.nodes.flatMap((n) => n.after.map((a) => { const p = at.get(n.id), q = at.get(a); if (!p || !q) return null; const on = focus && (focus === n.id || focus === a);
           const bend = Math.max(30, Math.abs(p.y - q.y) * 0.3 + Math.abs(p.x - q.x) * 0.1);
-          return <path key={`a${n.id}${a}`} d={`M${q.x - 9},${q.y} C${q.x - 9 - bend},${q.y} ${p.x - 9 - bend},${p.y} ${p.x - 9},${p.y}`} fill="none" stroke="var(--sun)" strokeWidth={on ? 2.5 : 1.5} strokeOpacity={on ? 0.9 : focus ? 0.05 : 0.3} />; }))}
+          return <g key={`a${n.id}${a}`}><path d={`M${q.x - 9},${q.y} C${q.x - 9 - bend},${q.y} ${p.x - 9 - bend},${p.y} ${p.x - 9},${p.y}`} fill="none" stroke="var(--sun)" strokeWidth={on ? 2.5 : 1.5} strokeOpacity={on ? 0.9 : focus ? 0.05 : 0.3} /><path d={`M${q.x - 9},${q.y} C${q.x - 9 - bend},${q.y} ${p.x - 9 - bend},${p.y} ${p.x - 9},${p.y}`} fill="none" stroke="transparent" strokeWidth="10"><title>{`${node.get(a)?.name} → ${t.leadsTo} → ${n.name}`}</title></path></g>; }))}
         {m.parts.map((p) => { const h = hub.get(p.id)!; return (
           <g key={p.id} className={onPart ? 'map-node' : undefined} onClick={() => onPart?.(p.id)} opacity={!focus || near.has(p.id) ? 1 : 0.35}>
             <title>{`${p.title} · ${t.pages(pageRanges(Array.from({ length: p.pageTo - p.pageFrom + 1 }, (_, k) => p.pageFrom + k)))}`}</title>
@@ -236,7 +239,7 @@ export function SkillPicker({ map, picked, onPick }: { map: SkillMap; picked: st
       <span className="small muted">{t.pickLead}</span>
       <div className="row" role="tablist" aria-label={t.picker}>{(['map', 'list'] as const).map((k) => <button key={k} role="tab" aria-selected={view === k} className={`pill ${view === k ? 'on' : ''}`} onClick={() => setView(k)}>{k === 'map' ? t.asMap : t.asList}</button>)}</div>
       {moved && <span className="small banner warn">{t.otherPart}</span>}
-      {view === 'map' ? <><span className="small muted">{t.tickHint}</span><NeuronMap map={map} picked={picked} onNode={(id) => tick(id, !picked.includes(id))} /></> : <>
+      {view === 'map' ? <><span className="small muted">{t.tickHint}</span><div className="map-legend small muted" aria-label={t.legendLabel}><span><i className="dot lang" /> {t.legendLang}</span><span><i className="dot maths" /> {t.legendMaths}</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1,9 C8,9 14,1 21,1" fill="none" stroke="var(--sun)" strokeWidth="2" /></svg> {t.legendBuilds}</span></div><NeuronMap map={map} picked={picked} onNode={(id) => tick(id, !picked.includes(id))} /></> : <>
       <input type="search" value={find} placeholder={t.search} onChange={(e) => setFind(e.target.value)} />
       <div className="stack" style={{ gap: 6, maxHeight: 320, overflow: 'auto' }}>
         {map.parts.map((p) => { const ns = map.nodes.filter((n) => n.part === p.id && (!f || n.name.toLowerCase().includes(f) || p.title.toLowerCase().includes(f))); return ns.length ? (

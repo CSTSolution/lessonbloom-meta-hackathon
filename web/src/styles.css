@@ -194,6 +194,10 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .p-opt { min-height: 72px; border-radius: 16px; border: 2px solid var(--line); background: var(--card); font: inherit; font-size: 28px; font-weight: 700; cursor: pointer; color: var(--ink); }
 .p-opt.right { border-color: var(--ok); background: var(--p-green); } .p-opt.wrong { border-color: #E8833A; background: #FFF6EC; }
 .p-word { min-height: 52px; border-radius: 14px; border: 2px solid var(--line); background: var(--card); font: inherit; font-size: 20px; padding: 6px 14px; cursor: pointer; color: var(--ink); }
+.p-act:disabled { opacity: .5; cursor: default; }
+.p-fold-box { display: flex; flex-direction: column; gap: 4px; }
+.p-fold { width: 100%; display: flex; justify-content: space-between; align-items: center; background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 12px 14px; font: inherit; font-weight: 700; font-size: 17px; cursor: pointer; color: var(--ink); }
+.p-row { width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left; background: none; border: none; border-bottom: 1px solid var(--line); padding: 10px 6px; font: inherit; font-size: 16px; cursor: pointer; color: var(--ink); }
 .p-word.on { border-color: var(--leaf); background: var(--leaf-2); } .p-word.used { opacity: .25; border-style: dashed; } .p-word.sel { border-color: var(--sun); background: var(--sun-2); } .p-word.emo { font-size: 30px; }
 .p-built { min-height: 60px; border-bottom: 3px dashed var(--line); display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
 .p-match { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .p-match > div { display: grid; gap: 8px; align-content: start; }
@@ -226,6 +230,7 @@ textarea { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px s
 .source-text { white-space: pre-wrap; font: inherit; font-size: 13px; margin: 4px 0 0; max-height: 520px; overflow: auto; background: var(--paper); border-radius: 6px; padding: 8px 10px; }
 .map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--card); }
 .map-node { cursor: pointer; }
+.map-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; } .map-legend span { display: inline-flex; gap: 5px; align-items: center; } .map-legend .dot { width: 10px; height: 10px; border-radius: 9px; display: inline-block; border: 2px solid; } .map-legend .dot.lang { border-color: var(--leaf); background: var(--leaf-2); } .map-legend .dot.maths { border-color: var(--sun); background: var(--sun-2); }
 .multi { position: relative; } .multi-btn { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; font-size: 16px; font-weight: 400; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: #fff; cursor: pointer; }
 .multi-list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 24px rgba(23, 32, 51, .12); max-height: 320px; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .cat { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--leaf-2); color: var(--leaf); align-self: start; } .cat.skill { background: var(--sun-2); color: #8a5200; }

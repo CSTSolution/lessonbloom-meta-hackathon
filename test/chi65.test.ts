@@ -43,6 +43,13 @@ test('the child side keeps the pairs game and cards to go over; a lesson everyon
   assert.ok(t.done && t.cards_seen && t.pairs_seen, 'the pairs game shows as done');
   assert.equal(t.cards_review, 2, 'cards to go over again');
   assert.ok(t.given, 'when it was given, to tell two of the same apart');
+  assert.equal(t.video_making, false, 'no video being made');
+  // "Xem bài" (Chi #79): a slide read aloud for the child (or the phone's own voice while the server's is off)
+  const sid = lesson.slides[0].id, said = await s.app.request(`/api/p/a/${a.id}/slide/${sid}/say`, { headers: { cookie: '' } });
+  assert.equal(said.status, 401, 'only the child signed in');
+  const r = await kid('GET', `/api/p/a/${a.id}/slide/${sid}/say`);
+  assert.ok(r.status === 200 || (r.status === 503 && r.json.code === 'voiceOff'), `slide voice ${r.status}`);
+  assert.equal((await kid('GET', `/api/p/a/${a.id}/slide/nope/say`)).status, 404);
   // finished by everyone it was given to: Done in the list (the page groups it so), though its due date is ahead
   row = (await call('GET', '/api/t/lessons')).json.lessons.find((l: any) => l.id === lessonId);
   assert.deepEqual([row.done_by, row.given_to], [1, 1]);
@@ -53,8 +60,21 @@ test('the child side keeps the pairs game and cards to go over; a lesson everyon
   assert.equal((await call('POST', `/api/t/assignments/${a.id}/hide`)).status, 200);
   view = (await call('GET', `/api/t/classes/${k.id}`)).json;
   assert.equal(view.assignments.length, 0, 'hidden from her list');
-  assert.equal((await kid('GET', '/api/p/today')).json.lessons.length, 1, 'still on the child\'s screen');
+  assert.equal((await kid('GET', '/api/p/today')).json.lessons.length, 0, 'hidden from the child too (Chi #76)');
   const other = s.client('198.51.100.72');
   await other('POST', '/api/auth/demo');
   assert.equal((await other('POST', `/api/t/assignments/${a.id}/hide`)).status, 404, 'only hers');
+});
+
+test('a fill item with its answer in the sentence is rejected (Chi #77); the same question and answer twice is a duplicate (Chi #74a)', async () => {
+  const { checkItem } = await import('../server/lesson/items.ts');
+  const base = { subject: 'english', template: 'fill', skill: 'animals', level: 'basic', prompt: 'Pick the right word to finish.', explain: 'A fish lives in water, not a cat or a dog.', options: ['cat', 'fish', 'dog'], answer: 'fish' } as any;
+  const ctx = { source: 'Unit 5 Animals: cat dog fish bird rabbit. It is a fish. It lives in water.', skills: [{ tag: 'animals', name: 'Animal words', kind: 'vocabulary' }], items: [] } as any;
+  const codes = (it: any, c = ctx) => checkItem(it, c).map((x: any) => x.code);
+  assert.ok(codes({ ...base, id: 'a', sentence: 'It is a fish. It is a ___.' }).includes('K'), 'the answer is in the sentence');
+  assert.ok(codes({ ...base, id: 'b', sentence: 'Two fishes swim. It is a ___.' }).includes('K'), 'its plural too');
+  assert.ok(!codes({ ...base, id: 'c', sentence: 'It lives in water. It is a ___.' }).includes('K'), 'a clue instead is fine');
+  const one = { ...base, id: 'd', sentence: 'It lives in water. It is a ___.' }, two = { ...base, id: 'e', sentence: 'It lives in water. It is a ___.', options: ['bird', 'fish', 'dog'] };
+  const c2 = { ...ctx, items: [one, two] };
+  assert.ok(!codes(one, c2).includes('dup') && codes(two, c2).includes('dup'), 'the later copy is the duplicate');
 });
