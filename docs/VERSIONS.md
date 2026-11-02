@@ -3,6 +3,31 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261102.1116 (2 Nov, late morning)
+
+Son's requests of 2 Nov:
+- **Skills map (Beta)**: optional, per book. "Build skills map · about N credits" shows the estimate, holds it when
+  the job joins the queue, and charges what it really used (never more than the estimate); the rest comes back.
+  Each part's skills, each tied to its part and pages; code fills any part or page the AI left out ("Nothing
+  missing" line). Drawn as a neuron-like map (parts as hubs, skills under them, lines to the skills they build
+  on) or a list. Ask the app to fix it (it proposes; nothing changes until Apply), or send a comment (free, emailed
+  to the team). Beta mark, "?" guide with a "no warranty" card, and Feedback beside it. In Knowledge → Skills map
+  and in its own top menu. Live check: English 3 sample, 6 skills in 16 s, 2 credits ($0.012 real).
+- **Old knowledge map removed**: the tab built from lessons made is gone; the skills map, built from the book,
+  replaces it.
+- **She always picks the scope**: no "Find it from the material"; the part list is a multi-check with "Select all"
+  (one book); no page is ticked until she ticks; or she chooses by the skills map (map or list). A sentence,
+  photo or the child's marked work is optional focus. More than about 12,000 characters of the book (5–8 pages)
+  is said on the page and refused.
+- **A lesson from several parts**: their ticked pages in book order; one reference per part; the lessons list
+  shows each part (📖) and the skills it was chosen by (🧠).
+
+## v1.0.20261102.0935 (2 Nov, morning)
+
+- The scope is always asked: the part's pages as checkboxes, untick what is not wanted (Son).
+- A unit after the blank ("= ___ cm") is read (Chi #63b); switching the material kind drops the last photos and
+  their mistakes (Chi #63c, #64).
+
 ## v1.0.20261101.2307 (1 Nov, night)
 
 From the live English test of 2246:
