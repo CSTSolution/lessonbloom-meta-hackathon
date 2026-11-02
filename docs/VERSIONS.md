@@ -3,6 +3,15 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261102.1917 (2 Nov, evening)
+
+From Chi's test of 1738:
+- **Top menu (#73)**: it is never cut at the ends any more (it was centred while it overflowed, so "Lessons" and
+  "Learning summary" lost letters). As the window narrows, the name hides first, "Working on: 1" becomes "⏳ 1"
+  (full words on hover), and at 1340 px and below the menu takes its own row. Checked 900–1536 px, both languages.
+- **Assigning before the video starts (#78)**: when the video will start by itself (a parent's on Assign, anyone's
+  after the pictures), the tick box already says it is still being made.
+
 ## v1.0.20261102.1738 (2 Nov, evening)
 
 Two things found on live while re-recording the demo:
