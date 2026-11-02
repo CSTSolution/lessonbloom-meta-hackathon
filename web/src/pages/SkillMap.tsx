@@ -5,6 +5,7 @@
 // SkillPicker is the same map as ticks, on the lesson page: a lesson from the skills she picks.
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type SkillMap, type SkillOp } from '../api.ts';
+import { ask } from '../ask.tsx';
 import { useLang, useT } from '../i18n.ts';
 import { go } from '../router.ts';
 
@@ -15,29 +16,29 @@ const KIND = {
 
 const T = {
   vi: {
-    title: 'Bản đồ kỹ năng', beta: 'Beta', lead: 'AI đọc sách của bạn và chia mỗi phần thành các kỹ năng. Mỗi kỹ năng gắn với phần và trang sách của nó. Bạn kiểm tra, nhờ app sửa, hoặc góp ý cho đội ngũ.',
+    title: 'Bản đồ kỹ năng', beta: 'Beta', lead: 'Tuỳ chọn: AI đọc sách của bạn và chia mỗi phần thành các kỹ năng, mỗi kỹ năng gắn với phần và trang sách của nó. Bạn kiểm tra, nhờ app sửa, hoặc góp ý cho đội ngũ. Lập bản đồ và hỏi app dùng lượt của bạn; góp ý thì miễn phí.',
     whole: (p: number, g: number, n: number) => `✓ Không thiếu gì: cả ${p} phần và ${g} trang đều có trong bản đồ (${n} kỹ năng).`,
     gap: (p: number, g: number) => `Còn ${p} phần (${g} trang) chưa có trong bản đồ, thường do phần sách vừa được tách hoặc gộp. Bấm "Làm lại bản đồ kỹ năng".`,
-    building: 'Đang lập bản đồ…', ready: (d: string) => `Đã lập ${d}`, none: 'Chưa có bản đồ', failed: 'Chưa lập được', rebuild: 'Làm lại bản đồ kỹ năng', build: 'Lập bản đồ kỹ năng',
+    building: 'Đang lập bản đồ…', ready: (d: string) => `Đã lập ${d}`, none: 'Chưa có bản đồ', failed: 'Chưa lập được', rebuild: 'Làm lại bản đồ kỹ năng', build: 'Lập bản đồ kỹ năng', cost: (n: number) => `khoảng ${n} lượt`, confirm: (n: number, left: number) => `Lập bản đồ kỹ năng cho sách này: ước tính ${n} lượt (bạn có ${left}). ${n} lượt được giữ trước khi việc vào hàng chờ; xong thì chỉ trừ số đã dùng, tối đa ${n}, phần còn lại được trả lại. Huỷ khi đang chờ thì trả lại đủ. Lập ngay?`, go: 'Lập bản đồ',
     asMap: 'Bản đồ', asList: 'Danh sách', part: 'Phần', pages: (p: string) => `tr. ${p}`, buildsOn: 'Dựa trên', usedBy: 'Là nền cho', open: 'Xem trang sách', make: 'Soạn bài từ kỹ năng này', ask: 'Hỏi về kỹ năng này', close: 'Đóng',
-    chat: 'Hỏi app hoặc góp ý', chatLead: 'Ví dụ: "Unit 5 còn thiếu kỹ năng số nhiều", "Gộp hai kỹ năng đầu của Unit 2", "Trang 12 nói về màu sắc". App đề xuất thay đổi; chỉ áp dụng khi bạn đồng ý. Góp ý được gửi cho đội ngũ LessonBloom.',
+    chat: 'Hỏi app hoặc góp ý', chatLead: 'Ví dụ: "Unit 5 còn thiếu kỹ năng số nhiều", "Gộp hai kỹ năng đầu của Unit 2", "Trang 12 nói về màu sắc". App đề xuất thay đổi; chỉ áp dụng khi bạn đồng ý. Mỗi câu hỏi app dùng khoảng 1–2 lượt. Góp ý miễn phí và được gửi cho đội ngũ LessonBloom.',
     about: (n: string) => `Về: ${n}`, place: 'Gõ câu hỏi, yêu cầu sửa hoặc góp ý…', send: 'Hỏi app', comment: 'Gửi góp ý', sent: 'Đã gửi góp ý cho đội ngũ. Cảm ơn bạn!', you: 'Bạn', app: 'App', yourComment: 'Góp ý của bạn',
     apply: 'Áp dụng', dismiss: 'Bỏ qua', applied: 'Đã áp dụng', dismissed: 'Đã bỏ qua', appliedN: (a: number, s: number) => `Đã áp dụng ${a} thay đổi${s ? `, ${s} thay đổi không còn hợp nên bỏ qua` : ''}.`,
     op: { rename: (a: string, b: string) => `Đổi tên “${a}” → “${b}”`, add: (n: string, p: string) => `Thêm “${n}” vào ${p}`, remove: (n: string) => `Bỏ “${n}” (trang của nó chuyển sang kỹ năng gần nhất)`, merge: (xs: string, n: string) => `Gộp ${xs} thành “${n}”`, pages: (n: string, p: string) => `Trang của “${n}”: ${p}`, kind: (n: string, k: string) => `“${n}” là ${k}` },
-    empty: 'Sách này chưa có bản đồ kỹ năng.', thinking: 'App đang trả lời…',
+    empty: 'Sách này chưa có bản đồ kỹ năng. Lập bản đồ là tuỳ chọn: bấm "Lập bản đồ kỹ năng" ở trên.', thinking: 'App đang trả lời…',
     pick: 'Chọn theo kỹ năng', pickLead: 'Tick các kỹ năng muốn dạy. Một bài soạn từ một phần sách, nên các kỹ năng tick cùng một phần; trang của chúng được tick ở dưới.', search: 'Tìm kỹ năng…', otherPart: 'Bạn đã chọn kỹ năng ở phần khác: chỉ giữ phần mới.', noMap: 'Sách này chưa có bản đồ kỹ năng. Mở Kiến thức → Bản đồ kỹ năng để lập.', openMap: 'Mở bản đồ kỹ năng',
   },
   en: {
-    title: 'Skills map', beta: 'Beta', lead: 'The AI read your book and broke each part into the skills it teaches. Every skill is tied to its part and pages. Check it, ask the app to fix it, or leave a comment for our team.',
+    title: 'Skills map', beta: 'Beta', lead: 'Optional: the AI reads your book and breaks each part into the skills it teaches, each tied to its part and pages. Check it, ask the app to fix it, or leave a comment for our team. Building the map and asking the app use your credits; comments are free.',
     whole: (p: number, g: number, n: number) => `✓ Nothing missing: all ${p} parts and ${g} pages are in the map (${n} skills).`,
     gap: (p: number, g: number) => `${p} ${p === 1 ? 'part' : 'parts'} (${g} ${g === 1 ? 'page' : 'pages'}) not in the map yet, usually because parts were split or merged. Press "Rebuild skills map".`,
-    building: 'Building the map…', ready: (d: string) => `Built ${d}`, none: 'No map yet', failed: 'Could not be built', rebuild: 'Rebuild skills map', build: 'Build skills map',
+    building: 'Building the map…', ready: (d: string) => `Built ${d}`, none: 'No map yet', failed: 'Could not be built', rebuild: 'Rebuild skills map', build: 'Build skills map', cost: (n: number) => `about ${n} ${n === 1 ? 'credit' : 'credits'}`, confirm: (n: number, left: number) => `Build the skills map for this book: estimated ${n} ${n === 1 ? 'credit' : 'credits'} (you have ${left}). ${n} are held as the job joins your queue; when it is done you pay only what it used, never more than ${n}, and the rest comes back. Cancel it while it waits and all of it comes back. Build it now?`, go: 'Build the map',
     asMap: 'Map', asList: 'List', part: 'Part', pages: (p: string) => `p. ${p}`, buildsOn: 'Builds on', usedBy: 'Leads to', open: 'See the book pages', make: 'Make a lesson from this skill', ask: 'Ask about this skill', close: 'Close',
-    chat: 'Ask the app or comment', chatLead: 'For example: "Unit 5 is missing plurals", "Merge the first two skills of Unit 2", "Page 12 is about colours". The app proposes changes; they apply only when you accept. Comments go to the LessonBloom team.',
+    chat: 'Ask the app or comment', chatLead: 'For example: "Unit 5 is missing plurals", "Merge the first two skills of Unit 2", "Page 12 is about colours". The app proposes changes; they apply only when you accept. Each question to the app uses about 1–2 credits. Comments are free and go to the LessonBloom team.',
     about: (n: string) => `About: ${n}`, place: 'Type a question, a fix or a comment…', send: 'Ask the app', comment: 'Send as comment', sent: 'Your comment was sent to the team. Thank you!', you: 'You', app: 'App', yourComment: 'Your comment',
     apply: 'Apply', dismiss: 'Dismiss', applied: 'Applied', dismissed: 'Dismissed', appliedN: (a: number, s: number) => `${a} ${a === 1 ? 'change' : 'changes'} applied${s ? `; ${s} no longer fit and were skipped` : ''}.`,
     op: { rename: (a: string, b: string) => `Rename “${a}” → “${b}”`, add: (n: string, p: string) => `Add “${n}” to ${p}`, remove: (n: string) => `Remove “${n}” (its pages go to the nearest skill)`, merge: (xs: string, n: string) => `Merge ${xs} into “${n}”`, pages: (n: string, p: string) => `Pages of “${n}”: ${p}`, kind: (n: string, k: string) => `“${n}” is ${k}` },
-    empty: 'This book has no skills map yet.', thinking: 'The app is answering…',
+    empty: 'This book has no skills map yet. It is optional: press "Build skills map" above.', thinking: 'The app is answering…',
     pick: 'Choose by skill', pickLead: 'Tick the skills to teach. A lesson comes from one part of the book, so the skills you tick are from one part; their pages are ticked below.', search: 'Find a skill…', otherPart: 'You picked a skill in another part: only the new part is kept.', noMap: 'This book has no skills map yet. Open Knowledge → Skills map to build it.', openMap: 'Open the skills map',
   },
 };
@@ -96,7 +97,8 @@ export function SkillMapView({ areaId, onSource }: { areaId: string; onSource: (
       <div><b>{t.title}</b> <span className="tag ai">{t.beta}</span><p className="small muted">{t.lead}</p></div>
       {m.books.map((b) => <div key={b.id} className="row small" style={{ gap: 8 }}>
         <span className="grow ellipsis"><b>{b.title}</b> · <span className="muted">{b.map === 'building' ? t.building : b.map === 'ready' ? t.ready(new Date(b.builtAt || '').toLocaleDateString(lang === 'en' ? 'en-GB' : 'vi-VN')) : b.map === 'error' ? t.failed : t.none}</span></span>
-        {b.status === 'ready' && <button className="btn small" disabled={!!busy || b.map === 'building'} onClick={() => run(`b${b.id}`, async () => { await api.rebuildSkills(b.id); await load(); })}>{b.map ? t.rebuild : t.build}</button>}
+        {b.status === 'ready' && <button className={`btn small ${b.map ? '' : 'primary'}`} disabled={!!busy || b.map === 'building'} title={t.cost(b.estimate)}
+          onClick={() => run(`b${b.id}`, async () => { if (!(await ask(t.confirm(b.estimate, m.credits), { ok: t.go }))) return; await api.rebuildSkills(b.id); window.dispatchEvent(new Event('lbm-credits')); window.dispatchEvent(new Event('lbm-jobs')); await load(); })}>{b.map ? t.rebuild : t.build} · {t.cost(b.estimate)}</button>}
       </div>)}
       {m.nodes.length > 0 && <p className={`banner ${cov.partsCovered === cov.parts && !missingPages ? '' : 'warn'} small`}>{cov.partsCovered === cov.parts && !missingPages ? t.whole(cov.parts, cov.pages, m.nodes.length) : t.gap(cov.parts - cov.partsCovered, missingPages)}</p>}
       {err && <p className="banner warn small">{err}</p>}

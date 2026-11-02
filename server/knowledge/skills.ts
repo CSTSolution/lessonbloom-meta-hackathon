@@ -1,7 +1,8 @@
 // The skills map (beta, Son 2 Nov): each part of her book broken into the skills it teaches, drawn as a
 // map of linked nodes. Every node belongs to one part and names its pages, and code fills any part or
-// page the model left out, so nothing in the book is missing from the map. Built once a book is read
-// (free to her: logged against the hackathon budget, not her credits) and again on "Rebuild".
+// page the model left out, so nothing in the book is missing from the map. Optional: built only when she
+// presses "Build skills map", paid from her credits: she sees the estimate first, it is held when the job
+// joins her queue, and she pays what it really used, never more than the estimate (Son, 2 Nov).
 // She changes it by asking in plain words: the app answers and proposes changes, shown first and
 // applied only when she accepts them (code checks each one again). Her comments are kept and emailed
 // to the team. A lesson can be made from the skills she ticks (their part and pages).
@@ -11,7 +12,9 @@ import type { Env } from '../app.ts';
 import { newId } from '../auth/accounts.ts';
 import { config } from '../config.ts';
 import type { Sql } from '../db/sql.ts';
-import { Blocked, type Budget, guardedJson, Limiter, requireOnTask, wrapUser } from '../guard/guard.ts';
+import { Blocked, type Budget, CREDIT_USD, guardedJson, Limiter, requireOnTask, wrapUser } from '../guard/guard.ts';
+import { holdCredits, settleHold, spare } from '../credits.ts';
+import type { Jobs } from '../jobs.ts';
 import { fail } from '../http.ts';
 import type { Mailer } from '../mail.ts';
 import { printedRange, shownPages } from './search.ts';
@@ -68,6 +71,16 @@ export function cover(part: Pick<Part, 'title' | 'page_from' | 'page_to'>, raw: 
 }
 
 // ---- building ----
+
+// What building a book's map costs, before it is built: Muse Spark's list prices ($1.25 / $4.25 per million
+// tokens in / out) on the text sent (about 3 characters a token, on the safe side), the instructions, and the
+// answers with their reasoning; then the call that links the skills. Real runs are logged in ai_usage.
+export async function mapEstimate(sql: Sql, bookId: string) {
+  const rows = await sql.query<{ n: string }>(`select least(sum(length(p.text)), $2) as n from passages p join sections s on s.id = p.section_id where p.book_id = $1 and s.title <> '—' group by p.section_id`, [bookId, SKILLS.partText]);
+  const parts = rows.length, chars = rows.reduce((s, r) => s + Number(r.n), 0), batches = Math.max(1, Math.ceil(chars / SKILLS.batchText), Math.ceil(parts / SKILLS.batchParts));
+  const inTok = chars / 3 + batches * 500 + parts * 60 + 400, outTok = parts * 350 + batches * 1500 + parts * 50 + 1500;
+  return { parts, credits: Math.max(1, Math.ceil(((inTok * 1.25 + outTok * 4.25) / 1e6) / CREDIT_USD)) };
+}
 
 const partsOf = (sql: Sql, bookId: string) => sql.query<Part>(`select id, title, page_from, page_to, ord from sections where book_id = $1 and title <> '—' order by ord`, [bookId]);
 async function textOf(sql: Sql, part: Part) {
@@ -188,13 +201,14 @@ export async function applyOps(sql: Sql, areaId: string, ops: Op[]): Promise<{ a
 
 // ---- routes ----
 
-export function skillRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; mail: Mailer; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T }) {
+export function skillRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budget; mail: Mailer; as: <T>(teacherId: string, fn: () => T, lessonId?: string, bookId?: string) => T; held: <T>(teacherId: string, hold: { used: number }, fn: () => T, bookId?: string, lessonId?: string) => T; jobs: Jobs }) {
   const { sql } = d, rebuilds = new Limiter(3, 12), chats = new Limiter(SKILLS.chatsPerMinute, SKILLS.chatsPerDay);
   const mine = (c: Context<Env>) => sql.one<{ id: string; name: string; subject: string }>('select id, name, subject from areas where id = $1 and teacher_id = $2', [c.req.param('id') ?? '', c.get('teacher').id]);
 
   app.get('/api/t/areas/:id/skills', async (c) => {
     const a = await mine(c);
     if (!a) return fail(c, 'notFound', 404);
+    const t = c.get('teacher');
     const books = await sql.query<{ id: string; title: string; status: string; map: string | null; error: string | null; built_at: string | null }>(
       `select b.id, b.title, b.status, m.status as map, m.error, m.built_at from books b left join skill_maps m on m.book_id = b.id where b.area_id = $1 order by b.created_at`, [a.id]);
     const parts = await sql.query<Part & { book_id: string }>(`select s.id, s.title, s.page_from, s.page_to, s.ord, s.book_id from sections s join books b on b.id = s.book_id where b.area_id = $1 and b.status = 'ready' and s.title <> '—' order by b.created_at, s.ord`, [a.id]);
@@ -207,7 +221,8 @@ export function skillRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budge
     const pages = parts.reduce((s, p) => s + p.page_to - p.page_from + 1, 0), covered = parts.reduce((s, p) => s + Array.from({ length: p.page_to - p.page_from + 1 }, (_, k) => p.page_from + k).filter((x) => named.has(`${p.book_id}:${x}`)).length, 0);
     return c.json({
       area: { id: a.id, name: a.name, subject: a.subject },
-      books: books.map((b) => ({ id: b.id, title: b.title, status: b.status, map: b.map, error: b.error, builtAt: b.built_at })),
+      books: await Promise.all(books.map(async (b) => ({ id: b.id, title: b.title, status: b.status, map: b.map, error: b.error, builtAt: b.built_at, estimate: b.status === 'ready' ? (await mapEstimate(sql, b.id)).credits : 0 }))),
+      credits: (await spare(sql, t.id)).left,
       parts: parts.map((p) => ({ id: p.id, bookId: p.book_id, title: p.title, pageFrom: p.page_from, pageTo: p.page_to, ...printedRange(shown.get(p.book_id)!, p.page_from, p.page_to) })),
       nodes: nodes.map((n) => ({ id: n.id, part: n.section_id, name: n.name, kind: n.kind, about: n.about, pages: n.pages, printed: n.pages.map((x) => shown.get(n.book_id)?.(x) ?? null), after: n.after })),
       coverage: { parts: parts.length, partsCovered: parts.filter((p) => withSkill.has(p.id)).length, pages, pagesCovered: covered },
@@ -215,17 +230,25 @@ export function skillRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: Budge
     });
   });
 
-  // "Rebuild skills map" for a book read before the map existed, or after its parts changed
+  // "Build skills map" (optional): the estimate is held from her credits as the job joins her queue; at the end
+  // she pays what it really used (at most the estimate) and the rest comes back; cancelled while waiting, all of it
   app.post('/api/t/books/:id/skills', async (c) => {
-    const t = c.get('teacher'), bk = await sql.one<{ id: string; status: string; map: string | null }>(`select b.id, b.status, m.status as map from books b join areas a on a.id = b.area_id left join skill_maps m on m.book_id = b.id where b.id = $1 and a.teacher_id = $2`, [c.req.param('id'), t.id]);
+    const t = c.get('teacher'), bk = await sql.one<{ id: string; title: string; status: string; map: string | null }>(`select b.id, b.title, b.status, m.status as map from books b join areas a on a.id = b.area_id left join skill_maps m on m.book_id = b.id where b.id = $1 and a.teacher_id = $2`, [c.req.param('id'), t.id]);
     if (!bk || bk.status !== 'ready') return fail(c, 'notFound', 404);
     if (bk.map === 'building') return c.json({ status: 'building' });
     const g = await d.budget.check(t.id);
     if (g && g !== 'credits') return fail(c, g === 'total' ? 'credit' : 'budget', 503);
+    const est = await mapEstimate(sql, bk.id);
+    if ((await spare(sql, t.id)).left < est.credits) return c.json({ code: 'mapCredits', error: `Bản đồ cần khoảng ${est.credits} lượt. Cô nhập mã khuyến mãi để có thêm lượt nhé.`, errorEn: `The map needs about ${est.credits} credits. Enter a promo code for more.`, estimate: est.credits }, 402);
     if (!rebuilds.take(t.id)) return fail(c, 'later', 429);
+    // its own hold (never the book's): a new ref each time, so a rebuild is held and settled again
+    const ref = `map:${bk.id}:${Date.now().toString(36)}`, hold = { used: 0 };
+    await holdCredits(sql, t.id, est.credits, ref);
     await sql.query(`insert into skill_maps (book_id, status) values ($1, 'building') on conflict (book_id) do update set status = 'building', error = null`, [bk.id]);
-    void d.held(t.id, { used: 0 }, () => buildSkillMap(sql, d.ai, bk.id));   // no book id: never counted in the book's hold
-    return c.json({ status: 'building' });
+    await d.jobs.add(t.id, 'book', ref, `${t.lang === 'en' ? 'Skills map' : 'Bản đồ kỹ năng'}: ${bk.title}`,
+      async () => { try { await d.held(t.id, hold, () => buildSkillMap(sql, d.ai, bk.id), bk.id); } finally { await settleHold(sql, t.id, ref, Math.min(hold.used, est.credits)); } },
+      async () => { await settleHold(sql, t.id, ref, 0); await sql.query(`update skill_maps set status = 'error', error = 'cancelled' where book_id = $1 and status = 'building'`, [bk.id]); }, est.credits);
+    return c.json({ status: 'building', held: est.credits });
   });
 
   // a comment: kept with the map and sent to the team; no model

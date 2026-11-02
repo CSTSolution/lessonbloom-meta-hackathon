@@ -24,8 +24,7 @@ const DAY = `(u.at at time zone 'Asia/Ho_Chi_Minh')::date`;
 const r1 = (n: unknown) => Math.round(Number(n || 0) * 10) / 10;
 
 export async function usageOf(sql: Sql, teacherId: string, days: number) {
-  // the skills map is built free (logged for the app's budget only), so it is not hers to see as spent
-  const mine = `from ai_usage u where u.teacher_id = $1 and u.model <> 'guard' and u.endpoint not in ('skills', 'skilllinks')`;
+  const mine = `from ai_usage u where u.teacher_id = $1 and u.model <> 'guard'`;
   const since = `${DAY} > (now() at time zone 'Asia/Ho_Chi_Minh')::date - $2::int`;
   const [all, kinds, daily, items, log, t, promised] = await Promise.all([
     sql.one<{ credits: string; calls: string }>(`select coalesce(sum(u.usd), 0) * 100 as credits, count(*) as calls ${mine}`, [teacherId]),

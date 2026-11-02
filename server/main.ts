@@ -30,6 +30,7 @@ const ended = await sql.query(`update jobs set status = 'error', progress = 'int
 for (const h of await sql.query<{ teacher_id: string; ref: string }>(`select distinct g.teacher_id, g.ref from credit_log g where g.reason = 'hold'
     and not exists (select 1 from credit_log x where x.teacher_id = g.teacher_id and x.reason = 'refund' and x.ref = g.ref)`)) await settleHold(sql, h.teacher_id, h.ref, await heldUsed(sql, h.ref));
 await sql.query(`update books set status = 'error', error = 'interrupted' where status = 'processing'`);
+await sql.query(`update skill_maps set status = 'error', error = 'interrupted' where status = 'building'`);   // its hold was settled above
 if (ended.length) console.log(`[start] ${ended.length} job(s) were interrupted by the restart`);
 
 const ai = pickProvider();

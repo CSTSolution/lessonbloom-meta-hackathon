@@ -1,13 +1,16 @@
-// The skills map (beta, Son 2 Nov): built after a book is read, every part and page covered, links
-// between skills, rebuild, comments, and chat whose changes apply only when accepted.
+// The skills map (beta, Son 2 Nov): optional, built when she asks and paid from her credits; every part
+// and page covered, links between skills, rebuild, comments, and chat whose changes apply only when accepted.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cover, SKILLS } from '../server/knowledge/skills.ts';
+import { charge } from '../server/credits.ts';
 import { areaWithBook, testServer } from './helpers.ts';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type Call = ReturnType<Awaited<ReturnType<typeof testServer>>['client']>;
+// "Build skills map" on each book, then wait for it
 async function mapOf(call: Call, areaId: string) {
+  for (const b of (await call('GET', `/api/t/areas/${areaId}/skills`)).json.books) if (!b.map) assert.equal((await call('POST', `/api/t/books/${b.id}/skills`)).status, 200);
   for (let i = 0; i < 300; i++) {
     const m = (await call('GET', `/api/t/areas/${areaId}/skills`)).json;
     if (m.books.every((b: any) => b.map === 'ready' || b.map === 'error')) return m;
@@ -37,21 +40,37 @@ test('cover: no part and no page left out, pages kept inside the part, repeats d
   assert.deepEqual(cover(part, [{ name: 'Reading', pages: [] }])[0].pages, [10, 11, 12, 13], 'a skill with no pages gets the whole part');
 });
 
-test('a book read gets its skills map: every part and page, linked skills; only hers', async () => {
+test('the skills map is built only when she asks, paid from her credits: every part and page, linked skills; only hers', async () => {
   const s = await testServer(), call = s.client('198.51.100.201');
-  await call('POST', '/api/auth/demo');
+  const me = (await call('POST', '/api/auth/demo')).json.teacher;
   const { areaId } = await areaWithBook(call, 'maths2');
+  const before = (await call('GET', `/api/t/areas/${areaId}/skills`)).json;
+  assert.equal(before.books[0].map, null, 'not built when the book is read');
+  assert.equal(before.nodes.length, 0);
+  assert.ok(before.books[0].estimate >= 1, 'the estimate is shown first');
+  const left0 = before.credits;
   const m = await mapOf(call, areaId);
   assert.equal(m.books[0].map, 'ready');
   assert.ok(m.parts.length >= 2 && m.nodes.length >= m.parts.length, `${m.parts.length} parts, ${m.nodes.length} skills`);
   whole(m);
   assert.ok(m.nodes.some((n: any) => n.after.length), 'skills are linked to what they build on');
   assert.ok(m.nodes.every((n: any) => n.after.every((a: string) => m.nodes.findIndex((x: any) => x.id === a) < m.nodes.findIndex((x: any) => x.id === n.id))), 'only to earlier skills');
-  // free to her: logged as held, never taken from her credits
-  const used = await s.sql.query<{ held: boolean; book_id: string | null; lesson_id: string | null }>(`select held, book_id, lesson_id from ai_usage where endpoint in ('skills', 'skilllinks')`);
-  assert.ok(used.length >= 2 && used.every((u) => u.held && !u.book_id && !u.lesson_id), 'never in a book\'s or a lesson\'s hold');
+  // the estimate was held as the job joined her queue; she paid what it used (at most the estimate), the rest came back
+  const used = await s.sql.query<{ held: boolean; book_id: string | null; usd: string }>(`select held, book_id, usd from ai_usage where endpoint in ('skills', 'skilllinks')`);
+  assert.ok(used.length >= 2 && used.every((u) => u.held && u.book_id === m.books[0].id));
+  const log = await s.sql.query<{ reason: string; credits: string; ref: string }>(`select reason, credits, ref from credit_log where teacher_id = $1 and ref like 'map:%' order by id`, [me.id]);
+  assert.deepEqual(log.map((x) => [x.reason, Number(x.credits)]), [['hold', -before.books[0].estimate], ['refund', before.books[0].estimate - Math.ceil(used.reduce((n, u) => n + Number(u.usd) * 100, 0) - 1e-9)]]);
+  const cost = used.reduce((n, u) => n + Number(u.usd) * 100, 0), left1 = (await call('GET', `/api/t/areas/${areaId}/skills`)).json.credits;
+  assert.ok(cost > 0 && left0 - left1 === Math.ceil(Math.min(cost, before.books[0].estimate) - 1e-9), `her credits went down by what it used (${left0} → ${left1}, ${cost.toFixed(2)})`);
+  const job = await s.sql.one<{ kind: string; title: string; hold: number; status: string }>(`select kind, title, hold, status from jobs where ref like 'map:%'`);
+  assert.deepEqual([job?.hold, job?.status], [before.books[0].estimate, 'done'], 'a job in her queue, with the hold');
   const u = (await call('GET', '/api/t/usage?days=7')).json;
-  assert.equal(u.period.credits, 0, 'not shown as spent'); assert.equal(u.items.length, 0);
+  assert.ok(u.kinds.books.credits > 0, 'shown as book work');
+  // too few credits for the estimate: refused before anything is spent
+  await charge(s.sql, me.id, left1);
+  const poor = await call('POST', `/api/t/books/${m.books[0].id}/skills`);
+  assert.equal(poor.status, 402);
+  assert.equal(poor.json.code, 'mapCredits');
   // another account sees nothing
   const other = s.client('198.51.100.202');
   await other('POST', '/api/auth/demo');

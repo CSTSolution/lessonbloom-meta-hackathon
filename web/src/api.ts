@@ -27,7 +27,8 @@ export interface SkillOp { op: 'rename' | 'add' | 'remove' | 'merge' | 'pages' |
 export interface SkillNote { id: string; skill: string | null; role: 'comment' | 'user' | 'app'; text: string; ops: SkillOp[] | null; status: 'proposed' | 'applied' | 'dismissed' | null; at: string }
 export interface SkillMap {
   area: { id: string; name: string; subject: string };
-  books: { id: string; title: string; status: string; map: 'building' | 'ready' | 'error' | null; error: string | null; builtAt: string | null }[];
+  books: { id: string; title: string; status: string; map: 'building' | 'ready' | 'error' | null; error: string | null; builtAt: string | null; estimate: number }[];
+  credits: number;
   parts: { id: string; bookId: string; title: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null }[];
   nodes: { id: string; part: string; name: string; kind: string; about: string; pages: number[]; printed: (number | null)[]; after: string[] }[];
   coverage: { parts: number; partsCovered: number; pages: number; pagesCovered: number };
