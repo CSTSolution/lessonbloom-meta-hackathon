@@ -3,6 +3,13 @@
 The version is shown next to the logo (`v1.0.<date>.<time, Hanoi>`), so a tester can say which one
 they used. Newest first. Each version lists what changed for users; the commits are in `git log`.
 
+## v1.0.20261102.1738 (2 Nov, evening)
+
+Two things found on live while re-recording the demo:
+- **Skills chat (#72)**: a rename that came back with no new name did nothing when applied. The name is now taken
+  from the quoted name in the app's reply; a rename, add or merge with no name at all is dropped, not proposed.
+- **Top menu (#73)**: with the "Working on" badge showing, the menu wrapped onto two lines; it stays on one now.
+
 ## v1.0.20261102.1659 (2 Nov, evening)
 
 Chi's last list before the contest (#72–#79):
