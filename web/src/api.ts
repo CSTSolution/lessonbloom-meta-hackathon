@@ -22,6 +22,17 @@ export interface SectionSource { section: { id: string; title: string; pageFrom:
 export interface KnowledgeMap { area: { id: string; name: string }; books: { id: string; title: string; pages: number }[]; sections: { id: string; title: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null; bookId: string }[];
   lessons: { id: string; title: string; section: string; status: string; classes: number; skills: string[] }[]; skills: { id: string; name: string; kind: string; lessons: string[] }[] }
 export interface Skill { tag: string; name: string; kind: string }
+// the skills map (beta, Son 2 Nov): each part's skills, every node tied to its part and pages
+export interface SkillOp { op: 'rename' | 'add' | 'remove' | 'merge' | 'pages' | 'kind'; id?: string; ids?: string[]; part?: string; name?: string; kind?: string; pages?: number[]; was?: string[] }
+export interface SkillNote { id: string; skill: string | null; role: 'comment' | 'user' | 'app'; text: string; ops: SkillOp[] | null; status: 'proposed' | 'applied' | 'dismissed' | null; at: string }
+export interface SkillMap {
+  area: { id: string; name: string; subject: string };
+  books: { id: string; title: string; status: string; map: 'building' | 'ready' | 'error' | null; error: string | null; builtAt: string | null }[];
+  parts: { id: string; bookId: string; title: string; pageFrom: number; pageTo: number; printedFrom?: number | null; printedTo?: number | null }[];
+  nodes: { id: string; part: string; name: string; kind: string; about: string; pages: number[]; printed: (number | null)[]; after: string[] }[];
+  coverage: { parts: number; partsCovered: number; pages: number; pagesCovered: number };
+  notes: SkillNote[];
+}
 export interface Slide { id: string; kind: string; heading: string; bullets: string[]; example?: string; notes: string; source: string; narration: string; image?: string; page?: number; fromWork?: boolean }
 export interface Item { id: string; subject: 'math' | 'english'; template: string; skill: string; level: Level; prompt: string; explain: string; answer: string; options?: string[]; pairs?: { word: string; emoji: string }[]; sentence?: string; say?: string; words?: string[]; story?: string; unit?: string; page?: number; redone?: string[]; fromWork?: boolean; a?: number; b?: number; op?: string; shown?: number; blank?: string; distractors?: number[] }
 export interface Card { id: string; front: string; back: string; emoji?: string }
@@ -160,6 +171,11 @@ export const api = {
   scanPage: (bookId: string, n: number, jpeg: Blob) => call<{ ok: boolean }>('PUT', `/t/books/${bookId}/pages/${n}`, undefined, jpeg),
   sectionSource: (id: string) => call<SectionSource>('GET', `/t/sections/${id}/source`),
   knowledgeMap: (areaId: string) => call<KnowledgeMap>('GET', `/t/areas/${areaId}/map`),
+  skillMap: (areaId: string) => call<SkillMap>('GET', `/t/areas/${areaId}/skills`),
+  rebuildSkills: (bookId: string) => call<{ status: string }>('POST', `/t/books/${bookId}/skills`),
+  skillChat: (areaId: string, text: string, skillId?: string) => call<{ reply: string; ops: SkillOp[]; id: string }>('POST', `/t/areas/${areaId}/skills/chat`, { text, ...(skillId ? { skillId } : {}) }),
+  skillComment: (areaId: string, text: string, skillId?: string) => call<{ ok: true; id: string }>('POST', `/t/areas/${areaId}/skills/notes`, { text, ...(skillId ? { skillId } : {}) }),
+  skillAnswer: (areaId: string, noteId: string, accept: boolean) => call<{ applied: number; skipped: number }>('POST', `/t/areas/${areaId}/skills/notes/${noteId}`, { accept }),
   originalStart: (areaId: string, size: number, title?: string, bookId?: string) => call<{ book: { id: string }; url: string }>('POST', `/t/areas/${areaId}/books/original`, { size, title, bookId }),
   originalDone: (bookId: string, read: boolean) => call<{ ok: boolean; text?: boolean; pages?: number; estimate?: ScanEstimate }>('POST', `/t/books/${bookId}/original/done`, { read }),
   originalScan: (bookId: string, pages: number[]) => call<{ ok: boolean; estimate: ScanEstimate }>('POST', `/t/books/${bookId}/original/scan`, { pages }),

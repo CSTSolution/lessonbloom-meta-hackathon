@@ -17,6 +17,7 @@ import { promisify } from 'node:util';
 import { SCAN_SCHEMA, SCAN_SYSTEM } from '../lesson/prompts.ts';
 import { fail, MSG } from '../http.ts';
 import { ingestBook, ingestPages, NotText } from './ingest.ts';
+import { buildSkillMap } from './skills.ts';
 import { readPdf } from './pdf.ts';
 import type { PdfPage } from './pdf.ts';
 import { candidates, citation, findSection, NoMatch, printedRange, shownPages, sourceOf } from './search.ts';
@@ -152,8 +153,15 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
   });
 
   // A book's reading, with its failure written on the book (scanned / blocked / failed).
+  // then its skills map (beta), free to her; a map that fails leaves the book as it is
+  const mapBook = async (id: string) => {
+    const who = await sql.one<{ teacher_id: string }>('select a.teacher_id from books b join areas a on a.id = b.area_id where b.id = $1 and b.status = $2', [id, 'ready']);
+    // logged without the book, so it is never counted in the book's own hold
+    const g = who && await d.budget.check(who.teacher_id);   // the app's own caps still apply (her credits do not: it is free)
+    if (who && (!g || g === 'credits')) await d.held(who.teacher_id, { used: 0 }, () => buildSkillMap(sql, d.ai, id));
+  };
   const readBook = async (id: string, work: () => Promise<unknown>) => {
-    try { await work(); } catch (e) {
+    try { await work(); await mapBook(id); } catch (e) {
       if (!(e instanceof NotText) && !(e instanceof Unread)) console.error(`[book] ${id}: ${String((e as Error)?.stack || e).slice(0, 800)}`);
       await sql.query(`update books set status = 'error', error = $2 where id = $1`, [id, e instanceof Unread ? e.why : e instanceof NotText ? 'scanned' : e instanceof Blocked ? 'blocked' : 'failed']);
     }
@@ -433,7 +441,7 @@ export function knowledgeRoutes(app: Hono<Env>, d: { sql: Sql; ai: AI; budget: B
     await mkdir(join(config.dataDir, 'books'), { recursive: true });
     await writeFile(bookFile(id), pdf);
     await sql.query(`insert into books (id, area_id, title, status) values ($1, $2, $3, 'processing')`, [id, areaId, s.title]);
-    try { await d.as(t.id, () => ingestBook(sql, d.ai, areaId, id, pdf), undefined, id); } catch (e) {
+    try { await d.as(t.id, () => ingestBook(sql, d.ai, areaId, id, pdf), undefined, id); void mapBook(id); } catch (e) {
       console.error(`[book] sample ${id}: ${String((e as Error)?.message).slice(0, 300)}`);
       await sql.query(`update books set status = 'error', error = 'failed' where id = $1`, [id]);
     }

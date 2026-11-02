@@ -44,13 +44,13 @@ export function parseJson<T>(text: string): T {
 // the items, which must judge correctness, keeps "medium".
 export const EFFORT: Partial<Record<Endpoint, 'minimal' | 'low' | 'medium'>> = {
   precheck: 'minimal', errortag: 'minimal',
-  critic: 'low', toc: 'low', rerank: 'low', intake: 'low', plan: 'low', slides: 'low', items: 'low', cards: 'low', write: 'low', ocr: 'low', work: 'low', comments: 'low',
+  critic: 'low', toc: 'low', rerank: 'low', intake: 'low', plan: 'low', slides: 'low', items: 'low', cards: 'low', write: 'low', ocr: 'low', work: 'low', comments: 'low', skills: 'low', skilllinks: 'low', skillchat: 'low',
   check: 'medium',
 };
 
 // A ceiling on each answer (reasoning included), well above the largest seen live, so a runaway answer
 // ends instead of running until the connection is cut. An answer cut at the ceiling is tried again.
-const MAX_OUT: Partial<Record<Endpoint, number>> = { precheck: 2000, errortag: 2000, critic: 4000, intake: 4000, toc: 6000, rerank: 6000, cards: 6000, items: 8000, comments: 8000, check: 10000, ocr: 12000, slides: 16000 };   // ocr: a page may hold two dense book pages
+const MAX_OUT: Partial<Record<Endpoint, number>> = { precheck: 2000, errortag: 2000, critic: 4000, intake: 4000, toc: 6000, rerank: 6000, cards: 6000, items: 8000, comments: 8000, check: 10000, ocr: 12000, slides: 16000, skills: 12000, skilllinks: 8000, skillchat: 6000 };   // ocr: a page may hold two dense book pages
 
 export class MetaProvider implements AI {
   name = 'meta';

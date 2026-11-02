@@ -8,6 +8,7 @@ import { hasText, looksLikePdf, openPdf, pageJpeg, pageText } from '../pdf.ts';
 import { photoJpeg } from '../photo.ts';
 import { guessSubject, type Guess } from '../guess.ts';
 import { KnowledgeMapView, pagesOf, SourceView } from './Sources.tsx';
+import { SkillMapView } from './SkillMap.tsx';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
 const config = { maxPages: 200 };   // pages a scanned book reads at a time (the server's limit too)
@@ -22,7 +23,7 @@ const T = {
     sources: (n: number) => `${n} nguồn`, reading: (n: number) => `${n} đang đọc`, ready: 'Sẵn sàng', grade: (g: number) => `Lớp ${g}`, pages: (n: number) => `${n} trang`,
     status: { processing: 'Đang đọc tài liệu…', ready: 'Sẵn sàng', error: 'Lỗi' }, errors: { interrupted: 'Việc đọc sách bị ngắt khi máy chủ khởi động lại; lượt đã giữ được trả lại. Cô xoá nguồn này rồi thêm lại nhé.', scanned: 'Tài liệu là ảnh chụp. Cô xoá nguồn này rồi thêm lại tệp: app sẽ đọc từng trang ảnh (có dự kiến lượt trước).', failed: 'Chưa đọc được tệp này.', stopped: 'Cô đã dừng việc đọc, nên sách không được thêm; lượt chưa dùng đã được trả lại.', credits: 'Lượt đã giữ không đủ để đọc hết sách, nên sách không được thêm (app không giữ một phần sách); lượt chưa dùng đã được trả lại.', unreadable: 'Không đọc được chữ trên các trang này. Cô xem ảnh có rõ, đúng chiều không, rồi xoá và thêm lại nhé.', blocked: 'Nội dung không dùng được.' },
     view: 'Xem tài liệu', remove: 'Xoá khỏi kho', removeAsk: 'Xoá nguồn này khỏi kho? Bài đã soạn vẫn còn.', removing: 'Đang xoá…', slow: 'Máy chủ xoá nguồn này lâu quá. Cô tải lại trang sau một phút để xem nguồn đã được xoá chưa nhé.', parts: (n: number) => `Phạm vi kiến thức (${n})`, partsLead: 'Mỗi bài chỉ chọn một phạm vi làm giới hạn kiến thức.',
-    page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', source: 'Xem nguồn', mapTab: 'Bản đồ kiến thức', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
+    page: (p: string) => `Trang ${p}`, used: (n: number) => `Đang dùng trong ${n} bài`, rename: 'Đổi tên', source: 'Xem nguồn', mapTab: 'Bản đồ kiến thức', skillsTab: 'Bản đồ kỹ năng', split: 'Tách', make: 'Tạo bài', seeAll: (n: number) => `Xem cả ${n} phạm vi`, merge: 'Gộp phạm vi', mergeHint: 'Chọn một phạm vi để gộp với phạm vi ngay sau nó.',
     splitAt: 'Tách từ trang', newTitle: 'Tên phần mới', inFile: (n: number) => `trang ${n} trong file`,
     oneLesson: 'Sách này chưa chia được bài, bạn tách tay theo trang: bấm "Tách" và chọn trang bắt đầu bài tiếp theo.',
     pageOneAsk: 'Số trang khác sách giấy?', pageOne: 'Trang 1 của sách là trang', pageOneEnd: 'trong file', pageOneHint: 'App chưa đọc được số trang in trong sách, nên đang ghi theo vị trí trong file. Cho biết trang 1 của sách nằm ở đâu để số trang khớp sách giấy.', pageOneSaved: 'Đã lưu: số trang theo sách giấy.', ok: 'Lưu', cancel: 'Huỷ', none: 'Chưa có nguồn nào. Tải sách của bạn: PDF hoặc ảnh trang sách.', orSample: 'Hoặc thử nhanh với sách mẫu do LessonBloom soạn:', noneHere: (s: string) => `Chưa có nguồn ${s} nào. Bấm "+ Thêm nguồn kiến thức" hoặc chọn "Tất cả".`,
@@ -36,7 +37,7 @@ const T = {
     sources: (n: number) => `${pl(n, 'source')}`, reading: (n: number) => `${n} reading`, ready: 'Ready', grade: (g: number) => `Grade ${g}`, pages: (n: number) => `${pl(n, 'page')}`,
     status: { processing: 'Reading…', ready: 'Ready', error: 'Error' }, errors: { interrupted: 'Reading was interrupted by a server restart; the held credits were given back. Remove this source and add it again.', scanned: 'The file is scanned pictures. Remove this source and add the file again: the app will read each page picture (with a credit estimate first).', failed: 'This file could not be read.', stopped: 'You stopped the reading, so the book was not added; the unused credits came back.', credits: 'The held credits were not enough to read the whole book, so it was not added (LessonBloom keeps no part of a book); the unused credits came back.', unreadable: 'No text could be read on these pages. Check the pictures are clear and the right way up, then remove and add them again.', blocked: 'This content cannot be used.' },
     view: 'Open', remove: 'Remove', removeAsk: 'Remove this source? Lessons already made stay.', removing: 'Removing…', slow: 'The server is taking too long to remove this source. Reload the page in a minute to see whether it is gone.', parts: (n: number) => `Parts (${n})`, partsLead: 'Each lesson uses one part as the limit of what it teaches.',
-    page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', source: 'View source', mapTab: 'Knowledge map', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
+    page: (p: string) => `Pages ${p}`, used: (n: number) => `Used in ${pl(n, 'lesson')}`, rename: 'Rename', source: 'View source', mapTab: 'Knowledge map', skillsTab: 'Skills map', split: 'Split', make: 'Make lesson', seeAll: (n: number) => `See all ${pl(n, 'part')}`, merge: 'Merge parts', mergeHint: 'Pick a part to merge it with the next one.',
     splitAt: 'Split from page', newTitle: 'New part name', inFile: (n: number) => `page ${n} in the file`,
     oneLesson: 'This book could not be split into lessons; split it by page: press "Split" and choose the page where the next lesson starts.',
     pageOneAsk: 'Page numbers differ from the paper book?', pageOne: 'Page 1 of the book is page', pageOneEnd: 'in the file', pageOneHint: 'The printed page numbers could not be read, so pages are counted as in the file. Say where the book\'s page 1 is so the numbers match the paper book.', pageOneSaved: 'Saved: pages follow the paper book.', ok: 'Save', cancel: 'Cancel', none: 'No sources yet. Upload your book: a PDF or photos of its pages.', orSample: 'Or try it quickly with a sample book written by LessonBloom:', noneHere: (s: string) => `No ${s} sources yet. Press "+ Add a source" or choose "All".`,
@@ -53,7 +54,7 @@ export function Knowledge() {
   const [fold, setFold] = useState<Record<string, boolean>>({}), [sel, setSel] = useState(''), [sections, setSections] = useState<SectionRow[]>([]), [all, setAll] = useState(false);
   // "/knowledge?add=1" opens the add form at once: the way in from an empty "+ New lesson" (Chi #39)
   const [adding, setAdding] = useState(() => new URLSearchParams(location.search).has('add'));
-  const [tab, setTab] = useState<'parts' | 'map'>('parts'), [source, setSource] = useState('');
+  const [tab, setTab] = useState<'parts' | 'map' | 'skills'>('parts'), [source, setSource] = useState('');
   const [edit, setEdit] = useState<{ id: string; mode: 'rename' | 'split'; title: string; page: number } | null>(null), [pickMerge, setPickMerge] = useState(''), [err, setErr] = useState({ what: '', text: '' }), [busy, setBusy] = useState('');
   // only the newest answer is shown: a poll sent before a delete and answered after it put the source back (Chi #51c)
   const seq = useRef(0);
@@ -124,9 +125,10 @@ export function Knowledge() {
           {err.what === 'del' && <p className="note" role="alert">{err.text}</p>}
           {book && <BookStatus t={t} book={book} sections={sections.length} onChange={load} onAgain={async () => { await api.deleteArea(a.id).catch(() => {}); await gone(a.id); setAdding(true); }} />}
           {book?.status === 'ready' && !book.printed && <PageOne key={book.id} t={t} book={book} onSaved={async () => { await load(); }} />}
-          <div className="row" role="tablist">{(['parts', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => { setTab(k); setSource(''); }}>{k === 'parts' ? t.parts(sections.length) : t.mapTab}</button>)}</div>
+          <div className="row" role="tablist">{(['parts', 'skills', 'map'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} className={`pill ${tab === k ? 'on' : ''}`} onClick={() => { setTab(k); setSource(''); }}>{k === 'parts' ? t.parts(sections.length) : k === 'skills' ? <>{t.skillsTab} <span className="tag ai">Beta</span></> : t.mapTab}</button>)}</div>
           {source && <SourceView sectionId={source} onClose={() => setSource('')} />}
           {/* drawn again when the book's parts change (a book still being read when the map opened) */}
+          {tab === 'skills' && <SkillMapView key={`s${a.id}:${book?.status}:${sections.length}`} areaId={a.id} onSource={(id) => setSource(id)} />}
           {tab === 'map' && <KnowledgeMapView key={`${a.id}:${book?.status}:${sections.length}`} areaId={a.id} onSource={(id) => setSource(id)} />}
           {tab === 'parts' && <>
           <p className="small muted">{t.partsLead}</p>

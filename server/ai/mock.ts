@@ -11,6 +11,18 @@ export class MockProvider implements AI {
   answers = new Map<Endpoint, (req: JsonRequest) => unknown>([
     ['precheck', () => ({ verdict: 'on_task', reason: 'mock' })],
     ...(lessonAnswers as [Endpoint, (r: JsonRequest) => unknown][]),
+    // the skills map: two skills a part, both on its first page only (code fills the rest); each links to the one before
+    ['skills', (r) => ({ parts: (r.fixture as { parts: { title: string; page_from: number }[] }).parts.map((p, k) => ({ part: k + 1, skills: [
+      { name: `Words: ${p.title}`, kind: 'vocabulary', about: 'The words of this part.', pages: [p.page_from] }, { name: `Using ${p.title}`, kind: 'speaking', about: 'Saying them in a sentence.', pages: [p.page_from] }] })) })],
+    ['skilllinks', (r) => { const ids = (r.fixture as { ids: string[] }).ids; return { links: ids.slice(1).map((id, k) => ({ id, after: [ids[k]] })) }; }],
+    ['skillchat', (r) => {
+      const f = r.fixture as { text: string; ids: string[]; parts: string[] };
+      if (/rename/i.test(f.text)) return { reply: 'Renamed.', ops: [{ op: 'rename', id: f.ids[0], name: 'Renamed skill' }] };
+      if (/merge/i.test(f.text)) return { reply: 'Merged.', ops: [{ op: 'merge', ids: [f.ids[0], f.ids[1]], name: 'Merged skill' }] };
+      if (/remove/i.test(f.text)) return { reply: 'Removed.', ops: [{ op: 'remove', id: f.ids[0] }, { op: 'remove', id: 'not-a-skill' }] };
+      if (/add/i.test(f.text)) return { reply: 'Added.', ops: [{ op: 'add', part: f.parts[0], name: 'New skill', kind: 'grammar', pages: [999] }] };
+      return { reply: `The map has ${f.ids.length} skills.`, ops: [] };
+    }],
   ]);
 
   async json<T>(req: JsonRequest): Promise<T> {

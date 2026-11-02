@@ -25,7 +25,7 @@ test('usage: her uploaded book and a photographed request make a lesson; what it
   const { id, lesson } = await lessonFrom(call, areaId, 'Lesson 21 adding with regrouping', { pictures: true });
   assert.equal(lesson.status, 'ready');
   await settled(s.sql, id);
-  const rows = await s.sql.query<{ usd: string; held: boolean; lesson_id: string | null }>(`select usd, held, lesson_id from ai_usage u join teachers t on t.id = u.teacher_id where t.kind = 'demo'`);
+  const rows = await s.sql.query<{ usd: string; held: boolean; lesson_id: string | null }>(`select usd, held, lesson_id from ai_usage u join teachers t on t.id = u.teacher_id where t.kind = 'demo' and u.endpoint not in ('skills', 'skilllinks')`);   // the skills map is free
   const spent = rows.reduce((n, r) => n + Number(r.usd) * 100, 0), heldCost = rows.filter((r) => r.held).reduce((n, r) => n + Number(r.usd) * 100, 0);
   assert.ok(spent > 0 && heldCost > 0 && rows.filter((r) => r.held).every((r) => r.lesson_id === id), 'the lesson was paid from its hold');
   const left = (await call('GET', '/api/t/me')).json.credits.left;
