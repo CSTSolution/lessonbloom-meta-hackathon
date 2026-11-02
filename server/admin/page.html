@@ -213,7 +213,7 @@ async function lesson(id) {
 // #19: the pilot, by promo code: one row per tester
 async function testers(code) {
   const codes = (await get('/promo')).codes || [];
-  if (!code) code = (codes.find((x) => x.active && x.code !== 'JUDGES') || codes[0] || {}).code || '';
+  if (!code) code = (codes.find((x) => x.active && !/judges/i.test(x.note || '')) || codes[0] || {}).code || '';
   const d = code ? await get('/testers/' + encodeURIComponent(code)) : { testers: [] }, mins = (m) => m == null ? '–' : m < 60 ? `${m} min` : `${(m / 60).toFixed(1)} h`;
   const sum = (k) => d.testers.reduce((a, r) => a + Number(r[k] || 0), 0);
   view.innerHTML = `
