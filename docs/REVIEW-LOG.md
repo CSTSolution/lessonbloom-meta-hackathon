@@ -4,7 +4,7 @@ LessonBloom was built by two people: **Son** (engineering) wrote the code; **Chi
 
 How the loop ran: Chi filed an item in a shared review table → Son fixed it with a test → it went live in a numbered version (see [VERSIONS.md](VERSIONS.md)) → Chi retested it on live and wrote the result. **Mức** is Chi's priority (Cao = high, Vừa = medium, Thấp = low). **Đã sửa** = fixed; **lên live bản …** = live in that version; **Để sau** = after the contest; **Không làm tiếp** = dropped (from 1 Nov the build focuses on English books).
 
-80 items · 50 replies.
+88 items · 51 replies.
 
 ## The items
 
@@ -90,6 +90,14 @@ How the loop ran: Chi filed an item in a shared review table → Son fixed it wi
 | 78 | Cao | Giao được bài khi video còn "being made" (Chi hỏi 2/11 chiều, bản 1144; Claude cũng gặp với bài (bài)): | Đã sửa, lên live bản 1102.1659 theo cách (1): video đang dựng thì ô tick ghi "…slides and exercises (the video is still being made)", giao xong báo video tự hiện cho con; chưa có video thì không nhắc video; màn con: ô video mờ, ghi "Video coming soon" |
 | 79 | Vừa | Xem slide khó: không có nút chuyển slide, và con không thấy slide (Chi hỏi 2/11 chiều, bản 1144): | Đã sửa, lên live bản 1102.1659: (a) bước Slides có nút ◀ Previous / Next ▶, phím ←/→, danh sách tự cuộn theo; (b) ô "Look at the lesson / Xem bài" cho con ở mọi bài (trước Video): từng trang, nút Trước/Sau to, nút "Read it / Đọc" đọc bằng giọng của video (máy tự đọc khi giọng máy chủ tắt), tính vào tiến trình |
 | 80 | Vừa | Cùng một file sách đọc hai lần ra hai cách chia phần khác nhau; hai nguồn trùng tên nằm cạnh nhau (Chi, 2/11 chiều, bản 1144, tài khoản thử): | Để sau 5/11 (Chi đã chốt danh sách cuối là #72–#79). Ghi nhận: chia phần bằng code theo tiêu đề đánh số cho kết quả ổn định, và phân biệt hai nguồn trùng tên |
+| 81 | Vừa | Cần hướng dẫn cách chấm bài để app đọc đúng dấu đúng/sai (Chi chốt 3/11 chiều, bản 1917, phiếu "Let's play together" 13 câu, con làm thật): | Chưa làm |
+| 82 | Thấp | Không xoá được bài đã soạn (nháp hoặc đang soạn) (Chi hỏi 3/11 chiều, bản 1917): | Chưa làm |
+| 83 | Cao | Bài "Made for (tên con)" không bám lỗi của con khi phần sách chọn không khớp phiếu (Chi quay màn hình 3/11 18:13, bản 1917, tài khoản thử): | Chưa làm |
+| 84 | Vừa | Trang của con tự chuyển "Today" sang bài khác sau khi làm xong (Chi quay màn hình 3/11 tối, bản 1917, con làm thật): | Chưa làm |
+| 85 | Thấp | "Practise · 16 questions" trên trang của con nhưng một lượt chỉ có 5 câu ("Question 1/5"): | Chưa làm |
+| 86 | Thấp | Thẻ nhớ "5 + 4 + 2" (mặt sau 🎉) trong bài "Let's play together" (video Chi quay 3/11, phút 1:40): | Chưa làm |
+| 87 | Thấp | Bản nháp giữ lại sau khi tải ảnh phiếu rồi bỏ dở (3/11, bản 1917): | Chưa làm |
+| 88 | — | Ghi nhận tốt (bổ sung dòng 83): | Đã thử |
 
 ## Timeline of replies (Son → Chi)
 
@@ -143,3 +151,4 @@ How the loop ran: Chi filed an item in a shared review table → Son fixed it wi
 - Cập nhật lần 43 (2/11, tối): cảm ơn Chi đã thử bản 1738; sửa #73 và ý nhỏ ở #78 (chờ lên live)
 - Cập nhật lần 44 (2/11, tối): #73 và #78 lên live bản 1917
 - Cập nhật lần 45 (2/11, tối): mọi mục Chi nhờ đã có trên live (bản 1917)
+- Cập nhật lần 46 (3/11, trưa): đã nhận bản mô tả của Chi; repo công khai đã chuẩn bị (chưa công khai)
