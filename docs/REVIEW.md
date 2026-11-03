@@ -13,7 +13,7 @@ The docs aren't in this repo; ask Chi for them. Status as of **29 Oct 2026**: ev
 
 - **One requirement:** read the code listed, then run its test, for example `npx tsx --test --test-name-pattern="confirm box" test/classes.test.ts`.
 - **The whole flow:** `test/e2e.test.ts` takes a teacher and a parent from sign-up to a child practising and the summary.
-- **A screen:** run the app locally (see `CLAUDE.md`), open it at 1280 px for the adult and 390 × 844 for the phone, and compare with Chi's design pages.
+- **A screen:** run the app locally (see [README.md](../README.md#run-it)), open it at 1280 px for the adult and 390 × 844 for the phone, and compare with Chi's design pages.
 - **Report what you find:** an issue, or a PR on a `chi/<topic>` branch. Say which doc and line it comes from, what you expected, what you saw, and how to see it again.
 
 ## Decisions (doc 1, "Quyết định đã chốt")

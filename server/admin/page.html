@@ -92,7 +92,7 @@ function askKey(msg = '') {
     };
     return;
   }
-  view.innerHTML = `<form class="key"><h1>Admin key</h1><p class="muted">deploy/vps/admin.sh put it on your clipboard. It stays in this tab only.</p><input type="password" autocomplete="off" required placeholder="LB_ADMIN_KEY"><button>Open</button><p class="err">${esc(msg)}</p></form>`;
+  view.innerHTML = `<form class="key"><h1>Admin key</h1><p class="muted">The admin key from the server's .env. It stays in this tab only.</p><input type="password" autocomplete="off" required placeholder="LB_ADMIN_KEY"><button>Open</button><p class="err">${esc(msg)}</p></form>`;
   view.querySelector('form').onsubmit = (e) => { e.preventDefault(); key = view.querySelector('input').value.trim(); try { sessionStorage.setItem(KEY, key); } catch {} route(); };
 }
 

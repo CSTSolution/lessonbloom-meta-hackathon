@@ -1,0 +1,17 @@
+# An example: the app, Postgres and the two voice engines on one host. Values come from .env (see .env.example).
+services:
+  app:
+    build: ..
+    restart: unless-stopped
+    env_file: [.env]
+    ports: ["127.0.0.1:8080:8080", "127.0.0.1:1495:1495"]   # the site; the admin view (SSH tunnel only)
+    volumes: [lessonbloom-data:/app/data]
+    depends_on: [postgres]
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment: { POSTGRES_USER: lessonbloom_meta, POSTGRES_PASSWORD: change-me, POSTGRES_DB: lessonbloom_meta }
+    volumes: [pg-data:/var/lib/postgresql/data]
+  # kokoro (English) and vieneu (Vietnamese): any HTTP text-to-speech service answering POST /tts;
+  # set KOKORO_URL and VIENEU_URL in .env to reach them
+volumes: { lessonbloom-data: {}, pg-data: {} }

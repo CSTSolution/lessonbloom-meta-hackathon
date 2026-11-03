@@ -1,6 +1,6 @@
 // The admin view: every assigner, what each one made and what each one cost. It is never on the public
 // site: it listens on its own port, which the server publishes on 127.0.0.1 only (reached through an
-// SSH tunnel, deploy/vps/admin.sh), and every API request needs LB_ADMIN_KEY. Besides reading, it makes
+// SSH tunnel, see deploy/README.md), and every API request needs LB_ADMIN_KEY. Besides reading, it makes
 // promo codes and gives an assigner credits or subscriber days (every grant is logged).
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
